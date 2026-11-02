@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BlackEye — Structural Calculations</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="logo"><span class="eye">◉</span> BlackEye <small>structural calculations</small></div>
+  <div class="actions">
+    <button id="btn-open" title="Open project file">Open</button>
+    <button id="btn-save" title="Save project file">Save</button>
+    <button id="btn-html" title="Download report as HTML">Export HTML</button>
+    <button id="btn-print" class="primary" title="Print or save as PDF">Print / PDF</button>
+    <input type="file" id="file-open" accept=".bkeye,.json" hidden>
+  </div>
+</header>
+<main>
+  <nav id="modules" aria-label="Calculation library"></nav>
+  <section id="editor">
+    <details class="project" open>
+      <summary>Project details</summary>
+      <div class="grid" id="project-fields"></div>
+    </details>
+    <h2 id="mod-title"></h2>
+    <p id="mod-desc" class="muted"></p>
+    <form id="inputs" autocomplete="off"></form>
+    <div id="status" role="status"></div>
+  </section>
+  <section id="preview">
+    <iframe id="report" title="Calculation report"></iframe>
+  </section>
+</main>
+<script src="/static/app.js"></script>
+</body>
+</html>
