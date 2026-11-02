@@ -8,13 +8,19 @@ from html import escape
 
 from ..core.calc import Calculation, Check
 
-_SUB = re.compile(r"([A-Za-zΑ-Ωα-ωλ̄]+)_([A-Za-z0-9,.Ͱ-Ͽ]+)")
+_SUB = re.compile(r"([A-Za-z\u0370-\u03ff\u0304']+)_([A-Za-z0-9,.\u0370-\u03ff]+)")
 _BOLD = re.compile(r"\*\*(.+?)\*\*")
 
 
 def sym(text: str) -> str:
     """Escape and typeset subscripts: ``f_ck`` → f<sub>ck</sub>."""
-    return _SUB.sub(lambda m: f"{m.group(1)}<sub>{m.group(2)}</sub>", escape(text))
+    out, pos = [], 0
+    for m in _SUB.finditer(text):
+        out.append(escape(text[pos:m.start()]))
+        out.append(f"{escape(m.group(1))}<sub>{escape(m.group(2))}</sub>")
+        pos = m.end()
+    out.append(escape(text[pos:]))
+    return "".join(out)
 
 
 def rich(text: str) -> str:

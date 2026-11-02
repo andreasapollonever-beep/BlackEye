@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BlackEye — Structural Calculations</title>
 <link rel="stylesheet" href="/static/app.css">
+<script type="importmap">
+{"imports": {"three": "/static/vendor/three/three.module.min.js",
+             "three/addons/": "/static/vendor/three/addons/"}}
+</script>
 </head>
 <body>
 <header class="top">
@@ -30,9 +34,15 @@
     <form id="inputs" autocomplete="off"></form>
   </section>
   <section id="preview">
-    <iframe id="report" title="Calculation report"></iframe>
+    <div class="tabs" role="tablist">
+      <button role="tab" data-tab="report" class="on">Report</button>
+      <button role="tab" data-tab="model" id="tab-model" hidden>3D model</button>
+    </div>
+    <div class="pane on" data-pane="report"><iframe id="report" title="Calculation report"></iframe></div>
+    <div class="pane" data-pane="model"><div id="viewer3d"></div></div>
   </section>
 </main>
 <script src="/static/app.js"></script>
+<script type="module" src="/static/viewer3d.js"></script>
 </body>
 </html>

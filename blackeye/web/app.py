@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,19 @@ app = FastAPI(title="BlackEye", version=__version__,
 class RunRequest(BaseModel):
     inputs: dict[str, Any] = Field(default_factory=dict)
     project: dict[str, Any] = Field(default_factory=dict)
+
+
+def _json_safe(obj: Any) -> Any:
+    """Convert numpy scalars and non-finite floats into JSON-friendly values."""
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_json_safe(v) for v in obj]
+    if hasattr(obj, "item") and not isinstance(obj, (str, bytes)):
+        obj = obj.item()
+    if isinstance(obj, float) and not math.isfinite(obj):
+        return 999.0 if obj > 0 else -999.0
+    return obj
 
 
 def _module(module_id: str):
@@ -55,7 +69,8 @@ def run_module(module_id: str, req: RunRequest) -> dict[str, Any]:
         calc = mod.calculate(req.inputs, req.project)
     except InputError as exc:
         raise HTTPException(422, str(exc)) from exc
-    return {"summary": calc.summary(), "html": render_html(calc)}
+    return _json_safe({"summary": calc.summary(), "html": render_html(calc),
+                       "model3d": calc.model3d})
 
 
 @app.post("/api/modules/{module_id}/report", response_class=HTMLResponse)

@@ -130,6 +130,15 @@ async function selectModule(id, inputs) {
   run();
 }
 
+let currentTab = "report";
+function showTab(name) {
+  currentTab = name;
+  document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
+  document.querySelectorAll(".pane").forEach((p) => p.classList.toggle("on", p.dataset.pane === name));
+  if (name === "model") window.dispatchEvent(new Event("blackeye:show3d"));
+}
+document.querySelectorAll(".tabs button").forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
+
 let timer;
 function schedule() { clearTimeout(timer); timer = setTimeout(run, 300); }
 
@@ -139,6 +148,13 @@ async function run() {
     const res = await api(`/api/modules/${state.schema.id}/run`, { inputs: state.inputs, project: state.project });
     state.lastHtml = res.html;
     $("#report").srcdoc = res.html;
+    const has3d = !!res.model3d;
+    $("#tab-model").hidden = !has3d;
+    if (!has3d && currentTab === "model") showTab("report");
+    if (has3d) {
+      window.__blackeyeModel = { model: res.model3d, summary: res.summary };
+      window.dispatchEvent(new CustomEvent("blackeye:model3d", { detail: window.__blackeyeModel }));
+    }
     const s = res.summary;
     if (!s.checks.length) { status.className = "pass"; status.textContent = "Analysis complete"; }
     else {

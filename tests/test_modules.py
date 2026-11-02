@@ -53,9 +53,9 @@ def test_ec2_hand_calc():
     assert v["A_s,req"] == pytest.approx(140e6 / (500 / 1.15 * z))
 
 
-def test_ec2_over_reinforced_flagged():
+def test_ec2_high_moment_needs_compression_steel():
     c = get_module("ec2_rc_beam").calculate({"MEd": 900})
-    assert not c.passed and c.warnings
+    assert not c.passed and c.values["A_s2,req"] > 0
 
 
 def test_invalid_input_rejected():

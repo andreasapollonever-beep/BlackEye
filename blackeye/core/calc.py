@@ -75,6 +75,7 @@ class Calculation:
         self.checks: list[Check] = []
         self.values: dict[str, float] = {}
         self.warnings: list[str] = []
+        self.model3d: dict[str, Any] | None = None  # optional 3D scene for viewers
 
     # ------------------------------------------------------------------ text
     def heading(self, text: str, level: int = 1) -> None:
@@ -130,6 +131,7 @@ class Calculation:
     def check(self, description: str, demand: float, capacity: float, unit: str = "",
               ref: str | None = None) -> Check:
         """Record a design check ``demand <= capacity`` (base units)."""
+        demand, capacity = float(demand), float(capacity)
         if capacity > 0:
             util = abs(demand) / capacity
         else:
@@ -147,6 +149,7 @@ class Calculation:
     def check_min(self, description: str, provided: float, required: float, unit: str = "",
                   ref: str | None = None) -> Check:
         """Record a check ``provided >= required`` (e.g. minimum reinforcement)."""
+        provided, required = float(provided), float(required)
         util = required / provided if provided > 0 else float("inf")
         chk = Check(description, required, provided, unit, ref, util, util <= 1.0 + 1e-9)
         self.checks.append(chk)

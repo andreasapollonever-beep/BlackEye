@@ -24,6 +24,7 @@ UNIT_FACTORS: dict[str, float] = {
     # moment
     "Nmm": 1.0,
     "kNm": 1e6,
+    "kNm/m": 1e3,  # moment per metre run -> Nmm/mm
     # line load / stiffness per length
     "N/mm": 1.0,
     "kN/m": 1.0,

@@ -14,7 +14,8 @@ clause references and PASS/FAIL checks — and produced as a print-ready calcula
 |---|---|---|
 | Continuous beam analysis | Stiffness method | Any supports (pinned/fixed), UDLs, point loads, moments; reactions, V/M/δ diagrams |
 | Steel beam design | EN 1993-1-1 | Classification, bending, shear, M+V interaction, LTB (Mcr, χLT), deflection |
-| RC beam section design | EN 1992-1-1 | Flexure, As,min/As,max, bar spacing, shear (VRd,c, VRd,s, VRd,max, variable θ) |
+| RC beam section design | EN 1992-1-1 | Flexure with **compression reinforcement**, strain-compatibility MRd, As,min/As,max, bar spacing, shear (VRd,c, VRd,s, VRd,max, variable θ) |
+| Cantilever retaining wall | EN 1997-1, EN 1998-5, EN 1992-1-1 | Coulomb active pressure on virtual back, sloping backfill, surcharge, groundwater & uplift, Mononobe-Okabe seismic thrust (±kv), sliding, overturning (EQU), bearing (Annex D, inclination factors), eccentricity, EC2 design of stem/heel/toe — DA1/DA2/DA3 — **interactive 3D model** |
 
 Platform:
 
@@ -23,6 +24,9 @@ Platform:
 * **Section library** (`blackeye.sections`) — IPE / HEA / HEB, properties derived from dimensions.
 * **Reports** (`blackeye.report`) — branded A4 calc sheets with title block, SVG diagrams, summary.
 * **Web app** (`blackeye.web`) — schema-driven forms, live preview, save/open projects (`.bkeye`), print to PDF.
+* **3D viewer** — Three.js (vendored, works offline): wall, soil, groundwater, cumulative pressure
+  prisms with arrows (earth / surcharge / water / seismic), base pressure, resultant forces,
+  layer toggles, live utilisation panel, PNG export.
 * **REST API** — every module is available over HTTP (`/docs` for the OpenAPI UI).
 * **CLI** — batch runs for automation.
 

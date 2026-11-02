@@ -5,14 +5,11 @@ from __future__ import annotations
 import math
 
 from ..core import Calculation, DesignModule, Field, register
+from ..design.ec2 import XI_LIM, bar_area, design_flexure, section_capacity
 from ..report.svg import rc_section
 
 CONCRETE = ["C20/25", "C25/30", "C30/37", "C35/45", "C40/50", "C45/55", "C50/60"]
 BARS = ["8", "10", "12", "14", "16", "20", "25", "32"]
-
-
-def bar_area(dia: float) -> float:
-    return math.pi * dia**2 / 4
 
 
 @register
@@ -21,7 +18,8 @@ class RCBeamEC2(DesignModule):
     title = "RC beam section design"
     category = "Concrete"
     standard = "EN 1992-1-1:2004"
-    description = ("Rectangular singly reinforced section: flexure (rectangular stress block), "
+    description = ("Rectangular section with tension and compression reinforcement: flexure "
+                   "(stress block, strain compatibility), "
                    "minimum/maximum reinforcement and shear with variable strut inclination.")
 
     fields = [
@@ -41,6 +39,10 @@ class RCBeamEC2(DesignModule):
               group="Reinforcement"),
         Field("dia", "Tension bar diameter", kind="choice", choices=BARS, default="16",
               group="Reinforcement"),
+        Field("n_comp", "Number of compression (top) bars", kind="int", default=2, min=2,
+              group="Reinforcement"),
+        Field("dia_comp", "Compression bar diameter", kind="choice", choices=BARS,
+              default="12", group="Reinforcement"),
         Field("link_dia", "Link diameter", kind="choice", choices=BARS[:4], default="8",
               group="Reinforcement"),
         Field("link_legs", "Link legs", kind="int", default=2, min=2, group="Reinforcement"),
@@ -53,6 +55,8 @@ class RCBeamEC2(DesignModule):
         fck = float(inp["concrete"].split("/")[0][1:])
         dia, dl = float(inp["dia"]), float(inp["link_dia"])
         n, legs, s = inp["n_bars"], inp["link_legs"], inp["link_s"]
+        n2, dia2 = inp["n_comp"], float(inp["dia_comp"])
+        As2_prov = n2 * bar_area(dia2)
 
         calc.heading("Geometry and materials")
         calc.input("b", b, "mm", "Section width")
@@ -64,57 +68,49 @@ class RCBeamEC2(DesignModule):
         calc.input("f_ck", fck, "N/mm²", "Characteristic cylinder strength")
         fcd = calc.formula("f_cd", "α_cc f_ck / γ_c", inp["alpha_cc"] * fck / inp["gamma_c"],
                            "N/mm²", ref="EN 1992-1-1 3.1.6(1)")
-        fctm = calc.formula("f_ctm", "0.30 f_ck^(2/3)", 0.30 * fck ** (2 / 3), "N/mm²",
+        calc.formula("f_ctm", "0.30 f_ck^(2/3)", 0.30 * fck ** (2 / 3), "N/mm²",
                             ref="Table 3.1")
         fyk = calc.input("f_yk", inp["fyk"], "N/mm²", "Reinforcement yield strength")
         fyd = calc.formula("f_yd", "f_yk / γ_s", fyk / inp["gamma_s"], "N/mm²", ref="3.2.7")
         As_prov = n * bar_area(dia)
-        calc.figure(rc_section(b, h, c, dl, dia, n),
-                    f"Section {b:g}×{h:g} - {n}Ø{dia:g} bottom, Ø{dl:g} links")
+        calc.figure(rc_section(b, h, c, dl, dia, n, dia2, n2),
+                    f"Section {b:g}×{h:g} — {n}Ø{dia:g} bottom, {n2}Ø{dia2:g} top, "
+                    f"Ø{dl:g} links")
 
         # ---------------------------------------------------------- flexure
         calc.heading("Flexure")
         MEd = calc.input("M_Ed", inp["MEd"], "kNm", "Design bending moment")
-        mu = calc.formula("μ", "M_Ed / (b d² f_cd)", MEd / (b * d**2 * fcd), "", dp=4)
-        xi_lim = 0.45
-        mu_lim = 0.8 * xi_lim * (1 - 0.4 * xi_lim)
-        calc.formula("μ_lim", "0.8ξ_lim(1 − 0.4ξ_lim), ξ_lim = 0.45", mu_lim, "",
-                     "Limit for singly reinforced section (ductility, 5.6.3)", dp=4)
-        if mu > mu_lim:
-            calc.warn("μ > μ_lim - compression reinforcement is required; increase the "
-                      "section depth or design as doubly reinforced.")
-            calc.check("Singly reinforced: μ ≤ μ_lim", mu, mu_lim, "", "5.6.3")
-            return
-        xi = calc.formula("ξ", "1.25(1 − √(1 − 2μ))", 1.25 * (1 - math.sqrt(1 - 2 * mu)), "",
-                          "Neutral axis depth ratio x/d (λ = 0.8, η = 1.0)", ref="3.1.7", dp=4)
-        z = calc.formula("z", "d(1 − 0.4ξ) ≤ 0.95d", min(d * (1 - 0.4 * xi), 0.95 * d), "mm",
-                         "Lever arm")
-        As_req = calc.formula("A_s,req", "M_Ed / (f_yd z)", MEd / (fyd * z), "mm²",
-                              "Required tension reinforcement")
-        As_min = calc.formula("A_s,min", "max(0.26 f_ctm/f_yk b d, 0.0013 b d)",
-                              max(0.26 * fctm / fyk * b * d, 0.0013 * b * d), "mm²",
-                              ref="9.2.1.1(1)")
-        As_max = calc.formula("A_s,max", "0.04 b h", 0.04 * b * h, "mm²", ref="9.2.1.1(3)")
+        d2 = c + dl + dia2 / 2
+        res = design_flexure(calc, b, d, MEd, fck, fcd, fyk, fyd, h, d2=d2)
+        As_req, As2_req = res["As"], res["As2"]
         calc.formula("A_s,prov", f"{n} × π × {dia:g}² / 4", As_prov, "mm²",
-                     f"Provided: {n}Ø{dia:g}")
-        calc.check_min("Flexural reinforcement: A_s,prov ≥ A_s,req", As_prov, As_req, "mm²",
+                     f"Provided tension: {n}Ø{dia:g}")
+        calc.formula("A_s2,prov", f"{n2} × π × {dia2:g}² / 4", As2_prov, "mm²",
+                     f"Provided compression: {n2}Ø{dia2:g}")
+        calc.check_min("Tension reinforcement: A_s,prov ≥ A_s,req", As_prov, As_req, "mm²",
                        "6.1")
-        calc.check_min("Minimum reinforcement: A_s,prov ≥ A_s,min", As_prov, As_min, "mm²",
-                       "9.2.1.1(1)")
-        calc.check_limit("Maximum reinforcement: A_s,prov ≤ A_s,max", As_prov, As_max, "mm²",
-                         "9.2.1.1(3)")
+        if As2_req > 0:
+            calc.check_min("Compression reinforcement: A_s2,prov ≥ A_s2,req", As2_prov,
+                           As2_req, "mm²", "6.1")
+        calc.check_min("Minimum reinforcement: A_s,prov ≥ A_s,min", As_prov, res["As_min"],
+                       "mm²", "9.2.1.1(1)")
+        calc.check_limit("Maximum reinforcement: A_s + A_s2 ≤ A_s,max", As_prov + As2_prov,
+                         res["As_max"], "mm²", "9.2.1.1(3)")
         clear = (b - 2 * (c + dl) - n * dia) / (n - 1)
         s_min = max(dia, 20.0 + 5.0, 20.0)  # dg = 20 mm assumed
         calc.formula("s_clear", "(b − 2(c_nom + φ_link) − nφ) / (n − 1)", clear, "mm",
-                     "Clear spacing between bars")
+                     "Clear spacing between tension bars")
         calc.check_min("Bar spacing: s_clear ≥ max(φ, d_g + 5, 20)", clear, s_min, "mm",
                        "8.2(2)")
-        MRd = As_prov * fyd * z
-        if As_prov * fyd / (0.8 * b * fcd) <= xi_lim * d:
-            x_p = As_prov * fyd / (0.8 * b * fcd)
-            MRd = As_prov * fyd * min(d - 0.4 * x_p, 0.95 * d)
-        calc.formula("M_Rd", "A_s,prov f_yd (d − 0.4x)", MRd, "kNm",
-                     "Moment resistance of provided reinforcement")
+        MRd, x = section_capacity(b, d, As_prov, fcd, fyd, d2, As2_prov if As2_req > 0 else 0)
+        calc.formula("x", "from strain compatibility (ε_cu3 = 3.5‰)", x, "mm",
+                     "Neutral axis depth of provided section", ref="6.1(2)")
+        MRd = calc.formula("M_Rd", "0.8xbf_cd(d − 0.4x) + A_s2σ_s2(d − d_2)", MRd, "kNm",
+                           "Moment resistance of provided reinforcement")
+        calc.check("Moment resistance: M_Ed ≤ M_Rd", MEd, MRd, "kNm", "6.1")
+        if x / d > XI_LIM + 1e-6:
+            calc.warn(f"x/d = {x / d:.3f} > 0.45 for the provided bars — ductility "
+                      "requirement of 5.6.3 not met; add compression steel.")
 
         # ------------------------------------------------------------ shear
         calc.heading("Shear")

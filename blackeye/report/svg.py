@@ -79,7 +79,8 @@ def beam_diagrams(res, deflection: bool = False, title: str = "") -> str:
     return "\n".join(parts)
 
 
-def rc_section(b: float, h: float, cover: float, link: float, dia: float, n: int) -> str:
+def rc_section(b: float, h: float, cover: float, link: float, dia: float, n: int,
+               dia2: float = 0.0, n2: int = 2) -> str:
     """Cross-section sketch of a rectangular RC beam."""
     scale = min(220 / h, 220 / b)
     wb, hb = b * scale, h * scale
@@ -100,9 +101,13 @@ def rc_section(b: float, h: float, cover: float, link: float, dia: float, n: int
         cx = ox + inner + (span * i / (n - 1) if n > 1 else span / 2)
         parts.append(f'<circle cx="{cx:.1f}" cy="{oy + hb - inner:.1f}" r="{r:.1f}" '
                      'fill="#333"/>')
-    for cx in (ox + inner, ox + wb - inner):  # hanger bars
-        parts.append(f'<circle cx="{cx:.1f}" cy="{oy + inner:.1f}" r="{max(r * 0.6, 2):.1f}" '
-                     'fill="#777"/>')
+    r2 = (dia2 / 2 * scale) if dia2 else max(r * 0.6, 2)
+    inner2 = (cover + link + (dia2 or dia * 0.6) / 2) * scale
+    span2 = wb - 2 * inner2
+    for i in range(max(n2, 2)):  # top / compression bars
+        cx = ox + inner2 + span2 * i / (max(n2, 2) - 1)
+        parts.append(f'<circle cx="{cx:.1f}" cy="{oy + inner2:.1f}" r="{r2:.1f}" '
+                     'fill="#555"/>')
     parts.append(f'<text x="{ox + wb / 2:.1f}" y="{oy + hb + 18:.1f}" class="dim" '
                  f'text-anchor="middle">b = {b:g} mm</text>')
     parts.append(f'<text x="{ox + wb + 10:.1f}" y="{oy + hb / 2:.1f}" class="dim">'
@@ -112,3 +117,86 @@ def rc_section(b: float, h: float, cover: float, link: float, dia: float, n: int
 
 
 __all__ = ["beam_diagrams", "rc_section", "math"]
+
+
+_PCOL = {"earth": "#b5651d", "surcharge": "#7d5ba6", "water": "#1f77b4", "seismic": "#d62728"}
+
+
+def wall_section(model: dict) -> str:
+    """Cross-section of a cantilever wall with pressure and base-pressure diagrams."""
+    g = model["geometry"]
+    B, tb, Hs, toe = g["B"], g["t_base"], g["H_stem"], g["toe"]
+    t_top, t_bot, hv, hw = g["t_top"], g["t_bot"], g["h_v"], g["h_w"]
+    beta = math.radians(g["beta"])
+    pmax = max([p for pr in model["pressures"] for _, p in pr["points"]] + [1.0])
+    stack_w = 0.9 * max(hv, B) * 0.55  # world width given to the pressure stack
+    qb = model.get("bearing") or []
+    qmax = max([q for _, q in qb] + [1.0])
+    q_depth = 0.25 * hv
+    xmin, xmax = -0.6, B + 0.8 + stack_w * len(model["pressures"]) ** 0.5 + 1.2
+    zmin, zmax = -q_depth - 0.6, hv + 0.8
+    Wpx = 720.0
+    s = (Wpx - 40) / (xmax - xmin)
+    Hpx = (zmax - zmin) * s + 20
+    X = lambda x: 20 + (x - xmin) * s  # noqa: E731
+    Z = lambda z: 10 + (zmax - z) * s  # noqa: E731
+    pts = lambda P: " ".join(f"{X(x):.1f},{Z(z):.1f}" for x, z in P)  # noqa: E731
+    out = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {Wpx:.0f} {Hpx:.0f}" '
+           'class="diagram" role="img"><style>.t{font:11px sans-serif;fill:#223}'
+           '.tb{font:600 11px sans-serif}</style>']
+    x0 = toe + t_top
+    far = B + 0.8
+    surf = lambda x: tb + Hs + max(x - x0, 0) * math.tan(beta)  # noqa: E731
+    soil = [(toe + t_bot, tb), (B, tb), (B, 0), (far, 0), (far, surf(far)), (x0, tb + Hs)]
+    out.append(f'<polygon points="{pts(soil)}" fill="#e9d8b8" stroke="none"/>')
+    if g["d_front"] > 0:
+        front = [(xmin, 0), (0, 0), (0, tb), (toe, tb), (toe, tb + g["d_front"]),
+                 (xmin, tb + g["d_front"])]
+        out.append(f'<polygon points="{pts(front)}" fill="#efe3cc"/>')
+    out.append(f'<line x1="{X(xmin):.1f}" y1="{Z(0):.1f}" x2="{X(far):.1f}" y2="{Z(0):.1f}" '
+               'stroke="#a08060" stroke-dasharray="3 3"/>')
+    if hw > 0:
+        out.append(f'<line x1="{X(toe + t_bot):.1f}" y1="{Z(hw):.1f}" x2="{X(far):.1f}" '
+                   f'y2="{Z(hw):.1f}" stroke="#1f77b4" stroke-width="1.5"/>'
+                   f'<text x="{X(far) - 4:.1f}" y="{Z(hw) - 4:.1f}" class="t" '
+                   'text-anchor="end" fill="#1f77b4">▽ GWL</text>')
+    stem = [(toe, tb), (toe + t_bot, tb), (x0, tb + Hs), (toe, tb + Hs)]
+    base = [(0, 0), (B, 0), (B, tb), (0, tb)]
+    for P in (stem, base):
+        out.append(f'<polygon points="{pts(P)}" fill="#b9bcc2" stroke="#4a4f57" '
+                   'stroke-width="1.5"/>')
+    out.append(f'<line x1="{X(B):.1f}" y1="{Z(0):.1f}" x2="{X(B):.1f}" y2="{Z(hv):.1f}" '
+               'stroke="#555" stroke-dasharray="6 4"/>'
+               f'<text x="{X(B) + 3:.1f}" y="{Z(hv) - 4:.1f}" class="t">virtual back</text>')
+    # pressure diagrams, each drawn from its own baseline to the right
+    x_start = far + 0.3
+    w_each = stack_w / max(len(model["pressures"]), 1) ** 0.5
+    for pr in model["pressures"]:
+        col = _PCOL.get(pr["key"], "#555")
+        sc = w_each / pmax
+        poly = [(x_start, 0)] + [(x_start + p * sc, z) for z, p in pr["points"]] + \
+               [(x_start, pr["points"][-1][0])]
+        out.append(f'<polygon points="{pts(poly)}" fill="{col}" fill-opacity="0.25" '
+                   f'stroke="{col}" stroke-width="1.4"/>')
+        zt, pt = max(pr["points"], key=lambda a: a[1])
+        out.append(f'<text x="{X(x_start + pt * sc) + 3:.1f}" y="{Z(zt) + 4:.1f}" '
+                   f'class="t" fill="{col}">{pt:.1f}</text>')
+        out.append(f'<text x="{X(x_start):.1f}" y="{Z(-0.25):.1f}" class="t" '
+                   f'fill="{col}">{escape(pr["key"])}</text>')
+        x_start += max(pt * sc, 0.3) + 0.7
+    if qb:
+        sc = q_depth / qmax
+        poly = [(0, 0)] + [(x, -q * sc) for x, q in qb] + [(B, 0)]
+        out.append(f'<polygon points="{pts(poly)}" fill="#2e8b57" fill-opacity="0.25" '
+                   'stroke="#2e8b57" stroke-width="1.4"/>')
+        xq, qm = max(qb, key=lambda a: a[1])
+        out.append(f'<text x="{X(xq) + 4:.1f}" y="{Z(-qm * sc) + 12:.1f}" class="t" '
+                   f'fill="#2e8b57">q = {qm:.0f} kN/m²</text>')
+    out.append(f'<text x="{X(B / 2):.1f}" y="{Z(zmin) - 2:.1f}" class="tb" '
+               f'text-anchor="middle">B = {B:.2f} m</text>')
+    out.append(f'<text x="{X(toe) - 4:.1f}" y="{Z(tb + Hs / 2):.1f}" class="tb" '
+               f'text-anchor="end">H = {Hs:.2f} m</text>')
+    out.append(f'<text x="{X(xmax) - 6:.1f}" y="18" class="t" text-anchor="end">'
+               'pressures in kN/m² (characteristic)</text>')
+    out.append("</svg>")
+    return "\n".join(out)
