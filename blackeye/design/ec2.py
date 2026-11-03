@@ -83,7 +83,8 @@ def design_flexure(calc: Calculation, b: float, d: float, MEd: float, fck: float
     elif not allow_compression or d2 is None:
         calc.warn("μ > μ_lim — the section is too small for a singly reinforced design; "
                   "increase the thickness.")
-        calc.check("Singly reinforced: μ ≤ μ_lim", mu, mu_lim, "", "5.6.3")
+        calc.check("Singly reinforced: μ ≤ μ_lim", mu, mu_lim, "", "5.6.3",
+                   hint="Increase the thickness of the member.")
         As = float("inf")
         res["z"] = 0.9 * d
     else:
@@ -132,5 +133,6 @@ def shear_no_links(calc: Calculation, b: float, d: float, As: float, fck: float,
     VRdc = calc.formula("V_Rd,c", "max(0.18/γ_c k(100ρ_l f_ck)^(1/3), v_min) b d",
                         max(0.18 / gamma_c * k * (100 * rho * fck) ** (1 / 3), vmin) * b * d
                         * scale, u, ref="Eq. 6.2")
-    calc.check("Shear: V_Ed ≤ V_Rd,c", VEd * scale, VRdc, u, "6.2.2")
+    calc.check("Shear: V_Ed ≤ V_Rd,c", VEd * scale, VRdc, u, "6.2.2",
+               hint="Increase the member thickness (or the tension reinforcement).")
     return VRdc / scale

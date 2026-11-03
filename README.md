@@ -8,13 +8,16 @@ clause references and PASS/FAIL checks — and produced as a print-ready calcula
 > Ευρωκώδικες. Κάθε υπολογισμός καταγράφεται αναλυτικά (δεδομένα → τύπος → τιμή →
 > παραπομπή κανονισμού → έλεγχος) και εξάγεται ως επαγγελματικό τεύχος υπολογισμών (HTML/PDF).
 
-## Features (v0.1)
+## Features (v0.2)
 
 | Module | Standard | Checks |
 |---|---|---|
 | Continuous beam analysis | Stiffness method | Any supports (pinned/fixed), UDLs, point loads, moments; reactions, V/M/δ diagrams |
 | Steel beam design | EN 1993-1-1 | Classification, bending, shear, M+V interaction, LTB (Mcr, χLT), deflection |
 | RC beam section design | EN 1992-1-1 | Flexure with **compression reinforcement**, strain-compatibility MRd, As,min/As,max, bar spacing, shear (VRd,c, VRd,s, VRd,max, variable θ) |
+| Gravity retaining wall | EN 1997-1, EN 1998-5, EN 1992-1-1 §12 | Mass concrete / masonry with optional footing; stability as above plus plain-concrete body sections — **3D** |
+| Pad footing | EN 1997-1, EN 1992-1-1, EN 1998-5 | Biaxial effective-area bearing (shape + inclination factors), sliding, eccentricity, bending, beam shear, punching (critical perimeter search, β), seismic combination — **3D pressure heat map** |
+| Slope stability (Bishop) | EN 1997-1 §11, EN 1998-5 | Automatic critical-circle search, r_u, crest surcharge, pseudo-static seismic; verified against Taylor's chart — **3D** |
 | Cantilever retaining wall | EN 1997-1, EN 1998-5, EN 1992-1-1 | Coulomb active pressure on virtual back, sloping backfill, surcharge, groundwater & uplift, Mononobe-Okabe seismic thrust (±kv), sliding, overturning (EQU), bearing (Annex D, inclination factors), eccentricity, EC2 design of stem/heel/toe — DA1/DA2/DA3 — **interactive 3D model** |
 
 Platform:
@@ -27,6 +30,8 @@ Platform:
 * **3D viewer** — Three.js (vendored, works offline): wall, soil, groundwater, cumulative pressure
   prisms with arrows (earth / surcharge / water / seismic), base pressure, resultant forces,
   layer toggles, live utilisation panel, PNG export.
+* **Usability** — Greek / English UI and reports, hints on every failing check, the wrong input is
+  highlighted, autosave, project files, module search, keyboard shortcuts (Ctrl+S/O/P/3).
 * **REST API** — every module is available over HTTP (`/docs` for the OpenAPI UI).
 * **CLI** — batch runs for automation.
 

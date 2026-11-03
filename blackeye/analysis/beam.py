@@ -102,7 +102,7 @@ class Beam:
         has_fixed = any(s.kind == "fixed" for s in self.supports)
         distinct = len({round(s.x, 6) for s in self.supports if s.kind != "free"})
         if restraints < 2 or (not has_fixed and distinct < 2):
-            raise ValueError("The beam is unstable - add supports")
+            raise ValueError("The beam is unstable — add supports")
         for p in self.point_loads:
             if not 0 <= p.x <= self.length:
                 raise ValueError(f"Point load at x={p.x} is outside the beam")

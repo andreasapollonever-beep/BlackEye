@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="el">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -12,31 +12,42 @@
 </head>
 <body>
 <header class="top">
-  <div class="logo"><span class="eye">◉</span> BlackEye <small>structural calculations</small></div>
+  <div class="logo"><span class="eye">◉</span> BlackEye <small data-t="structural calculations">structural calculations</small></div>
   <div class="actions">
-    <button id="btn-open" title="Open project file">Open</button>
-    <button id="btn-save" title="Save project file">Save</button>
-    <button id="btn-html" title="Download report as HTML">Export HTML</button>
-    <button id="btn-print" class="primary" title="Print or save as PDF">Print / PDF</button>
+    <div class="lang" role="group" aria-label="Language">
+      <button data-lang="el" title="Ελληνικά">ΕΛ</button><button data-lang="en" title="English">EN</button>
+    </div>
+    <button id="btn-open" data-t="Open" data-tt="Open project file (Ctrl+O)">Open</button>
+    <button id="btn-save" data-t="Save" data-tt="Save project file (Ctrl+S)">Save</button>
+    <button id="btn-html" data-t="Export HTML" data-tt="Download report as HTML">Export HTML</button>
+    <button id="btn-print" class="primary" data-t="Print / PDF" data-tt="Print or save as PDF (Ctrl+P)">Print / PDF</button>
     <input type="file" id="file-open" accept=".bkeye,.json" hidden>
   </div>
 </header>
 <main>
-  <nav id="modules" aria-label="Calculation library"></nav>
+  <nav aria-label="Calculation library">
+    <input id="search" type="search" autocomplete="off">
+    <div id="modules"></div>
+    <p id="shortcuts" class="muted pad small"></p>
+  </nav>
   <section id="editor">
-    <details class="project" open>
-      <summary>Project details</summary>
+    <details class="project">
+      <summary data-t="Project details">Project details</summary>
       <div class="grid" id="project-fields"></div>
     </details>
-    <h2 id="mod-title"></h2>
+    <div class="mod-head">
+      <h2 id="mod-title"></h2>
+      <button id="btn-reset" class="ghost" data-t="Reset to defaults">Reset to defaults</button>
+    </div>
     <p id="mod-desc" class="muted"></p>
-    <div id="status" role="status"></div>
-    <form id="inputs" autocomplete="off"></form>
+    <p id="restored" class="note" hidden data-t="Inputs restored from your last session">Inputs restored</p>
+    <div id="status" role="status" aria-live="polite"></div>
+    <form id="inputs" autocomplete="off" onsubmit="return false"></form>
   </section>
   <section id="preview">
     <div class="tabs" role="tablist">
-      <button role="tab" data-tab="report" class="on">Report</button>
-      <button role="tab" data-tab="model" id="tab-model" hidden>3D model</button>
+      <button role="tab" data-tab="report" class="on" data-t="Report">Report</button>
+      <button role="tab" data-tab="model" id="tab-model" hidden data-t="3D model">3D model</button>
     </div>
     <div class="pane on" data-pane="report"><iframe id="report" title="Calculation report"></iframe></div>
     <div class="pane" data-pane="model"><div id="viewer3d"></div></div>

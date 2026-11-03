@@ -86,10 +86,11 @@ class SteelBeamEC3(DesignModule):
                             "Internal web in bending", ref="Table 5.2 (sheet 1)", dp=2)
         w_class = 1 if cw_t <= 72 * eps else 2 if cw_t <= 83 * eps else 3 if cw_t <= 124 * eps else 4
         sec_class = max(f_class, w_class)
-        calc.text(f"Flange: Class {f_class} (limits 9ε = {9 * eps:.2f}, 10ε = {10 * eps:.2f}, "
-                  f"14ε = {14 * eps:.2f}); web: Class {w_class} (limits 72ε = {72 * eps:.1f}, "
-                  f"83ε = {83 * eps:.1f}, 124ε = {124 * eps:.1f}).")
-        calc.text(f"**Section is Class {sec_class}.**")
+        calc.text("Flange: Class {fc} (limits 9ε = {a:.2f}, 10ε = {b:.2f}, 14ε = {c:.2f}); "
+                  "web: Class {wc} (limits 72ε = {d:.1f}, 83ε = {e:.1f}, 124ε = {f:.1f}).",
+                  fc=f_class, a=9 * eps, b=10 * eps, c=14 * eps, wc=w_class, d=72 * eps,
+                  e=83 * eps, f=124 * eps)
+        calc.text("**Section is Class {n}.**", n=sec_class)
         if sec_class == 4:
             calc.warn("Class 4 sections require effective properties (EN 1993-1-5) - "
                       "not covered by this module.")
@@ -131,7 +132,7 @@ class SteelBeamEC3(DesignModule):
         calc.heading("Bending resistance", 1)
         McRd = calc.formula("M_c,Rd", "W_y × f_y / γ_M0", Wy * fy / inp["gamma_M0"], "kNm",
                             ref="EN 1993-1-1 6.2.5")
-        calc.check("Bending: M_Ed ≤ M_c,Rd", MEd, McRd, "kNm", "6.2.5(1)")
+        calc.check("Bending: M_Ed ≤ M_c,Rd", MEd, McRd, "kNm", "6.2.5(1)", hint="Choose a deeper section or a higher steel grade.")
 
         # -------------------------------------------------------------- shear
         calc.heading("Shear resistance")
@@ -139,7 +140,7 @@ class SteelBeamEC3(DesignModule):
                           "Shear area", ref="6.2.6(3)")
         VplRd = calc.formula("V_pl,Rd", "A_v × (f_y / √3) / γ_M0",
                              Av * fy / math.sqrt(3) / inp["gamma_M0"], "kN", ref="6.2.6(2)")
-        calc.check("Shear: V_Ed ≤ V_pl,Rd", VEd, VplRd, "kN", "6.2.6(1)")
+        calc.check("Shear: V_Ed ≤ V_pl,Rd", VEd, VplRd, "kN", "6.2.6(1)", hint="Choose a section with a thicker or deeper web.")
         calc.check_limit("Shear buckling: h_w/t_w ≤ 72ε/η", sec.hw / sec.tw, 72 * eps, "",
                          "6.2.6(6)")
 
@@ -152,7 +153,7 @@ class SteelBeamEC3(DesignModule):
             MvRd = calc.formula("M_v,Rd", "(W_pl,y − ρA_w²/(4t_w)) f_y / γ_M0",
                                 min((sec.Wpl_y - rho * (sec.hw * sec.tw) ** 2 / (4 * sec.tw))
                                     * fy / inp["gamma_M0"], McRd), "kNm", ref="6.2.8(5)")
-            calc.check("Bending + shear: M_Ed ≤ M_v,Rd", MEd, MvRd, "kNm", "6.2.8")
+            calc.check("Bending + shear: M_Ed ≤ M_v,Rd", MEd, MvRd, "kNm", "6.2.8", hint="Choose a heavier section.")
         else:
             calc.text("V_Ed at the position of maximum moment ≤ 0.5 V_pl,Rd - no reduction "
                       "for shear is required (6.2.8(2)).")
@@ -175,8 +176,8 @@ class SteelBeamEC3(DesignModule):
                            ref="6.3.2.2(1)", dp=3)
         curve = "b" if sec.h / sec.b <= 2 else "c"
         alpha = {"b": 0.34, "c": 0.49}[curve]
-        calc.text(f"h/b = {sec.h / sec.b:.2f} → buckling curve **{curve}** for rolled sections "
-                  f"(Table 6.5), α_LT = {alpha}.")
+        calc.text("h/b = {r:.2f} → buckling curve **{c}** for rolled sections (Table 6.5), "
+                  "α_LT = {a}.", r=sec.h / sec.b, c=curve, a=alpha)
         lam0, beta = 0.4, 0.75
         phi = calc.formula("Φ_LT", "0.5[1 + α_LT(λ̄_LT − λ̄_LT,0) + βλ̄_LT²]",
                            0.5 * (1 + alpha * (lam - lam0) + beta * lam**2), "",
@@ -191,7 +192,7 @@ class SteelBeamEC3(DesignModule):
                            chi, "", ref="6.3.2.3(1)", dp=3)
         MbRd = calc.formula("M_b,Rd", "χ_LT W_y f_y / γ_M1", chi * Wy * fy / inp["gamma_M1"],
                             "kNm", ref="6.3.2.1(3)")
-        calc.check("LTB: M_Ed ≤ M_b,Rd", MEd, MbRd, "kNm", "6.3.2.1(1)")
+        calc.check("LTB: M_Ed ≤ M_b,Rd", MEd, MbRd, "kNm", "6.3.2.1(1)", hint="Add lateral restraints to the compression flange (reduce L_cr) or choose a wider section (HEA/HEB).")
 
         # -------------------------------------------------------- deflection
         calc.heading("Serviceability - deflection")
@@ -199,7 +200,7 @@ class SteelBeamEC3(DesignModule):
         dq = calc.formula("δ_q", "max δ(x) under variable loads", sls.max_deflection[0], "mm",
                           "Variable load deflection")
         dlim = calc.formula("δ_lim", f"L / {inp['defl_limit']:g}", L / inp["defl_limit"], "mm")
-        calc.check("Deflection: δ_q ≤ δ_lim", dq, dlim, "mm", "EN 1990 A1.4")
+        calc.check("Deflection: δ_q ≤ δ_lim", dq, dlim, "mm", "EN 1990 A1.4", hint="Choose a deeper (stiffer) section or reduce the span.")
         tot = analyse(gk + qk, Gp + Qp)
         calc.formula("δ_tot", "max δ(x) under g_k + q_k", tot.max_deflection[0], "mm",
                      "Total characteristic deflection (for information)")

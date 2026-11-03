@@ -7,6 +7,7 @@ import re
 from html import escape
 
 from ..core.calc import Calculation, Check
+from ..i18n import tr
 
 _SUB = re.compile(r"([A-Za-z\u0370-\u03ff\u0304']+)_([A-Za-z0-9,.\u0370-\u03ff]+)")
 _BOLD = re.compile(r"\*\*(.+?)\*\*")
@@ -45,9 +46,9 @@ def _unit(u: str) -> str:
     return f'<span class="u">{escape(u)}</span>' if u and u != "-" else ""
 
 
-def _check_html(chk: Check, is_min: bool) -> str:
+def _check_html(chk: Check, is_min: bool, lang: str = "en") -> str:
     ok = "pass" if chk.passed else "fail"
-    word = "PASS" if chk.passed else "FAIL"
+    word = tr("PASS" if chk.passed else "FAIL", lang)
     op = "≥" if is_min else "≤"
     from ..core.units import from_base
     dem, cap = from_base(chk.demand, chk.unit), from_base(chk.capacity, chk.unit)
@@ -57,7 +58,9 @@ def _check_html(chk: Check, is_min: bool) -> str:
     return (f'<div class="check {ok}"><div class="cdesc">{sym(chk.description)}{ref}</div>'
             f'<div class="cval">{num(left)} {_unit(chk.unit)} {op} {num(right)} '
             f'{_unit(chk.unit)}</div><div class="cutil">U = {util}</div>'
-            f'<div class="badge {ok}">{word}</div></div>')
+            f'<div class="badge {ok}">{word}</div>'
+            + (f'<div class="hint">💡 {rich(chk.hint)}</div>' if chk.hint and not chk.passed else "")
+            + '</div>')
 
 
 CSS = """
@@ -97,6 +100,7 @@ padding:7px 10px;margin:6px 0;border-radius:4px}
 .check .cdesc{font-weight:600}
 .check .cval{white-space:nowrap}
 .check .cutil{color:var(--muted);white-space:nowrap}
+.check .hint{grid-column:1/-1;color:#7a2b14;font-size:12.5px}
 .badge{font-weight:700;text-align:center;padding:2px 0;border-radius:3px;color:#fff}
 .badge.pass{background:var(--pass)}.badge.fail{background:var(--fail)}
 table{border-collapse:collapse;width:100%;margin:8px 0;font-size:12.5px}
@@ -147,7 +151,7 @@ def render_body(calc: Calculation) -> str:
                        f'<div class="e">{sym(d["symbol"])} = {sym(d["expression"])}{ref}</div>'
                        f'<div class="r">{num(d["value"], d["dp"])} {_unit(d["unit"])}</div></div>')
         elif k == "check":
-            out.append(_check_html(d["check"], d.get("min", False)))
+            out.append(_check_html(d["check"], d.get("min", False), calc.lang))
         elif k == "table":
             head = "".join(f"<th>{escape(str(h))}</th>" for h in d["headers"])
             body = "".join("<tr>" + "".join(f"<td>{escape(str(c))}</td>" for c in r) + "</tr>"
@@ -163,39 +167,43 @@ def render_body(calc: Calculation) -> str:
 def render_summary(calc: Calculation) -> str:
     if not calc.checks:
         return ""
+    L = calc.lang
     ok = "pass" if calc.passed else "fail"
-    word = "ALL CHECKS PASS" if calc.passed else "DESIGN FAILS"
+    word = tr("ALL CHECKS PASS" if calc.passed else "DESIGN FAILS", L)
     rows = "".join(
         f"<tr><td style='text-align:left'>{sym(c.description)}</td>"
         f"<td>{'∞' if math.isinf(c.utilisation) else f'{c.utilisation:.3f}'}</td>"
         f"<td style='color:var(--{'pass' if c.passed else 'fail'});font-weight:700'>"
-        f"{'PASS' if c.passed else 'FAIL'}</td></tr>" for c in calc.checks)
+        f"{tr('PASS' if c.passed else 'FAIL', L)}</td></tr>" for c in calc.checks)
     mu = "∞" if math.isinf(calc.max_utilisation) else f"{calc.max_utilisation:.3f}"
-    return (f'<section class="summary"><div class="big {ok}">{word} — max utilisation '
-            f'{mu}</div><table><thead><tr><th>Check</th><th>Utilisation</th>'
-            f'<th>Result</th></tr></thead><tbody>{rows}</tbody></table></section>')
+    return (f'<section class="summary"><div class="big {ok}">{word} — '
+            f'{tr("max utilisation", L)} {mu}</div><table><thead><tr><th>{tr("Check", L)}</th>'
+            f'<th>{tr("Utilisation", L)}</th><th>{tr("Result", L)}</th></tr></thead>'
+            f'<tbody>{rows}</tbody></table></section>')
 
 
 def render_html(calc: Calculation, standalone: bool = True) -> str:
     p = calc.project
+    L = calc.lang
+    t = lambda x: escape(tr(x, L))  # noqa: E731
     tb = (
-        f'<header class="tb"><div class="brand"><div class="k">Company</div>'
-        f'<div class="v">{escape(p.company)}</div><div class="k">Project</div>'
+        f'<header class="tb"><div class="brand"><div class="k">{t("Company")}</div>'
+        f'<div class="v">{escape(p.company)}</div><div class="k">{t("Project")}</div>'
         f'<div class="v">{escape(p.project)}</div></div>'
-        f'<div><div class="k">Job no.</div><div class="v">{escape(p.job_no)}</div></div>'
-        f'<div><div class="k">Section / element</div><div class="v">{escape(p.section)}</div></div>'
-        f'<div><div class="k">Calc. by / checked</div><div class="v">{escape(p.calc_by)}'
+        f'<div><div class="k">{t("Job no.")}</div><div class="v">{escape(p.job_no)}</div></div>'
+        f'<div><div class="k">{t("Section / element")}</div><div class="v">{escape(p.section)}</div></div>'
+        f'<div><div class="k">{t("Calc. by / checked")}</div><div class="v">{escape(p.calc_by)}'
         f'{" / " + escape(p.checked_by) if p.checked_by else ""}</div></div>'
-        f'<div><div class="k">Date</div><div class="v">{escape(p.date)}</div></div></header>'
+        f'<div><div class="k">{t("Date")}</div><div class="v">{escape(p.date)}</div></div></header>'
     )
     content = (f'<div class="sheet">{tb}<h1>{escape(calc.title)}</h1>'
-               f'<div class="std">In accordance with {escape(calc.standard)}'
-               f'{" — client: " + escape(p.client) if p.client else ""}</div>'
+               f'<div class="std">{t("In accordance with")} {escape(calc.standard)}'
+               f'{" — " + t("client") + ": " + escape(p.client) if p.client else ""}</div>'
                f'{render_body(calc)}{render_summary(calc)}'
-               f'<footer>Generated by BlackEye · module {escape(calc.module_id)}</footer></div>')
+               f'<footer>{t("Generated by BlackEye")} · {escape(calc.module_id)}</footer></div>')
     if not standalone:
         return content
-    return (f'<!doctype html><html lang="en"><head><meta charset="utf-8">'
+    return (f'<!doctype html><html lang="{L}"><head><meta charset="utf-8">'
             f'<meta name="viewport" content="width=device-width,initial-scale=1">'
             f'<title>{escape(calc.title)}</title><style>{CSS}</style></head>'
             f'<body>{content}</body></html>')

@@ -12,12 +12,20 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any, ClassVar
 
+from ..i18n import tr
 from .calc import Calculation, ProjectInfo
 from .units import to_base
 
 
 class InputError(ValueError):
-    """Raised when user inputs are invalid."""
+    """Raised when user inputs are invalid.
+
+    ``field`` names the offending input so the UI can highlight it.
+    """
+
+    def __init__(self, message: str, field: str | None = None) -> None:
+        super().__init__(message)
+        self.field = field
 
 
 @dataclass
@@ -34,36 +42,46 @@ class Field:
     help: str = ""
     columns: list["Field"] | None = None  # for kind == "table"
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self, lang: str = "en") -> dict[str, Any]:
         d = asdict(self)
+        d["label"] = tr(self.label, lang)
+        d["group"] = tr(self.group, lang)
+        d["help"] = tr(self.help, lang)
+        if self.choices:
+            d["choice_labels"] = [tr(c, lang, quiet=True) for c in self.choices]
         if self.columns is not None:
-            d["columns"] = [c.to_dict() for c in self.columns]
+            d["columns"] = [c.to_dict(lang) for c in self.columns]
         return d
 
     # ---------------------------------------------------------------- parse
-    def parse(self, raw: Any) -> Any:
+    def parse(self, raw: Any, lang: str = "en") -> Any:
         """Validate ``raw`` and return the value (numbers in base units)."""
+        L = tr(self.label, lang)
+
+        def err(msg: str, **kw: Any) -> InputError:
+            return InputError(tr(msg, lang, label=L, **kw), self.name)
+
         if raw is None or raw == "":
             raw = self.default
         if raw is None:
-            raise InputError(f"'{self.label}' is required")
+            raise err("'{label}' is required")
         if self.kind in ("float", "int"):
             try:
                 num = float(raw)
             except (TypeError, ValueError) as exc:
-                raise InputError(f"'{self.label}' must be a number") from exc
+                raise err("'{label}' must be a number") from exc
             if self.kind == "int":
                 if num != int(num):
-                    raise InputError(f"'{self.label}' must be a whole number")
+                    raise err("'{label}' must be a whole number")
                 num = int(num)
             if self.min is not None and num < self.min:
-                raise InputError(f"'{self.label}' must be ≥ {self.min} {self.unit}".strip())
+                raise err("'{label}' must be ≥ {v} {unit}", v=f"{self.min:g}", unit=self.unit)
             if self.max is not None and num > self.max:
-                raise InputError(f"'{self.label}' must be ≤ {self.max} {self.unit}".strip())
+                raise err("'{label}' must be ≤ {v} {unit}", v=f"{self.max:g}", unit=self.unit)
             return to_base(num, self.unit) if self.kind == "float" else num
         if self.kind == "choice":
             if self.choices and str(raw) not in self.choices:
-                raise InputError(f"'{self.label}' must be one of: {', '.join(self.choices)}")
+                raise err("'{label}' must be one of: {v}", v=", ".join(self.choices))
             return str(raw)
         if self.kind == "bool":
             if isinstance(raw, str):
@@ -71,17 +89,17 @@ class Field:
             return bool(raw)
         if self.kind == "table":
             if not isinstance(raw, list):
-                raise InputError(f"'{self.label}' must be a list of rows")
+                raise err("'{label}' must be a list of rows")
             rows = []
             for i, row in enumerate(raw, 1):
                 if not isinstance(row, dict):
-                    raise InputError(f"'{self.label}' row {i} is invalid")
+                    raise err("'{label}' row {i} is invalid", i=i)
                 parsed = {}
                 for col in self.columns or []:
                     try:
-                        parsed[col.name] = col.parse(row.get(col.name))
+                        parsed[col.name] = col.parse(row.get(col.name), lang)
                     except InputError as exc:
-                        raise InputError(f"{self.label}, row {i}: {exc}") from exc
+                        raise InputError(f"{L}, {tr('row', lang)} {i}: {exc}", self.name) from exc
                 rows.append(parsed)
             return rows
         return str(raw)
@@ -98,14 +116,14 @@ class DesignModule:
     fields: ClassVar[list[Field]] = []
 
     @classmethod
-    def schema(cls) -> dict[str, Any]:
+    def schema(cls, lang: str = "en") -> dict[str, Any]:
         return {
             "id": cls.id,
-            "title": cls.title,
-            "category": cls.category,
-            "standard": cls.standard,
-            "description": cls.description,
-            "fields": [f.to_dict() for f in cls.fields],
+            "title": tr(cls.title, lang),
+            "category": tr(cls.category, lang),
+            "standard": tr(cls.standard, lang, quiet=True),
+            "description": tr(cls.description, lang),
+            "fields": [f.to_dict(lang) for f in cls.fields],
         }
 
     @classmethod
@@ -113,18 +131,22 @@ class DesignModule:
         return {f.name: f.default for f in cls.fields}
 
     @classmethod
-    def parse_inputs(cls, raw: dict[str, Any] | None) -> dict[str, Any]:
+    def parse_inputs(cls, raw: dict[str, Any] | None, lang: str = "en") -> dict[str, Any]:
         raw = raw or {}
-        return {f.name: f.parse(raw.get(f.name)) for f in cls.fields}
+        return {f.name: f.parse(raw.get(f.name), lang) for f in cls.fields}
 
     @classmethod
     def calculate(cls, raw_inputs: dict[str, Any] | None = None,
-                  project: ProjectInfo | dict | None = None) -> Calculation:
+                  project: ProjectInfo | dict | None = None,
+                  lang: str = "en") -> Calculation:
         if not isinstance(project, ProjectInfo):
             project = ProjectInfo.from_dict(project)
-        inputs = cls.parse_inputs(raw_inputs)
-        calc = Calculation(cls.title, cls.id, cls.standard, project)
-        cls.run(calc, inputs)
+        inputs = cls.parse_inputs(raw_inputs, lang)
+        calc = Calculation(cls.title, cls.id, cls.standard, project, lang=lang)
+        try:
+            cls.run(calc, inputs)
+        except InputError as exc:
+            raise InputError(tr(str(exc), lang), exc.field) from exc
         return calc
 
     @classmethod

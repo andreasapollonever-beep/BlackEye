@@ -74,8 +74,8 @@ class RCBeamEC2(DesignModule):
         fyd = calc.formula("f_yd", "f_yk / γ_s", fyk / inp["gamma_s"], "N/mm²", ref="3.2.7")
         As_prov = n * bar_area(dia)
         calc.figure(rc_section(b, h, c, dl, dia, n, dia2, n2),
-                    f"Section {b:g}×{h:g} — {n}Ø{dia:g} bottom, {n2}Ø{dia2:g} top, "
-                    f"Ø{dl:g} links")
+                    calc.tr("Section {b:g}×{h:g} — {n}Ø{d:g} bottom, {n2}Ø{d2:g} top, "
+                            "Ø{dl:g} links", b=b, h=h, n=n, d=dia, n2=n2, d2=dia2, dl=dl))
 
         # ---------------------------------------------------------- flexure
         calc.heading("Flexure")
@@ -84,33 +84,33 @@ class RCBeamEC2(DesignModule):
         res = design_flexure(calc, b, d, MEd, fck, fcd, fyk, fyd, h, d2=d2)
         As_req, As2_req = res["As"], res["As2"]
         calc.formula("A_s,prov", f"{n} × π × {dia:g}² / 4", As_prov, "mm²",
-                     f"Provided tension: {n}Ø{dia:g}")
+                     calc.tr("Provided tension: {n}Ø{d:g}", n=n, d=dia))
         calc.formula("A_s2,prov", f"{n2} × π × {dia2:g}² / 4", As2_prov, "mm²",
-                     f"Provided compression: {n2}Ø{dia2:g}")
+                     calc.tr("Provided compression: {n}Ø{d:g}", n=n2, d=dia2))
         calc.check_min("Tension reinforcement: A_s,prov ≥ A_s,req", As_prov, As_req, "mm²",
-                       "6.1")
+                       "6.1", hint="Add bars or use a larger diameter (or increase the depth h).")
         if As2_req > 0:
             calc.check_min("Compression reinforcement: A_s2,prov ≥ A_s2,req", As2_prov,
-                           As2_req, "mm²", "6.1")
+                           As2_req, "mm²", "6.1", hint="Add top (compression) bars or increase the section depth.")
         calc.check_min("Minimum reinforcement: A_s,prov ≥ A_s,min", As_prov, res["As_min"],
-                       "mm²", "9.2.1.1(1)")
+                       "mm²", "9.2.1.1(1)", hint="Add bars or use a larger diameter.")
         calc.check_limit("Maximum reinforcement: A_s + A_s2 ≤ A_s,max", As_prov + As2_prov,
-                         res["As_max"], "mm²", "9.2.1.1(3)")
+                         res["As_max"], "mm²", "9.2.1.1(3)", hint="Increase the section size instead of adding more bars.")
         clear = (b - 2 * (c + dl) - n * dia) / (n - 1)
         s_min = max(dia, 20.0 + 5.0, 20.0)  # dg = 20 mm assumed
         calc.formula("s_clear", "(b − 2(c_nom + φ_link) − nφ) / (n − 1)", clear, "mm",
                      "Clear spacing between tension bars")
         calc.check_min("Bar spacing: s_clear ≥ max(φ, d_g + 5, 20)", clear, s_min, "mm",
-                       "8.2(2)")
+                       "8.2(2)", hint="Use fewer, larger bars or a wider section.")
         MRd, x = section_capacity(b, d, As_prov, fcd, fyd, d2, As2_prov if As2_req > 0 else 0)
         calc.formula("x", "from strain compatibility (ε_cu3 = 3.5‰)", x, "mm",
                      "Neutral axis depth of provided section", ref="6.1(2)")
         MRd = calc.formula("M_Rd", "0.8xbf_cd(d − 0.4x) + A_s2σ_s2(d − d_2)", MRd, "kNm",
                            "Moment resistance of provided reinforcement")
-        calc.check("Moment resistance: M_Ed ≤ M_Rd", MEd, MRd, "kNm", "6.1")
+        calc.check("Moment resistance: M_Ed ≤ M_Rd", MEd, MRd, "kNm", "6.1", hint="Add reinforcement or increase the section depth h.")
         if x / d > XI_LIM + 1e-6:
-            calc.warn(f"x/d = {x / d:.3f} > 0.45 for the provided bars — ductility "
-                      "requirement of 5.6.3 not met; add compression steel.")
+            calc.warn("x/d = {r:.3f} > 0.45 for the provided bars — ductility requirement of "
+                      "5.6.3 not met; add compression steel.", r=x / d)
 
         # ------------------------------------------------------------ shear
         calc.heading("Shear")
@@ -144,15 +144,15 @@ class RCBeamEC2(DesignModule):
                            "Strut inclination", ref="Eq. 6.7N", dp=3)
         VRdmax = calc.formula("V_Rd,max", "α_cw b z ν_1 f_cd / (cot θ + tan θ)",
                               b * zv * nu1 * fcd_s / (cot + 1 / cot), "kN", ref="Eq. 6.9")
-        calc.check("Concrete strut: V_Ed ≤ V_Rd,max", VEd, VRdmax, "kN", "6.2.3(3)")
+        calc.check("Concrete strut: V_Ed ≤ V_Rd,max", VEd, VRdmax, "kN", "6.2.3(3)", hint="Increase the section width or depth (or concrete class).")
         Asw = legs * bar_area(dl)
         calc.formula("A_sw", f"{legs} × π × {dl:g}² / 4", Asw, "mm²", "Link area")
         fywd = fyd
         VRds = calc.formula("V_Rd,s", "(A_sw / s) z f_ywd cot θ", Asw / s * zv * fywd * cot,
                             "kN", ref="Eq. 6.8")
-        calc.check("Shear reinforcement: V_Ed ≤ V_Rd,s", VEd, VRds, "kN", "6.2.3(3)")
+        calc.check("Shear reinforcement: V_Ed ≤ V_Rd,s", VEd, VRds, "kN", "6.2.3(3)", hint="Reduce the link spacing or use larger / more link legs.")
         rho_w_min = calc.formula("ρ_w,min", "0.08√f_ck / f_yk", 0.08 * math.sqrt(fck) / fyk, "",
                                  ref="Eq. 9.5N", dp=5)
         calc.check_min("Minimum links: A_sw/(s b) ≥ ρ_w,min", Asw / (s * b), rho_w_min, "",
-                       "9.2.2(5)")
-        calc.check_limit("Link spacing: s ≤ 0.75d", s, 0.75 * d, "mm", "9.2.2(6)")
+                       "9.2.2(5)", hint="Reduce the link spacing or use larger links.")
+        calc.check_limit("Link spacing: s ≤ 0.75d", s, 0.75 * d, "mm", "9.2.2(6)", hint="Reduce the link spacing.")

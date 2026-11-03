@@ -52,14 +52,15 @@ def test_wall_defaults_pass_and_model():
     c = WALL.calculate({})
     assert c.passed, [(x.description, x.utilisation) for x in c.checks if not x.passed]
     m = c.model3d
-    assert m["type"] == "retaining_wall"
-    assert {p["key"] for p in m["pressures"]} >= {"earth", "surcharge", "seismic"}
-    assert m["bearing"] and m["governing"]["B_eff"] > 0
+    assert m["kind"] == "retaining_wall"
+    keys = {l["key"] for l in m["layers"]}
+    assert keys >= {"concrete", "soil", "earth", "surcharge", "seismic", "bearing", "forces"}
+    assert any(o["t"] == "arrow" and o["layer"] == "bearing" for o in m["objects"])
 
 
 def test_wall_water_and_slope_run():
     c = WALL.calculate({"h_w": 2.0, "beta": 15})
-    assert any(p["key"] == "water" for p in c.model3d["pressures"])
+    assert any(o["layer"] == "water" and o["t"] == "arrow" for o in c.model3d["objects"])
 
 
 def test_wall_invalid_geometry():
@@ -69,7 +70,7 @@ def test_wall_invalid_geometry():
 
 def test_api_returns_3d_model():
     r = TestClient(app).post("/api/modules/ec7_retaining_wall/run", json={"inputs": {}})
-    assert r.status_code == 200 and r.json()["model3d"]["geometry"]["B"] == pytest.approx(3.6)
+    assert r.status_code == 200 and r.json()["model3d"]["kind"] == "retaining_wall"
     assert TestClient(app).get("/static/vendor/three/three.module.min.js").status_code == 200
 
 

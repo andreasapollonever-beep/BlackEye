@@ -64,7 +64,7 @@ class BeamAnalysis(DesignModule):
             )
             res = beam.solve()
         except (ValueError, ArithmeticError) as exc:
-            raise InputError(str(exc)) from exc
+            raise InputError(str(exc), "supports") from exc
         except Exception as exc:  # singular stiffness matrix etc.
             raise InputError(f"Analysis failed: {exc}") from exc
 
@@ -89,12 +89,12 @@ class BeamAnalysis(DesignModule):
         Mh, xh = res.max_hogging
         V, xv = res.max_shear
         dmax, xdm = res.max_deflection
-        calc.formula("M_max,sag", f"at x = {from_base(xs, 'm'):.2f} m", max(Ms, 0.0), "kNm",
+        calc.formula("M_max,sag", calc.tr("at x = {x:.2f} m", x=from_base(xs, "m")), max(Ms, 0.0), "kNm",
                      "Maximum sagging moment")
-        calc.formula("M_max,hog", f"at x = {from_base(xh, 'm'):.2f} m", min(Mh, 0.0), "kNm",
+        calc.formula("M_max,hog", calc.tr("at x = {x:.2f} m", x=from_base(xh, "m")), min(Mh, 0.0), "kNm",
                      "Maximum hogging moment")
-        calc.formula("V_max", f"at x = {from_base(xv, 'm'):.2f} m", abs(V), "kN",
+        calc.formula("V_max", calc.tr("at x = {x:.2f} m", x=from_base(xv, "m")), abs(V), "kN",
                      "Maximum shear force")
-        calc.formula("δ_max", f"at x = {from_base(xdm, 'm'):.2f} m", dmax, "mm",
+        calc.formula("δ_max", calc.tr("at x = {x:.2f} m", x=from_base(xdm, "m")), dmax, "mm",
                      "Maximum deflection (down +)")
         calc.figure(beam_diagrams(res, deflection=True), "Shear, moment and deflection")

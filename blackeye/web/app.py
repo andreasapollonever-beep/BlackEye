@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from .. import __version__
 from ..core import InputError, all_modules, get_module
+from ..i18n import LANGS
 from ..report import render_html
 
 STATIC = Path(__file__).parent / "static"
@@ -24,6 +25,7 @@ app = FastAPI(title="BlackEye", version=__version__,
 class RunRequest(BaseModel):
     inputs: dict[str, Any] = Field(default_factory=dict)
     project: dict[str, Any] = Field(default_factory=dict)
+    lang: str = "en"
 
 
 def _json_safe(obj: Any) -> Any:
@@ -51,24 +53,29 @@ def health() -> dict[str, str]:
     return {"status": "ok", "version": __version__}
 
 
+def _lang(lang: str) -> str:
+    return lang if lang in LANGS else "en"
+
+
 @app.get("/api/modules")
-def list_modules() -> list[dict[str, Any]]:
-    return [{k: m.schema()[k] for k in ("id", "title", "category", "standard", "description")}
-            for m in all_modules()]
+def list_modules(lang: str = "en") -> list[dict[str, Any]]:
+    lang = _lang(lang)
+    return [{k: m.schema(lang)[k] for k in ("id", "title", "category", "standard",
+                                            "description")} for m in all_modules()]
 
 
 @app.get("/api/modules/{module_id}")
-def module_schema(module_id: str) -> dict[str, Any]:
-    return _module(module_id).schema()
+def module_schema(module_id: str, lang: str = "en") -> dict[str, Any]:
+    return _module(module_id).schema(_lang(lang))
 
 
 @app.post("/api/modules/{module_id}/run")
 def run_module(module_id: str, req: RunRequest) -> dict[str, Any]:
     mod = _module(module_id)
     try:
-        calc = mod.calculate(req.inputs, req.project)
+        calc = mod.calculate(req.inputs, req.project, _lang(req.lang))
     except InputError as exc:
-        raise HTTPException(422, str(exc)) from exc
+        raise HTTPException(422, {"message": str(exc), "field": exc.field}) from exc
     return _json_safe({"summary": calc.summary(), "html": render_html(calc),
                        "model3d": calc.model3d})
 

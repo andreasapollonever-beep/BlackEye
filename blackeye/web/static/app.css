@@ -15,6 +15,31 @@ button:hover{background:rgba(255,255,255,.12)}
 button.primary{background:#fff;color:var(--accent);font-weight:600}
 main{flex:1;display:grid;grid-template-columns:230px 380px 1fr;min-height:0}
 nav{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:10px 0}
+#search{display:block;width:calc(100% - 24px);margin:2px 12px 6px;padding:6px 8px}
+.pad{padding:0 16px}.small{font-size:11px}
+.lang{display:flex;border:1px solid rgba(255,255,255,.35);border-radius:4px;overflow:hidden;margin-right:6px}
+.lang button{border:0;border-radius:0;padding:5px 9px}
+.lang button.on{background:#fff;color:var(--accent);font-weight:700}
+.mod-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+button.ghost{color:var(--accent2);border:1px solid var(--line);background:#fff;font-size:12px;padding:3px 8px;white-space:nowrap}
+button.ghost:hover{background:#f3f6fa}
+.note{background:#eef5fc;color:#24527a;border-radius:4px;padding:5px 8px;font-size:12px;margin:4px 0}
+.field.invalid{background:#fdeceb;border-radius:4px;outline:2px solid #e8a19b;padding:2px 4px}
+.field.invalid input,.field.invalid select{border-color:var(--fail)}
+.tblwrap.invalid{outline:2px solid #e8a19b;border-radius:4px}
+.tbl-title{font-size:12px;font-weight:600;margin:4px 0}
+.chk{width:18px;height:18px}
+#status .head{font-weight:700}
+#status .ubar{height:6px;background:rgba(0,0,0,.08);border-radius:3px;margin:6px 0 2px;overflow:hidden}
+#status.pass .ubar i{display:block;height:100%;background:var(--pass)}
+#status.fail .ubar i{display:block;height:100%;background:var(--fail)}
+#status details{margin-top:6px;font-weight:400}
+#status summary{cursor:pointer;font-weight:600}
+#status ul.fails{margin:6px 0 0;padding-left:18px}
+#status ul.fails li{margin:4px 0}
+#status .hint{color:#7a2b14;font-size:12px;margin-top:2px}
+#status.busy{opacity:.65;transition:opacity .2s}
+.v3d-help{position:absolute;bottom:10px;right:10px;font-size:11px;color:#556;background:rgba(255,255,255,.8);padding:3px 8px;border-radius:4px;z-index:2}
 nav h3{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
 margin:12px 16px 4px}
 nav a{display:block;padding:7px 16px;color:var(--ink);text-decoration:none;border-left:3px solid transparent}
