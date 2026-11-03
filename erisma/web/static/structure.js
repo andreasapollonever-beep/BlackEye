@@ -97,6 +97,14 @@ Object.assign(UI.el, {
   "Round": "Γύρος", "Apply": "Εφαρμογή", "Design slabs": "Πλάκες", "Design foundation": "Θεμελίωση",
   "Flange B": "Πέλμα B", "Web b_w": "Κορμός b_w", "Depth h": "Ύψος h", "k_s": "k_s", "D": "D",
   "φ'": "φ'", "c'": "c'", "γ": "γ", "Foundation beams": "Πεδιλοδοκοί",
+  "Plan + 3D": "Κάτοψη + 3D", "Diagrams": "Διαγράμματα", "Moments M": "Ροπές M",
+  "Shear V": "Τέμνουσες V", "Axial N": "Αξονικές N", "Deformed": "Παραμόρφωση",
+  "Mode 1": "Ιδιομορφή 1", "Mode 2": "Ιδιομορφή 2", "Mode 3": "Ιδιομορφή 3",
+  "Show / hide in the 3D view": "Εμφάνιση / απόκρυψη στο 3D", "Regularity": "Κανονικότητα",
+  "plan": "κάτοψη", "elevation": "όψη", "regular": "κανονικό", "not regular": "μη κανονικό",
+  "torsionally flexible": "στρεπτικά εύκαμπτο", "torsionally stiff": "στρεπτικά δύσκαμπτο",
+  "q used": "q που χρησιμοποιήθηκε", "Mode": "Ιδιομορφή", "torsion": "στρέψη",
+  "Drift d_r·ν / (α·h) per storey": "Σχετική μετακίνηση d_r·ν / (α·h) ανά όροφο",
   "Raft": "Κοιτόστρωση", "Thickness t": "Πάχος t", "Overhang": "Πρόβολος", "Mesh": "Πλέγμα",
   "Raft: demand / basic mesh": "Κοιτόστρωση: απαίτηση / βασικός οπλισμός",
   "additional bars": "πρόσθετος οπλισμός", "Punching": "Διάτρηση",
@@ -112,7 +120,7 @@ const Structure = (() => {
   const KEY = "erisma.structure";
   const VKEY = "erisma.structure.view";
   const S = { schema: null, inp: null, tool: "select", sel: [], res: null, view: "plan", tab: "home",
-    hist: [], hpos: -1, timer: null, runId: 0, built: false, auto: true, dirty: false, vb: null,
+    hist: [], hpos: -1, timer: null, runId: 0, built: false, auto: true, dirty: false, vb: null, layers: {},
     opt: { colour: "util", storey: "all", labels: false, names: true, dims: true, axes: true, slabs: true,
       ribbonMin: false, onlyFail: false, filter: "", sort: ["member", 1] } };
   Object.assign(S.opt, store.get(VKEY, {}));
@@ -196,6 +204,12 @@ const Structure = (() => {
     qty: '<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>',
     tag: '<path d="M3 12V3h9l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
     min: '<path d="M6 15l6-6 6 6"/>',
+    split: '<rect x="2" y="4" width="9" height="16"/><path d="M13 7l4-3 5 3v10l-5 3-4-3z"/>',
+    diagM: '<path d="M3 18h18"/><path d="M3 18c4-12 14-12 18 0" fill="currentColor" fill-opacity=".25"/>',
+    diagV: '<path d="M3 12h18"/><path d="M3 6h9v6M12 12v6h9" />',
+    diagN: '<path d="M3 12h18"/><rect x="3" y="7" width="18" height="5" fill="currentColor" fill-opacity=".25"/>',
+    defl: '<path d="M3 6h18" stroke-dasharray="2 2"/><path d="M3 6c6 10 12 10 18 0"/>',
+    mode: '<path d="M6 21V5M18 21V5" stroke-dasharray="2 2"/><path d="M6 21c0-8 4-12 8-16M18 21c0-8-4-12-8-16"/>',
     autosize: '<path d="M4 20L20 4"/><path d="M14 4h6v6"/><rect x="3" y="13" width="8" height="8"/><path d="M15 15l2 2 4-4"/>',
     found: '<path d="M3 20h18"/><rect x="5" y="14" width="14" height="4"/><path d="M9 14V4h6v10"/>',
   };
@@ -331,6 +345,7 @@ const Structure = (() => {
           btn("autosize", t("Auto-size"), t("Enlarge members and adjust options until every Eurocode check passes"), autoSize, { big: true })),
         group(t("Views"), btn("plan", t("Plan"), t("Plan"), () => setView("plan"), { big: true, on: v("plan") }),
           btn("cube", "3D", "3D (Ctrl+3)", () => setView("3d"), { big: true, on: v("3d") }),
+          btn("split", t("Plan + 3D"), t("Plan + 3D"), () => setView("split"), { big: true, on: v("split") }),
           btn("table", t("Table"), t("Table"), () => setView("table"), { big: true, on: v("table") }),
           btn("report", t("Report"), t("Report"), () => setView("report"), { big: true, on: v("report") })),
       ]],
@@ -385,6 +400,9 @@ const Structure = (() => {
           return s;
         })())),
         group(t("Labels"), col(viewTog("labels", t("Reinforcement")), viewTog("names", t("Names")))),
+        group(t("Diagrams"), ...[["diagM", "Moments M", "dM"], ["diagV", "Shear V", "dV"], ["diagN", "Axial N", "dN"],
+          ["defl", "Deformed", "defl"]].map(([ic, lab, key]) => btn(ic, t(lab), t("Show / hide in the 3D view"), () => layer3d(key), { big: true, on: !!S.layers[key] }))),
+        group(t("Modes"), ...[1, 2, 3].map((n) => btn("mode", t(`Mode ${n}`), t("Show / hide in the 3D view"), () => layer3d(`mode${n}`), { big: true, on: !!S.layers[`mode${n}`] }))),
         group(t("Reports"), btn("modes", t("Modes"), "", () => gotoReport("Masses and modal analysis"), { big: true }),
           btn("drift", t("Storey checks"), "", () => gotoReport("Storey checks"), { big: true }),
           btn("qty", t("Quantities"), "", () => gotoReport("Quantities and cost estimate"), { big: true }),
@@ -393,6 +411,7 @@ const Structure = (() => {
       ["view", t("View"), [
         group(t("Views"), btn("plan", t("Plan"), "", () => setView("plan"), { big: true, on: v("plan") }),
           btn("cube", "3D", "Ctrl+3", () => setView("3d"), { big: true, on: v("3d") }),
+          btn("split", t("Plan + 3D"), "", () => setView("split"), { big: true, on: v("split") }),
           btn("table", t("Table"), "", () => setView("table"), { big: true, on: v("table") }),
           btn("report", t("Report"), "", () => setView("report"), { big: true, on: v("report") })),
         group(t("Navigate"), btn("zin", t("Zoom in"), `${t("Zoom in")} (+)`, () => zoom(0.8), { big: true }),
@@ -443,19 +462,37 @@ const Structure = (() => {
     S.tool = id;
     $("#st-hint").textContent = HINTS()[id];
     $("#sb-tool").textContent = `✎ ${TOOLN()[id]}`;
-    if (S.view !== "plan") setView("plan");
+    if (S.view !== "plan" && S.view !== "split" && S.view !== "3d") setView("plan");
     renderRibbon();
   }
   function setView(v) {
     S.view = v;
-    document.querySelectorAll(".st-pane").forEach((p) => p.classList.toggle("on", p.dataset.pane === v));
-    if (v === "3d") window.dispatchEvent(new CustomEvent("erisma:show3d", { detail: { host: "st-3d" } }));
-    if (v === "plan") drawPlan();
+    const split = v === "split";
+    $("#structure .st-center").classList.toggle("split", split);
+    document.querySelectorAll(".st-pane").forEach((p) => p.classList.toggle("on",
+      p.dataset.pane === v || (split && (p.dataset.pane === "plan" || p.dataset.pane === "3d"))));
+    if (v === "3d" || split) setTimeout(() => window.dispatchEvent(new CustomEvent("erisma:show3d", { detail: { host: "st-3d" } })), 30);
+    if (v === "plan" || split) drawPlan();
     if (v === "table") renderTable();
     renderRibbon();
   }
+  const highlight3d = () => window.dispatchEvent(new CustomEvent("erisma:highlight",
+    { detail: { host: "st-3d", picks: S.sel.map((x) => `${x.kind}:${x.id}`) } }));
+  function layer3d(key) {
+    S.layers[key] = !S.layers[key];
+    if (S.view !== "3d" && S.view !== "split") setView("split");
+    window.dispatchEvent(new CustomEvent("erisma:layers", { detail: { host: "st-3d", show: { [key]: S.layers[key] } } }));
+    renderRibbon();
+  }
+  window.addEventListener("erisma:pick", (e) => {
+    if (e.detail.host !== "st-3d" || !document.body.classList.contains("in-structure")) return;
+    if (!e.detail.pick) { if (S.tool === "select" && !e.detail.shift) setSel([]); return; }
+    const [kind, id] = e.detail.pick.split(":");
+    act(kind, id, e.detail.shift);
+  });
   function setSel(list) {
     S.sel = list;
+    highlight3d();
     redraw();
     $("#sb-sel").textContent = S.sel.length ? `${S.sel.length} ${t("selected")}` : "";
     renderRibbon();
@@ -547,6 +584,19 @@ const Structure = (() => {
           el("td", {}, `${(s.drift.Y * 1000).toFixed(2)}‰`), el("td", {}, Math.max(s.theta.X, s.theta.Y).toFixed(3))));
       }
       box.append(el("div", { class: "st-ptitle" }, t("Storey checks")), tb);
+      // drift utilisation bars d_r ν / (α h): ν, α from the report → use the EC8 check values
+      const checks = (S.res?.summary?.checks || []).filter((c) => /d_r ν ≤ α h/.test(c.description));
+      if (checks.length) {
+        const chart = el("div", { class: "st-drift" }, el("div", { class: "st-lt" }, t("Drift d_r·ν / (α·h) per storey")));
+        for (const c of checks) {
+          const u = Math.min(c.utilisation, 1.2);
+          chart.append(el("div", { class: "st-dbar", title: c.description },
+            el("span", {}, (/(\d+)[^:]*?([XY])\s*:/.exec(c.description) || []).slice(1).join(" ")),
+            el("i", { style: `width:${u / 1.2 * 100}%;background:${c.passed ? heat(0.85 * u ** 2) : "#e03b3b"}` }),
+            el("b", {}, c.utilisation.toFixed(2))));
+        }
+        box.append(chart);
+      }
     }
   }
 
@@ -1005,6 +1055,7 @@ const Structure = (() => {
     S.sel = [];
     commit();
     renderRibbon();
+    highlight3d();
   }
 
   // ------------------------------------------------------------ properties (right)
@@ -1204,7 +1255,12 @@ const Structure = (() => {
       S.res = res;
       S.dirty = false;
       $("#st-report").srcdoc = res.html;
-      if (res.model3d) window.dispatchEvent(new CustomEvent("erisma:model3d", { detail: { host: "st-3d", model: res.model3d, summary: res.summary } }));
+      if (res.model3d) {
+        window.dispatchEvent(new CustomEvent("erisma:model3d", { detail: { host: "st-3d", model: res.model3d, summary: res.summary } }));
+        window.dispatchEvent(new CustomEvent("erisma:layers", { detail: { host: "st-3d", show: Object.fromEntries(
+          ["dM", "dV", "dN", "defl", "mode1", "mode2", "mode3"].map((k) => [k, !!S.layers[k]])) } }));
+        highlight3d();
+      }
       renderResult(res);
       renderSettings(); redraw(); renderRibbon();
     } catch (err) {
@@ -1248,6 +1304,24 @@ const Structure = (() => {
       el("span", {}, el("i", { style: `background:${heat(0.1)}` }), "η ≈ 0.3"),
       el("span", {}, el("i", { style: `background:${heat(0.8)}` }), "η ≈ 1"),
       el("span", {}, el("i", { style: "background:#e03b3b" }), t("Fails"))));
+    if (r.modes?.length) {
+      const kind = { X: "X", Y: "Y", RZ: t("torsion") };
+      sm.append(el("h4", {}, t("Modes")), el("table", { class: "st-res" },
+        el("tr", {}, el("th", {}, "#"), el("th", {}, "T [s]"), el("th", {}, "m_X"), el("th", {}, "m_Y"), el("th", {}, "m_RZ"), el("th", {}, "")),
+        ...r.modes.slice(0, 6).map((md) => el("tr", { class: md.type === "RZ" && md.mode === 1 ? "bad" : "" },
+          el("td", {}, String(md.mode)), el("td", {}, md.T.toFixed(3)), el("td", {}, `${(md.mX * 100).toFixed(0)}%`),
+          el("td", {}, `${(md.mY * 100).toFixed(0)}%`), el("td", {}, `${((md.mRZ || 0) * 100).toFixed(0)}%`),
+          el("td", {}, el("button", { type: "button", class: "mini", title: t("Show / hide in the 3D view"),
+            on: { click: () => md.mode <= 3 && layer3d(`mode${md.mode}`) } }, kind[md.type] || ""))))));
+    }
+    if (r.regularity) {
+      const g = r.regularity, yes = (b, a, b2) => el("span", { class: b ? "ok" : "bad" }, b ? a : b2);
+      sm.append(el("h4", {}, `${t("Regularity")} (EC8 4.2.3)`), el("table", { class: "st-sum" },
+        el("tr", {}, el("td", {}, t("plan")), el("td", {}, yes(g.plan, t("regular"), t("not regular")))),
+        el("tr", {}, el("td", {}, t("elevation")), el("td", {}, yes(g.elevation, t("regular"), t("not regular")))),
+        el("tr", {}, el("td", {}, "r ≥ l_s"), el("td", {}, yes(!g.torsional, t("torsionally stiff"), t("torsionally flexible")))),
+        el("tr", {}, el("td", {}, t("q used")), el("td", {}, g.q_used != null ? g.q_used.toFixed(2) : "—"))));
+    }
     if (s.warnings.length) {
       sm.append(el("details", { class: "st-msgs" }, el("summary", {}, `⚠ ${t("Messages")} (${s.warnings.length})`),
         el("ul", {}, ...s.warnings.map((w) => el("li", {}, w)))));

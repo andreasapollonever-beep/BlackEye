@@ -52,10 +52,13 @@ class Scene3D:
                              "z": _r(z), "color": color, "opacity": opacity, "edges": edges})
 
     def box(self, layer: str, center: Vec, size: Vec, color: str, opacity: float = 1.0,
-            edges: bool = True) -> None:
-        self.objects.append({"t": "box", "layer": layer, "c": [_r(v) for v in center],
-                             "s": [_r(v) for v in size], "color": color, "opacity": opacity,
-                             "edges": edges})
+            edges: bool = True, pick: str | None = None) -> None:
+        """``pick``: id returned by the viewer when the box is clicked (editable models)."""
+        o = {"t": "box", "layer": layer, "c": [_r(v) for v in center],
+             "s": [_r(v) for v in size], "color": color, "opacity": opacity, "edges": edges}
+        if pick:
+            o["pick"] = pick
+        self.objects.append(o)
 
     def mesh(self, layer: str, vertices: list[Vec], faces: list[tuple[int, int, int]],
              color: str = "#888888", opacity: float = 1.0,

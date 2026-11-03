@@ -27,6 +27,7 @@ class Viewer {
     this.sun.shadow.mapSize.set(2048, 2048);
     this.scene.add(this.sun, this.sun.target);
     this.buildUi();
+    this.enablePicking();
     new ResizeObserver(() => this.resize()).observe(host);
     const loop = () => { this.controls.update(); this.render(); requestAnimationFrame(loop); };
     loop();
@@ -101,6 +102,46 @@ class Viewer {
   }
 
   build(o) {
+    const obj = this.build1(o);
+    if (obj && o.pick) obj.userData.pick = o.pick;
+    return obj;
+  }
+
+  // click (without dragging) on an object carrying a "pick" id → erisma:pick event
+  enablePicking() {
+    const el = this.labels.domElement;
+    let down = null;
+    el.addEventListener("pointerdown", (e) => { down = [e.clientX, e.clientY, e.button]; });
+    el.addEventListener("pointerup", (e) => {
+      if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4 || down[2] !== 0) return;
+      const r = el.getBoundingClientRect();
+      const ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      const ray = new THREE.Raycaster();
+      ray.setFromCamera(ndc, this.camera);
+      const cands = [];
+      this.root?.traverse((o) => {
+        if (o.isMesh && o.userData.pick) {
+          let v = true;
+          for (let p = o; p; p = p.parent) if (p.visible === false) v = false;
+          if (v) cands.push(o);
+        }
+      });
+      const hit = ray.intersectObjects(cands, false)[0];
+      window.dispatchEvent(new CustomEvent("erisma:pick", { detail: { host: this.host.id,
+        pick: hit ? hit.object.userData.pick : null, shift: e.shiftKey || e.ctrlKey || e.metaKey } }));
+    });
+  }
+
+  highlight(picks) {
+    this.picked = new Set(picks || []);
+    this.root?.traverse((o) => {
+      if (!o.isMesh || !o.userData.pick || !o.material?.emissive) return;
+      o.material.emissive.set(this.picked.has(o.userData.pick) ? 0x3b82f6 : 0x000000);
+      o.material.emissiveIntensity = this.picked.has(o.userData.pick) ? 0.9 : 0;
+    });
+  }
+
+  build1(o) {
     if (o.t === "prism") {
       const shape = new THREE.Shape(o.pts.map(([x, y]) => new THREE.Vector2(x, y)));
       const geo = new THREE.ExtrudeGeometry(shape, { depth: o.depth, bevelEnabled: false });
@@ -219,6 +260,7 @@ class Viewer {
     this.help.textContent = T("Drag to rotate · right-drag to pan · scroll to zoom");
     this.applyVisibility();
     if (kindChanged || !this.framed) { this.setView(scene.views?.default || "iso"); this.framed = true; }
+    if (this.picked) this.highlight([...this.picked]);
   }
 
   renderPanel(scene) {
@@ -282,4 +324,12 @@ function show(detail) {
 }
 window.addEventListener("erisma:model3d", (e) => show(e.detail));
 window.addEventListener("erisma:show3d", (e) => viewers[e.detail?.host || "viewer3d"]?.resize());
+window.addEventListener("erisma:layers", (e) => {
+  const v = viewers[e.detail?.host || "viewer3d"];
+  if (!v) return;
+  Object.entries(e.detail.show || {}).forEach(([k, on]) => { v.hidden[k] = !on; });
+  v.applyVisibility();
+  v.panel.querySelectorAll("input[data-k]").forEach((i) => { i.checked = !v.hidden[i.dataset.k]; });
+});
+window.addEventListener("erisma:highlight", (e) => viewers[e.detail?.host || "viewer3d"]?.highlight(e.detail.picks));
 if (window.__erismaModel) show(window.__erismaModel);

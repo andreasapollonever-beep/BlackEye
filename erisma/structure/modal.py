@@ -58,6 +58,11 @@ class ModalResult:
         s = np.abs(u[:, :3]).max()
         return u / s if s > 0 else u
 
+    def mode_type(self, n: int) -> str:
+        """'X', 'Y' or 'RZ' (torsional): the direction with the largest effective-mass ratio."""
+        r = {d: float(self.ratio(d)[n]) for d in self.meff}
+        return max(r, key=r.get) if r else ""
+
     def table(self) -> list[dict]:
         rows, cum = [], {d: 0.0 for d in self.meff}
         for n in range(self.n_modes):
@@ -67,6 +72,7 @@ class ModalResult:
                 r = float(self.ratio(d)[n])
                 cum[d] += r
                 row[f"m{d}"], row[f"sum{d}"] = r, cum[d]
+            row["type"] = self.mode_type(n)
             rows.append(row)
         return rows
 
@@ -165,6 +171,15 @@ def modal(analysis: Analysis, mass_source: dict[str, float] | None = None, n_mod
         p = Ma @ r
         g = phi_a.T @ p
         gamma[d], meff[d], total[d] = g, g**2, float(r @ p)
+    # rotation about the vertical axis: every floor turns by 1 rad about its diaphragm master
+    rz = np.array([1.0 if dm.kind[i] == 5 and dm.labels[i].startswith("diaphragm") else 0.0
+                   for i in range(dm.n)])[a]
+    if rz.any():
+        p = Ma @ rz
+        g = phi_a.T @ p
+        tot = float(rz @ p)
+        if tot > 0:
+            gamma["RZ"], meff["RZ"], total["RZ"] = g, g**2, tot
     return ModalResult(analysis, np.sqrt(w2), phi, gamma, meff, total, dict(mass_source))
 
 

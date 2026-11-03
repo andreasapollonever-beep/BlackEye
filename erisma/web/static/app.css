@@ -481,3 +481,12 @@ button.danger{color:var(--fail)!important}
 @keyframes stspin{to{transform:rotate(360deg)}}
 .st-raft{stroke:rgba(0,0,0,.15);stroke-width:8;opacity:.85}
 .st-punch{fill:none;stroke-width:90}
+.st-center.split .st-pane.on[data-pane="plan"]{right:50%}
+.st-center.split .st-pane.on[data-pane="3d"]{left:50%;border-left:2px solid var(--line2)}
+.st-sum .ok{color:var(--pass);font-weight:600}.st-sum .bad{color:var(--fail);font-weight:600}
+.st-drift{margin-top:8px}
+.st-dbar{display:grid;grid-template-columns:48px 1fr 36px;gap:6px;align-items:center;font-size:11.5px;margin:3px 0}
+.st-dbar i{display:block;height:9px;border-radius:3px}
+.st-dbar span{color:var(--muted);white-space:nowrap;overflow:hidden}
+#st-3d .v3d-results{display:none}
+.st-f.chk{display:flex;gap:8px;align-items:center}

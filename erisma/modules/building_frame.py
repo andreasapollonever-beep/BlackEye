@@ -106,6 +106,10 @@ class BuildingFrame(DesignModule):
               default=list(DRIFT)[0], group="Seismic", show_if="seismic"),
         Field("cracked", "Cracked stiffness factor", "", 0.5, min=0.3, max=1.0, group="Seismic",
               show_if="seismic", help="EN 1998-1 4.3.1(7): 50 % of the uncracked stiffness."),
+        Field("regularity", "Apply EC8 regularity consequences to q", kind="bool", default=True,
+              group="Seismic", show_if="seismic",
+              help="Not regular in elevation: q × 0.8 (4.2.3.1(7)); torsionally flexible: "
+                   "q ≤ 2.0 (Table 5.1)."),
         Field("n_modes", "Number of modes", kind="int", default=12, min=3, max=60,
               group="Seismic", show_if="seismic"),
         Field("pdelta", "P-Δ effects (geometric stiffness)", kind="bool", default=False,
@@ -213,13 +217,14 @@ class BuildingFrame(DesignModule):
                       "included in every analysis below.", p=psi2)
         seis = None
         if seismic:
-            seis = cls._seismic_section(calc, inp, na, an, psi2)
+            seis = cls._seismic_section(calc, inp, na, an, psi2, info)
         designs = []
         if inp["design"]:
             designs = cls._design_section(calc, inp, spec, info, res, seis, uls, quasi,
                                           (g_unf, g_q, psi2))
         calc.building_qty = cls._quantities(spec, info, an, designs)
         calc.structure = cls._results(calc, info, seis, designs)
+        calc._uls, calc._quasi = uls, quasi
         calc.model3d = cls._scene(calc, spec, info, an, seis, designs)
 
     # ---------------------------------------------------------------- model
@@ -263,8 +268,58 @@ class BuildingFrame(DesignModule):
                      "Average dead load per floor area", dp=2)
 
     # -------------------------------------------------------------- seismic
+    @staticmethod
+    def _regularity_section(calc, inp, an, md, info) -> float:
+        """EN 1998-1 4.2.3: regularity in plan and elevation, torsional flexibility → q."""
+        from ..structure.regularity import regularity
+        reg = regularity(an, md, info)
+        calc.heading("Structural regularity (EN 1998-1 4.2.3)")
+        ok = lambda b: "✓" if b else "✗"  # noqa: E731
+        calc.table(["Floor", "x_CM [m]", "y_CM [m]", "x_CR [m]", "y_CR [m]", "e_0x [m]", "e_0y [m]",
+                    "r_x [m]", "r_y [m]", "l_s [m]", "e_0 ≤ 0.3 r", "r ≥ l_s"],
+                   [[str(f.index), f"{f.cm[0] / 1e3:.2f}", f"{f.cm[1] / 1e3:.2f}",
+                     f"{f.cr[0] / 1e3:.2f}", f"{f.cr[1] / 1e3:.2f}", f"{f.e0x / 1e3:.2f}",
+                     f"{f.e0y / 1e3:.2f}", f"{f.rx / 1e3:.2f}", f"{f.ry / 1e3:.2f}",
+                     f"{f.ls / 1e3:.2f}", ok(f.ok_ecc), ok(f.ok_radius)] for f in reg.floors],
+                   caption="Centre of mass CM, centre of stiffness CR, torsional radii r and radius "
+                           "of gyration l_s per floor (4.2.3.2(6)); CR, r from the 3×3 floor "
+                           "flexibility under unit loads at that floor")
+        calc.table(["Criterion", "Value", "Limit", ""],
+                   [[calc.tr("Compactness: recesses / floor area"), f"{reg.compact_ratio:.1%}",
+                     "5 %", ok(reg.compact_ratio <= 0.05)],
+                    [calc.tr("Slenderness λ = L_max / L_min"), f"{reg.slenderness:.2f}", "4",
+                     ok(reg.slenderness <= 4)]],
+                   caption="EN 1998-1 4.2.3.2(4), (5)")
+        rows = []
+        for n, m_ in enumerate(reg.storey_m):
+            rows.append([str(n + 1), f"{m_ * 1e3:.0f}", f"{reg.storey_k['X'][n] / 1e3:.0f}",
+                         f"{reg.storey_k['Y'][n] / 1e3:.0f}"])
+        calc.table(["Storey", "m [t]", "K_X [kN/mm]", "K_Y [kN/mm]"], rows,
+                   caption="Storey mass and lateral stiffness (V_i / interstorey drift under the "
+                           "lateral-force pattern). EN 1998-1 4.2.3.3(3) gives no numerical "
+                           "limits; flagged here: stiffness < 70 % of the storey above or mass > "
+                           "150 % of the storey above (indicative)")
+        verdict = calc.tr("regular") if reg.plan_regular else calc.tr("not regular")
+        calc.label("Plan", verdict, "Regularity in plan (4.2.3.2)")
+        calc.label("Elevation", calc.tr("regular") if reg.elevation_regular else
+                   calc.tr("not regular"), "Regularity in elevation (4.2.3.3)")
+        calc.label("Torsion", calc.tr("torsionally flexible") if reg.torsionally_flexible else
+                   calc.tr("torsionally stiff"), "r ≥ l_s in both directions (5.1.2)")
+        q = inp["q_factor"]
+        q_used = reg.q_effective(q) if inp["regularity"] else q
+        if not reg.plan_regular:
+            calc.note("Not regular in plan: a spatial model is required (Table 4.1) — used here.")
+        if q_used < q - 1e-9:
+            calc.formula("q", calc.tr("{q:g} reduced for irregularity (4.2.3.1(7), Table 5.1)",
+                                      q=q), q_used, "", "Behaviour factor used", dp=2)
+        elif not inp["regularity"] and (not reg.elevation_regular or reg.torsionally_flexible):
+            calc.warn("The EC8 regularity consequences on q are switched off — justify q.")
+        calc.regularity = reg
+        calc.q_used = q_used
+        return q_used
+
     @classmethod
-    def _seismic_section(cls, calc, inp, na, an, psi2):
+    def _seismic_section(cls, calc, inp, na, an, psi2, info):
         psiE = inp["phi_E"] * psi2
         calc.heading("Masses and modal analysis")
         calc.formula("ψ_E", "φ ψ_2", psiE, "", "Combination coefficient for the mass",
@@ -272,10 +327,20 @@ class BuildingFrame(DesignModule):
         md = modal(an, {"G": 1.0, "Q": psiE}, n_modes=inp["n_modes"])
         calc.formula("M", "Σ (G + ψ_E Q) / g", md.total_mass["X"] * 1e3, "",
                      "Seismic mass above the base [t]", dp=1)
+        kind = {"X": calc.tr("translation X"), "Y": calc.tr("translation Y"),
+                "RZ": calc.tr("torsion")}
+        table = md.table()
         rows = [[str(r["mode"]), f"{r['T']:.3f}", f"{r['mX'] * 100:.1f}", f"{r['sumX'] * 100:.1f}",
-                 f"{r['mY'] * 100:.1f}", f"{r['sumY'] * 100:.1f}"] for r in md.table()]
-        calc.table(["Mode", "T [s]", "m_X [%]", "Σm_X [%]", "m_Y [%]", "Σm_Y [%]"], rows,
-                   caption="Periods and effective modal masses")
+                 f"{r['mY'] * 100:.1f}", f"{r['sumY'] * 100:.1f}",
+                 f"{r.get('mRZ', 0.0) * 100:.1f}", kind.get(r["type"], "")] for r in table]
+        calc.table(["Mode", "T [s]", "m_X [%]", "Σm_X [%]", "m_Y [%]", "Σm_Y [%]", "m_RZ [%]",
+                    "Type"], rows,
+                   caption="Periods, effective modal masses (translation and rotation about the "
+                           "vertical axis) and the character of each mode")
+        calc.modes_table = table
+        if table and table[0]["type"] == "RZ":
+            calc.warn("The first mode is torsional: the building is torsionally sensitive — add "
+                      "stiffness (walls) at the perimeter.")
         for d in ("X", "Y"):
             calc.check_min(calc.tr("Σ effective mass in {d} ≥ 90 %", d=d),
                            float(md.cumulative(d)[-1]), 0.90, "", "EN 1998-1 4.3.3.3.1(3)",
@@ -283,8 +348,9 @@ class BuildingFrame(DesignModule):
             if md.cumulative(d)[-1] < 0.90:
                 calc.issues.append({"type": "modes"})
 
+        q_used = cls._regularity_section(calc, inp, an, md, info)
         calc.heading("Design spectrum")
-        sp = ec8_spectrum(inp["ag"], inp["ground"], inp["q_factor"], inp["importance"],
+        sp = ec8_spectrum(inp["ag"], inp["ground"], q_used, inp["importance"],
                           calc.project.annex)
         calc.input("a_gR", inp["ag"], "", "Reference peak ground acceleration [g]", dp=3)
         calc.formula("a_g", "γ_I a_gR", sp.ag, "", "Design ground acceleration [g]",
@@ -741,6 +807,19 @@ class BuildingFrame(DesignModule):
                                         for e in r["elements"]],
                            "punching": [{"grid": p["grid"], "util": float(p["util"])}
                                         for p in r["punching"]]}
+        mt = getattr(calc, "modes_table", None)
+        if mt:
+            out["modes"] = [{k: (v if isinstance(v, (str, int)) else round(float(v), 4))
+                             for k, v in r.items()} for r in mt]
+        reg = getattr(calc, "regularity", None)
+        if reg is not None:
+            out["regularity"] = {
+                "plan": reg.plan_regular, "elevation": reg.elevation_regular,
+                "torsional": reg.torsionally_flexible, "q_used": getattr(calc, "q_used", None),
+                "floors": [{"index": f.index, "cm": [f.cm[0] / 1e3, f.cm[1] / 1e3],
+                            "cr": [f.cr[0] / 1e3, f.cr[1] / 1e3], "rx": f.rx / 1e3,
+                            "ry": f.ry / 1e3, "ls": f.ls / 1e3, "e0x": f.e0x / 1e3,
+                            "e0y": f.e0y / 1e3} for f in reg.floors]}
         if seis is not None:
             out["periods"] = [float(t) for t in seis.modes.periods[:6]]
             out["base_shear"] = {d: v / 1e3 for d, v in seis.base_shear.items()}
@@ -749,6 +828,74 @@ class BuildingFrame(DesignModule):
                                                                    s.drift.items()},
                                        "theta": s.theta})
         return out
+
+    @staticmethod
+    def _ghosts(sc, spec, info, m) -> None:
+        """Translucent boxes at empty column positions and missing beams, so the 3D view can
+        be used to add them back (pick ids as in the plan editor)."""
+        xs, ys, zs = info["xs"], info["ys"], info["zs"]
+        lay = spec.layout or {}
+        walls = {str(w["at"]).upper() for w in spec.walls}
+        g = "#8fb3d9"
+        for i, x in enumerate(xs):
+            for j, y in enumerate(ys):
+                gid = grid_label(i, j)
+                if gid in set(lay.get("omit_columns", [])) and gid not in walls:
+                    for z0, z1 in zip(zs[:-1], zs[1:]):
+                        sc.box("ghost", (m(x), m((z0 + z1) / 2), m(y)), (0.25, m(z1 - z0), 0.25),
+                               g, opacity=0.12, edges=False, pick=f"point:{gid}")
+        for key in lay.get("omit_beams", []):
+            a, b = key.split("-")
+            ia = next((i, j) for i in range(len(xs)) for j in range(len(ys)) if grid_label(i, j) == a)
+            ib = next((i, j) for i in range(len(xs)) for j in range(len(ys)) if grid_label(i, j) == b)
+            x0, y0, x1, y1 = xs[ia[0]], ys[ia[1]], xs[ib[0]], ys[ib[1]]
+            for z in zs[1:]:
+                size = (m(abs(x1 - x0)) or 0.2, 0.2, m(abs(y1 - y0)) or 0.2)
+                sc.box("ghost", (m((x0 + x1) / 2), m(z) - 0.15, m((y0 + y1) / 2)), size, g,
+                       opacity=0.12, edges=False, pick=f"beam:{key}")
+
+    @staticmethod
+    def _diagrams(sc, res, frame, m, ext) -> None:
+        """M, V and N diagrams of the ULS combination drawn on the members (tension side)."""
+        an = res.analysis
+        comps = {"dM": ("My", "Mz"), "dV": ("Vz", "Vy"), "dN": ("N", None)}
+        colors = {"dM": "#e03b3b", "dV": "#2e9b5f", "dN": "#8e6cc4"}
+        data = {}
+        for mem in frame:
+            data[mem.id] = res.forces(mem.id, 11)
+        for layer, (major, minor) in comps.items():
+            vmax = max((np.abs(f[k]).max() for f in data.values() for k in (major, minor) if k),
+                       default=0.0) or 1.0
+            scale = 0.08 * ext / vmax
+            peak = (0.0, None)
+            for mem in frame:
+                f = data[mem.id]
+                e = an.elements[an.member_index[mem.id]]
+                ex, ey, ez = e.R
+                key, axis = major, -ez
+                if minor and np.abs(f[minor]).max() > np.abs(f[major]).max():
+                    key, axis = minor, -ey
+                if layer == "dN":
+                    axis = ey if abs(ex[2]) < 0.5 else np.array([1.0, 0.0, 0.0])
+                if layer == "dV":
+                    axis = -axis
+                pi = an.model.nodes[mem.i].xyz
+                verts, faces = [], []
+                for x, v in zip(f["x"], f[key]):
+                    p = pi + ex * x
+                    q = p + axis * v * scale
+                    verts += [(m(p[0]), m(p[2]), m(p[1])), (m(q[0]), m(q[2]), m(q[1]))]
+                for k in range(len(f["x"]) - 1):
+                    a = 2 * k
+                    faces += [(a, a + 1, a + 3), (a, a + 3, a + 2)]
+                sc.mesh(layer, verts, faces, colors[layer], opacity=0.55)
+                k_ = int(np.argmax(np.abs(f[key])))
+                if abs(f[key][k_]) > abs(peak[0]):
+                    peak = (f[key][k_], verts[2 * k_ + 1])
+            if peak[1] is not None:
+                unit = "kN" if layer != "dM" else "kNm"
+                val = peak[0] / (1e6 if layer == "dM" else 1e3)
+                sc.label(layer, f"{val:.0f} {unit}", peak[1], "result")
 
     @staticmethod
     def _quantities(spec, info, an, designs) -> dict:
@@ -872,8 +1019,13 @@ class BuildingFrame(DesignModule):
         sc.layer("slabs", "Slabs")
         if spec.foundation:
             sc.layer("found", "Foundation beams")
+        sc.layer("ghost", "Empty positions (click to add)")
+        for key, label in (("dM", "Bending moments M (ULS)"), ("dV", "Shear forces V (ULS)"),
+                           ("dN", "Axial forces N (ULS)"), ("defl", "Deformed shape (G+ψ2Q)")):
+            sc.layer(key, label, visible=False)
         if seis is not None:
-            sc.layer("mode", "Mode 1 (deformed)", visible=False)
+            for n in range(min(3, seis.modes.n_modes)):
+                sc.layer(f"mode{n + 1}", calc.tr("Mode {n} (deformed)", n=n + 1), visible=False)
         sc.layer("grid", "Grid labels")
         des = {d.member: d for d in designs}
         for mid in an.model.members:  # every wall storey shows its base design
@@ -921,7 +1073,10 @@ class BuildingFrame(DesignModule):
                 t = ((d.rho - 0.01) / 0.03 if d.kind == "column" else
                      d.rho / 0.02 if d.kind == "wall" else d.rho / 0.03)
                 col = heat_color(0.85 * min(max(t, 0.0), 1.0))
-            sc.box("frame", tuple(m(v) for v in c), tuple(m(v) for v in size), col)
+            pk = mem.id.split(".", 1)[1]
+            pick = {"C": "column", "W": "wall", "B": "beam"}.get(mem.id[0])
+            sc.box("frame", tuple(m(v) for v in c), tuple(m(v) for v in size), col,
+                   pick=f"{pick}:{pk}" if pick else None)
         xs, ys, zs = info["xs"], info["ys"], info["zs"]
         rf = info.get("raft")
         if rf:
@@ -950,20 +1105,37 @@ class BuildingFrame(DesignModule):
                     sc.box("slabs", (m((xs[i] + xs[i + 1]) / 2), m(z - spec.slab_t / 2),
                                      m((ys[j] + ys[j + 1]) / 2)),
                            (m(xs[i + 1] - xs[i]), m(spec.slab_t), m(ys[j + 1] - ys[j])),
-                           PALETTE["concrete"], opacity=0.35, edges=False)
-        if seis is not None:
-            shape = seis.modes.mode_shape(0)
-            scale = 0.08 * max(xs[-1], ys[-1], zs[-1])
-            dm = an.dofmap
-            for mem in model.members.values():
+                           PALETTE["concrete"], opacity=0.35, edges=False, pick=f"panel:{grid_label(i, j)}")
+        ext = max(xs[-1], ys[-1], zs[-1])
+        BuildingFrame._ghosts(sc, spec, info, m)
+        dm = an.dofmap
+        frame = [mm for mm in model.members.values() if mm.id[0] in "CWB" and "." in mm.id]
+
+        def deformed(layer, u_nodes, scale, color):
+            for mem in frame:
                 pts = []
                 for nid in (mem.i, mem.j):
                     n = model.nodes[nid]
-                    u = shape[dm.index[nid]] * scale
+                    u = u_nodes[dm.index[nid]] * scale
                     pts.append((m(n.x + u[0]), m(n.z + u[2]), m(n.y + u[1])))
-                sc.line("mode", pts, PALETTE["seismic"])
-            sc.label("mode", calc.tr("T_1 = {t:.3f} s", t=float(seis.modes.periods[0])),
-                     (m(xs[-1] / 2), m(zs[-1]) + 1.2, m(ys[-1] / 2)), "result")
+                sc.line(layer, pts, color)
+
+        if seis is not None:
+            kinds = {"X": "X", "Y": "Y", "RZ": calc.tr("torsion")}
+            for n in range(min(3, seis.modes.n_modes)):
+                deformed(f"mode{n + 1}", seis.modes.mode_shape(n), 0.08 * ext, PALETTE["seismic"])
+                sc.label(f"mode{n + 1}", calc.tr("Mode {n}: T = {t:.3f} s ({k})", n=n + 1,
+                                                 t=float(seis.modes.periods[n]),
+                                                 k=kinds.get(seis.modes.mode_type(n), "")),
+                         (m(xs[-1] / 2), m(zs[-1]) + 1.2, m(ys[-1] / 2)), "result")
+        quasi, uls = getattr(calc, "_quasi", None), getattr(calc, "_uls", None)
+        if quasi is not None:
+            umax = np.abs(quasi.u[:, :3]).max() or 1.0
+            deformed("defl", quasi.u, 0.04 * ext / umax, "#2f8fd8")
+            sc.label("defl", calc.tr("max |u| = {u:.1f} mm", u=umax),
+                     (m(xs[-1] / 2), m(zs[-1]) + 0.8, m(ys[-1] / 2)), "result")
+        if uls is not None:
+            BuildingFrame._diagrams(sc, uls, frame, m, ext)
         for i, x in enumerate(xs):
             sc.label("grid", str(i + 1), (m(x), -0.4, -1.0))
         for j, y in enumerate(ys):
