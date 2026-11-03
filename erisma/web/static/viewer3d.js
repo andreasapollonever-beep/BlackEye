@@ -269,14 +269,17 @@ class Viewer {
   }
 }
 
-let viewer = null;
+// One viewer per host element: the calculation preview ("viewer3d") and the
+// Erisma Structure workspace ("st-3d") each have their own.
+const viewers = {};
 function show(detail) {
-  const host = document.getElementById("viewer3d");
+  const id = detail?.host || "viewer3d";
+  const host = document.getElementById(id);
   if (!host || !detail?.model) return;
-  viewer ||= new Viewer(host);
-  viewer.load(detail.model, detail.summary);
-  viewer.resize();
+  viewers[id] ||= new Viewer(host);
+  viewers[id].load(detail.model, detail.summary);
+  viewers[id].resize();
 }
 window.addEventListener("erisma:model3d", (e) => show(e.detail));
-window.addEventListener("erisma:show3d", () => viewer?.resize());
+window.addEventListener("erisma:show3d", (e) => viewers[e.detail?.host || "viewer3d"]?.resize());
 if (window.__erismaModel) show(window.__erismaModel);

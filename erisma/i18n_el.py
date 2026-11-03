@@ -2378,4 +2378,12 @@ EL: dict[str, str] = {
         "Δοκός {g}: το ύψος πρέπει να είναι μεγαλύτερο από το πάχος της πλάκας",
     "Slab panel {p} has no supporting beam — add a beam or make it an opening":
         "Το φάτνωμα {p} δεν στηρίζεται σε καμία δοκό — προσθέστε δοκό ή κάντε το άνοιγμα",
+    "Missing columns/beams, slab openings and member sizes — drawn in Erisma Structure.":
+        "Υποστυλώματα/δοκοί που λείπουν, ανοίγματα πλακών και διατομές μελών — σχεδιάζονται στο "
+        "Erisma Structure.",
+    "Capacity design is switched off: ΣM_Rc ≥ 1.3 ΣM_Rb (4.4.2.3) and the capacity-design shears are not checked.":
+        "Ο ικανοτικός σχεδιασμός είναι απενεργοποιημένος: δεν ελέγχονται το ΣM_Rc ≥ 1.3 ΣM_Rb "
+        "(4.4.2.3) και οι ικανοτικές τέμνουσες.",
+    "Columns: braced = no (r_m = 1), l_0 = clear height.":
+        "Υποστυλώματα: μη δεσμευμένα (r_m = 1), l_0 = καθαρό ύψος.",
 }

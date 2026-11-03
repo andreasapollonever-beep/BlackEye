@@ -604,6 +604,12 @@ function openModule(id, inputs) {
 
 function route() {
   const id = location.hash.slice(1);
+  document.body.classList.toggle("in-structure", id === "structure");
+  if (id === "structure" && window.Structure) {
+    document.body.classList.remove("at-home");
+    Structure.show();
+    return;
+  }
   if (id.startsWith("p/") && window.Proj?.item(id.slice(2))) {
     const c = Proj.item(id.slice(2));
     document.body.classList.remove("at-home");
@@ -825,10 +831,12 @@ function download(name, text, type) {
   document.body.append(a); a.click(); a.remove();
 }
 const fileBase = () => (state.project.job_no || "calc").replace(/[^\w.-]+/g, "_") + "_" + state.schema.id;
+const inStructure = () => document.body.classList.contains("in-structure") && window.Structure;
 const actions = {
-  print: () => $("#report").contentWindow.print(),
-  html: () => download(`${fileBase()}.html`, state.lastHtml, "text/html"),
+  print: () => (inStructure() ? Structure.print() : $("#report").contentWindow.print()),
+  html: () => (inStructure() ? Structure.html() : download(`${fileBase()}.html`, state.lastHtml, "text/html")),
   save: () => {
+    if (inStructure()) { Structure.save(); return; }
     if (window.Proj?.ws.calcs.length) {
       const name = (state.project.job_no || state.project.project || "project").replace(/[^\w.-]+/g, "_");
       download(`${name}.erisma`, JSON.stringify(Proj.doc(), null, 2), "application/json");
@@ -902,6 +910,11 @@ $("#file-open").onchange = async (e) => {
     state.project = doc.project || {};
     store.set("erisma.project", state.project);
     renderProject();
+    if (doc.workspace === "structure" && window.Structure) {
+      Structure.load(doc.inputs || {});
+      location.hash = "structure";
+      return;
+    }
     if (doc.version === 2 && Array.isArray(doc.calcs)) {
       Proj.ws = { calcs: doc.calcs }; Proj.status = {}; Proj.save();
       await Proj.refresh(); renderNav();
@@ -918,6 +931,10 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "F1") { e.preventDefault(); openManual(); return; }
   if (!(e.ctrlKey || e.metaKey)) return;
   const k = e.key.toLowerCase();
+  if ((k === "z" || k === "y") && inStructure()) {
+    e.preventDefault(); Structure.undo(k === "y" || e.shiftKey ? 1 : -1); return;
+  }
+  if (k === "3" && inStructure()) { e.preventDefault(); Structure.toggle3d(); return; }
   if ((k === "z" || k === "y") && state.schema && !document.body.classList.contains("at-home")) {
     e.preventDefault(); undo(k === "y" || e.shiftKey ? 1 : -1); return;
   }
@@ -935,7 +952,7 @@ document.querySelectorAll(".lang button").forEach((b) => (b.onclick = async () =
   state.modules = await api("/api/modules");
   renderNav();
   if (document.body.classList.contains("at-home")) renderHome();
-  else selectModule(state.schema.id, state.inputs);
+  else if (!inStructure() && state.schema) selectModule(state.schema.id, state.inputs);
 }));
 
 $("#btn-theme").onclick = () => setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");

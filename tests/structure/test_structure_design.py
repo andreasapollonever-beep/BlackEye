@@ -90,3 +90,22 @@ def test_module_variants_run():
     assert mod.calculate({"walls": [], "pdelta": True}).checks
     with pytest.raises(Exception):
         mod.calculate({"walls": [{"at": "Z9", "dir": "X", "L": 2, "t": 250}]})
+
+
+def test_web_api_returns_member_results_for_the_workspace():
+    from fastapi.testclient import TestClient
+
+    from erisma.web.app import app
+
+    c = TestClient(app)
+    r = c.post("/api/modules/building_frame/run",
+               json={"inputs": {"layout": {"omit_columns": ["B2"], "openings": ["A1"]}},
+                     "lang": "el"})
+    assert r.status_code == 200
+    st = r.json()["structure"]
+    assert "C1.A1" in st["members"] and "C1.B2" not in st["members"]
+    assert st["members"]["C1.A1"]["module"] == "ec2_rc_column"
+    bad = c.post("/api/modules/building_frame/run",
+                 json={"inputs": {"layout": {"omit_beams": ["Z1-Z2"]}}, "lang": "el"})
+    assert bad.status_code == 422 and bad.json()["detail"]["field"] == "layout"
+    assert "structure.js" in c.get("/").text

@@ -288,6 +288,52 @@ zoom. Το πλαίσιο <b>Επίπεδα</b> ανάβει/σβήνει έδα
 ]
 
 CHAPTERS += [
+    ("structure", {"en": "Erisma Structure: whole buildings", "el": "Erisma Structure: ολόκληρα κτίρια"}, {
+        "en": """
+<p><b>Erisma Structure</b> is the second space of the program (button on the home page). It
+analyses and designs a whole RC building drawn in plan, with the same calculations, reports,
+3D viewer and licence as the member calculations.</p>
+<ol>
+<li><b>Grid:</b> on the left give the spans along X and Y and the storey heights. The
+defaults are a realistic 3-storey building that passes.</li>
+<li><b>Draw:</b> pick a tool and click in the plan — <b>Column</b> (C) or <b>Wall X / Y</b>
+(W) on a grid point, <b>Beam</b> (B) between two grid points (adds or removes it),
+<b>Opening</b> (O) on a slab panel. With <b>Select</b> (V) click any element to change its size;
+<b>Del</b> removes it, <b>Ctrl+Z / Ctrl+Y</b> undo and redo.</li>
+<li><b>Results:</b> after every change the building is re-analysed (3D frame, modal response
+spectrum, drift, θ, capacity design) and every member is designed. In the plan each member is
+coloured by its utilisation; red means it fails — the panel on the right says why and what to
+change. The table of the selected element lists its reinforcement per storey; ↗ opens that
+member, with its design forces, in the member calculation.</li>
+<li><b>Report and 3D:</b> the <b>3D</b> and <b>Report</b> buttons (Ctrl+3) show the model
+and the full step-by-step report, which prints with Ctrl+P.</li>
+</ol>
+<p>The layout is the same on every storey (typical floor). The work is saved automatically in
+the browser; <b>Save</b> writes a project file that <b>Open</b> brings back.</p>""",
+        "el": """
+<p>Το <b>Erisma Structure</b> είναι ο δεύτερος χώρος του προγράμματος (κουμπί στην αρχική
+σελίδα). Αναλύει και διαστασιολογεί ολόκληρο κτίριο Ο/Σ που σχεδιάζεται σε κάτοψη, με τους
+ίδιους υπολογισμούς, τεύχη, 3D προβολή και άδεια με τους υπολογισμούς μελών.</p>
+<ol>
+<li><b>Κάνναβος:</b> αριστερά δίνετε τα ανοίγματα κατά X και Y και τα ύψη ορόφων. Οι
+προεπιλογές είναι ένα ρεαλιστικό τριώροφο κτίριο που επαρκεί.</li>
+<li><b>Σχεδίαση:</b> διαλέγετε εργαλείο και κάνετε κλικ στην κάτοψη — <b>Υποστύλωμα</b> (C)
+ή <b>Τοίχωμα X / Y</b> (W) σε κόμβο του καννάβου, <b>Δοκός</b> (B) ανάμεσα σε δύο κόμβους
+(προσθήκη ή αφαίρεση), <b>Άνοιγμα πλάκας</b> (O) σε φάτνωμα. Με την <b>Επιλογή</b> (V)
+κάνετε κλικ σε στοιχείο για να αλλάξετε τη διατομή του· το <b>Del</b> το διαγράφει, τα
+<b>Ctrl+Z / Ctrl+Y</b> αναιρούν και επαναλαμβάνουν.</li>
+<li><b>Αποτελέσματα:</b> μετά από κάθε αλλαγή το κτίριο επιλύεται ξανά (χωρικό πλαίσιο,
+φάσμα απόκρισης, σχετικές μετακινήσεις, θ, ικανοτικός σχεδιασμός) και διαστασιολογείται κάθε
+μέλος. Στην κάτοψη κάθε μέλος χρωματίζεται ανάλογα με την εκμετάλλευσή του· κόκκινο σημαίνει
+ανεπάρκεια — δεξιά φαίνεται γιατί και τι να αλλάξετε. Ο πίνακας του επιλεγμένου στοιχείου
+δίνει τον οπλισμό ανά όροφο· το ↗ ανοίγει το μέλος, με τα εντατικά του, στον υπολογισμό
+μέλους.</li>
+<li><b>Τεύχος και 3D:</b> τα κουμπιά <b>3D</b> και <b>Τεύχος</b> (Ctrl+3) δείχνουν το
+μοντέλο και το πλήρες αναλυτικό τεύχος, που εκτυπώνεται με Ctrl+P.</li>
+</ol>
+<p>Η διάταξη είναι ίδια σε όλους τους ορόφους (τυπικός όροφος). Η εργασία αποθηκεύεται
+αυτόματα στον browser· η <b>Αποθήκευση</b> γράφει αρχείο έργου που ανοίγει με το
+<b>Άνοιγμα</b>.</p>"""}),
     ("project", {"en": "Projects: several calculations together", "el": "Έργα: πολλοί υπολογισμοί μαζί"}, {
         "en": """
 <p>A <b>project</b> collects all the calculations of one job (e.g. column C1, footing F1,
