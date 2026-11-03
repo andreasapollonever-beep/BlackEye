@@ -8,7 +8,7 @@ clause references and PASS/FAIL checks — and produced as a print-ready calcula
 > Ευρωκώδικες. Κάθε υπολογισμός καταγράφεται αναλυτικά (δεδομένα → τύπος → τιμή →
 > παραπομπή κανονισμού → έλεγχος) και εξάγεται ως επαγγελματικό τεύχος υπολογισμών (HTML/PDF).
 
-## Features (v0.2)
+## Features (v0.4) — 25 modules
 
 | Module | Standard | Checks |
 |---|---|---|
@@ -20,6 +20,23 @@ clause references and PASS/FAIL checks — and produced as a print-ready calcula
 | Berlin wall (soldier pile wall) | EN 1997-1, EN 1993-1-1, EN 1995-1-1, EN 1998-5 | HEB/IPE soldier piles + timber lagging, cantilever (Blum) or single anchor row (free earth support), spatial passive resistance (f·b ≤ a), EC3 pile, EC5 lagging with arching, anchor force, seismic (M-O + Kpe), deflection — **3D** (piles, lagging, anchors, pressures, moments, deflected shape); verified against closed-form solutions |
 | Slope stability (Bishop) | EN 1997-1 §11, EN 1998-5 | Automatic critical-circle search, r_u, crest surcharge, pseudo-static seismic; verified against Taylor's chart — **3D** |
 | Cantilever retaining wall | EN 1997-1, EN 1998-5, EN 1992-1-1 | Optional **stepped stem** (checked at base and at the step) and **shear key** (passive resistance, EC2 key design); Coulomb active pressure on virtual back, sloping backfill, surcharge, groundwater & uplift, Mononobe-Okabe seismic thrust (±kv), sliding, overturning (EQU), bearing (Annex D, inclination factors), eccentricity, EC2 design of stem/heel/toe — DA1/DA2/DA3 — **interactive 3D model** |
+| Load combinations | EN 1990 Annex A1 | ULS 6.10, seismic 6.12b, SLS characteristic/frequent/quasi-permanent with ψ of the annex |
+| Wind and snow at the site | EN 1991-1-4, EN 1991-1-3 | q_p(z), wall pressures, roof snow — v_b,0 and s_k read from the Cyprus maps at the project site |
+| Seismic spectrum and lateral forces | EN 1998-1 | Type 1 spectrum, T1, base shear, storey forces |
+| RC column | EN 1992-1-1 §5.8, EN 1998-1 | Imperfections, slenderness, nominal curvature, biaxial bending, shear, detailing, DCM rules — **3D** |
+| RC slab | EN 1992-1-1 | Two-way panels (plate FD, any edges) or one-way continuous, reinforcement, shear, span/depth, punching — **3D** |
+| Strip footing and tie beams | EN 1997-1, EN 1992-1-1, EN 1998-5 | Bearing with inclination, sliding, transverse bending/shear, seismic tie beams — **3D** |
+| Single pile | EN 1997-1 §7 | Layered clay/sand, R1–R4 per pile type, model or ξ factors, tension, Broms lateral, RC section — **3D** |
+| Foundation settlement | EN 1997-1 §6.6 | Newmark stresses, E_oed or C_c/C_r/OCR, influence depth, Annex H — **3D stress bulb** |
+| Gabion wall | EN 1997-1, EN 1998-5 | Global stability plus every joint between courses — **3D** |
+| Embedded pile wall with anchors | EN 1997-1 §9 | Elastic–plastic subgrade reaction, several anchor rows, passive mobilisation, RC piles — **3D** |
+| Water tank / pool | EN 1992-3 | Water test and backfill cases, crack width vs w_k1, x_min, flotation (UPL) — **3D** |
+| Steel column | EN 1993-1-1 §6.3 | Buckling about both axes, LTB, Annex B interaction, class 4 webs — **3D** |
+| Bolted connection | EN 1993-1-8 §3 | Eccentric bolt group, shear, bearing, tension, punching, block tearing — **3D** |
+| Column base plate | EN 1993-1-8 §6.2 | f_jd, T-stubs, anchor bolts, M–N, shear — **3D** |
+| Timber beam | EN 1995-1-1 | k_mod/k_def, k_crit, shear, bearing, final deflection — **3D** |
+| Masonry wall | EN 1996-1-1 | f_k, γ_M (Cyprus Table 1), slenderness, Annex G, in-plane shear — **3D** |
+| Assessment & strengthening | EN 1998-3 Annex A | KL/CF, θ_y, θ_um, V_R, NC/SD/DL; RC jacket or FRP wrapping — **3D** |
 
 Platform:
 
@@ -32,8 +49,10 @@ Platform:
   prisms with arrows (earth / surcharge / water / seismic), base pressure, resultant forces,
   layer toggles, live utilisation panel, PNG export.
 * **National Annexes** — selectable per project: EN recommended values and **Cyprus** (CYS
-  National Annexes to EN 1990, 1992-1-1, 1997-1, 1998-1, 1998-5 — DA2, γR factors, anchor
-  1.35·Pk, v_Rd,max = 0.5νf_cd, seismic zones 0.15/0.20/0.25 g). Reports list every NDP used.
+  National Annexes to EN 1990, 1991-1-3/1-4, 1992-1-1, 1992-3, 1993-1-8, 1996-1-1, 1997-1,
+  1998-1, 1998-3, 1998-5 — DA2, γR and pile factors, anchor 1.35·Pk, v_Rd,max = 0.5νf_cd,
+  seismic zones 0.15/0.20/0.25 g, snow and wind maps, w_k1, γ_M masonry, CF). Reports list
+  every NDP used; where no annex is available (e.g. EN 1995-1-1) the report says so.
 * **Site map** — pick the project site on the official Cyprus zonation map (click, town search,
   GPS or coordinates); the zone and a_gR are filled in automatically and written to the report
   (highest zone within 1 km near boundaries).
