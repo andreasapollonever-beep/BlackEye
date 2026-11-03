@@ -21,6 +21,8 @@ from __future__ import annotations
 import string
 from dataclasses import dataclass, field
 
+import numpy as np
+
 from .model import Material, Model, Section, StructureError
 
 CONCRETE_WEIGHT = 25e-6  # N/mm³
@@ -66,6 +68,9 @@ class BuildingSpec:
     #   openings: ["A1", …] slab panels (named by their corner with the lowest indices) left open;
     #   col_sizes: {"A1": [b, h]} and beam_sizes: {"A1-A2": [b, h]} in mm override the defaults.
     layout: dict = field(default_factory=dict)
+    # foundation: None = fixed base; {"B", "bw", "h" (mm), "ks" (N/mm³), "n"} = foundation beams
+    # (inverted T: flange width B, web bw, depth h) on Winkler springs along the grid lines
+    foundation: dict | None = None
     labels: dict[str, str] = field(default_factory=dict)
 
     def check(self) -> None:
@@ -214,7 +219,7 @@ def build(spec: BuildingSpec) -> tuple[Model, dict]:
                     columns.append(cid)
                 m.member(cid, node_id(i, j, k - 1), node_id(i, j, k), sec, conc)
                 m.load_member("G", cid, wz=-CONCRETE_WEIGHT * sec.A)
-                if k == 1:
+                if k == 1 and not spec.foundation:
                     m.support(node_id(i, j, 0), "fixed")
 
         def add_beam(i1, j1, i2, j2, along, perimeter, store):
@@ -269,6 +274,7 @@ def build(spec: BuildingSpec) -> tuple[Model, dict]:
         level = [node_id(i, j, k) for i in range(nx) for j in range(ny)
                  if node_id(i, j, k) in used]
         m.diaphragm(f"L{k}", level)
+    fbeams = _foundation(m, spec, xs, ys, wall_at, conc) if spec.foundation else {}
     used = {mm.i for mm in m.members.values()} | {mm.j for mm in m.members.values()}
     for nid in [n for n in m.nodes if n not in used]:
         del m.nodes[nid]
@@ -277,5 +283,72 @@ def build(spec: BuildingSpec) -> tuple[Model, dict]:
     info = {"xs": xs, "ys": ys, "zs": zs, "columns": columns, "walls": walls,
             "wall_spec": wall_at, "beams_x": beams_x,
             "beams_y": beams_y, "concrete": conc, "col": col, "beam": beam,
-            "plan_area": area, "sizes": sizes, "openings": openings}
+            "plan_area": area, "sizes": sizes, "openings": openings, "fbeams": fbeams}
     return m, info
+
+
+def _foundation(m: Model, spec: BuildingSpec, xs, ys, wall_at, conc) -> dict[str, list[str]]:
+    """Foundation beams on Winkler springs along every grid segment joining two supported
+    grid points; returns grid segment → its sub-elements (FB.<segment>.<n>).
+
+    Each segment is divided into ``n`` elements; a node carries the vertical spring
+    k = k_s·B·(tributary length), horizontal translations are restrained (friction and
+    passive resistance), rotations are free.  Walls bear on the beam over their length
+    (rigid zone of half the wall length, which also takes its share of the springs).
+    """
+    f = spec.foundation
+    B, bw, h, ks, n = f["B"], f["bw"], f["h"], f["ks"], int(f.get("n", 6))
+    sec = Section.rectangle(bw, h, f"FB {bw:g}×{h:g}")
+    hf = min(250.0, h / 3)                       # flange thickness of the inverted T
+    w_self = -CONCRETE_WEIGHT * (bw * h + (B - bw) * hf)
+    nx, ny = len(xs), len(ys)
+    base = {nid for mm in m.members.values() for nid in (mm.i, mm.j) if nid.endswith("@0")}
+    trib: dict[str, float] = {}
+    out: dict[str, list[str]] = {}
+
+    def seg(i1, j1, i2, j2, along):
+        a, b = grid_label(i1, j1), grid_label(i2, j2)
+        na, nb = node_id(i1, j1, 0), node_id(i2, j2, 0)
+        if na not in base or nb not in base:
+            return
+        pa, pb = m.nodes[na].xyz, m.nodes[nb].xyz
+        L = float(np.linalg.norm(pb - pa))
+        oa = wall_at[a]["L"] / 2 if a in wall_at and wall_at[a]["dir"] == along else 0.0
+        ob = wall_at[b]["L"] / 2 if b in wall_at and wall_at[b]["dir"] == along else 0.0
+        Lf = L - oa - ob
+        key = f"{a}-{b}"
+        ids, prev = [], na
+        for k in range(1, n + 1):
+            if k < n:
+                nid = f"{key}@f{k}"
+                p = pa + (pb - pa) * (oa + Lf * k / n) / L
+                m.node(nid, *p)
+            else:
+                nid = nb
+            mid = f"FB.{key}.{k}"
+            spec.labels[mid] = key
+            m.member(mid, prev, nid, sec, conc, offset_i=oa if k == 1 else 0.0,
+                     offset_j=ob if k == n else 0.0)
+            m.load_member("G", mid, wz=w_self)
+            ids.append(mid)
+            for node, length in ((prev, Lf / n / 2 + (oa if k == 1 else 0.0)),
+                                 (nid, Lf / n / 2 + (ob if k == n else 0.0))):
+                trib[node] = trib.get(node, 0.0) + length
+            prev = nid
+        out[key] = ids
+
+    for j in range(ny):
+        for i in range(nx - 1):
+            seg(i, j, i + 1, j, "X")
+    for i in range(nx):
+        for j in range(ny - 1):
+            seg(i, j, i, j + 1, "Y")
+    for nid in base:
+        if nid not in trib:
+            raise StructureError("The column at {g} has no foundation beam — connect it to a "
+                                 "neighbouring column or use pad footings",
+                                 g=nid.split("@")[0])
+    for nid, length in trib.items():
+        s = m.support(nid, "free", springs=(0.0, 0.0, ks * B * length, 0.0, 0.0, 0.0))
+        s.restraints = (True, True, False, False, False, False)
+    return out

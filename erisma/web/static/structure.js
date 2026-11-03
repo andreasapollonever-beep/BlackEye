@@ -83,11 +83,27 @@ Object.assign(UI.el, {
   "Facade walls": "Τοιχοποιίες όψεων", "Category": "Κατηγορία", "Ground": "Έδαφος",
   "Importance": "Σπουδαιότητα", "EI cracked": "EI ρηγματ.", "Non-structural": "Μη φέροντα",
   "Concrete": "Σκυρόδεμα", "Cover": "Επικάλυψη",
+  "Foundation": "Θεμελίωση", "Soil": "Έδαφος", "Type": "Τύπος", "Foundation beam": "Πεδιλοδοκός",
+  "Footing": "Πέδιλο", "Slab": "Πλάκα", "Auto-size": "Αυτόματη διαστ.",
+  "Enlarge members and adjust options until every Eurocode check passes":
+    "Μεγέθυνση μελών και προσαρμογή επιλογών μέχρι να περάσουν όλοι οι έλεγχοι των Ευρωκωδίκων",
+  "Automatic sizing…": "Αυτόματη διαστασιολόγηση…",
+  "Running the complete calculation repeatedly — this can take a little while.":
+    "Ο πλήρης υπολογισμός εκτελείται επανειλημμένα — μπορεί να διαρκέσει λίγο.",
+  "All Eurocode checks pass after these changes:": "Όλοι οι έλεγχοι των Ευρωκωδίκων επαρκούν μετά από αυτές τις αλλαγές:",
+  "Nothing to change — every check already passes.": "Δεν χρειάζεται αλλαγή — όλοι οι έλεγχοι ήδη επαρκούν.",
+  "Still failing after the automatic changes — change these by hand:":
+    "Εξακολουθούν να ανεπαρκούν μετά τις αυτόματες αλλαγές — αλλάξτε τα χειροκίνητα:",
+  "Round": "Γύρος", "Apply": "Εφαρμογή", "Design slabs": "Πλάκες", "Design foundation": "Θεμελίωση",
+  "Flange B": "Πέλμα B", "Web b_w": "Κορμός b_w", "Depth h": "Ύψος h", "k_s": "k_s", "D": "D",
+  "φ'": "φ'", "c'": "c'", "γ": "γ", "Foundation beams": "Πεδιλοδοκοί",
 });
 const SHORT = { col_b: "Column b_x", col_h: "Column h_y", beam_b: "Beam b", beam_h: "Beam h", slab_t: "Slab t",
   g_finish: "Finishes g", q: "Imposed q", q_roof: "Roof q", g_wall: "Facade walls", category: "Category",
   ag: "a_gR [g]", ground: "Ground", importance: "Importance", q_factor: "q", cracked: "EI cracked",
-  drift: "Non-structural", n_modes: "Modes", phi_E: "φ (ψ_E)", concrete: "Concrete", fyk: "f_yk", cover: "Cover" };
+  drift: "Non-structural", n_modes: "Modes", phi_E: "φ (ψ_E)", concrete: "Concrete", fyk: "f_yk", cover: "Cover",
+  found_type: "Type", fb_B: "Flange B", fb_bw: "Web b_w", fb_h: "Depth h", ks: "k_s", D_found: "D",
+  phi_soil: "φ'", c_soil: "c'", gamma_soil: "γ" };
 
 const Structure = (() => {
   const KEY = "erisma.structure";
@@ -107,6 +123,11 @@ const Structure = (() => {
   const arr = (k) => (lay()[k] ||= []);
   const obj = (k) => (lay()[k] ||= {});
   const field = (n) => S.schema.fields.find((f) => f.name === n);
+  const shownIf = (f) => {   // "name" (bool switch) or "name=value"
+    if (!f?.show_if) return true;
+    const [k, v] = f.show_if.split("=");
+    return v === undefined ? !!S.inp[k] : String(S.inp[k]) === v;
+  };
   const heat = (x) => {
     const st = [[0, [47, 111, 216]], [0.35, [46, 155, 95]], [0.7, [240, 196, 40]], [1, [224, 59, 59]]];
     x = Math.max(0, Math.min(1, x));
@@ -124,7 +145,8 @@ const Structure = (() => {
   };
   const wallAt = (g) => (S.inp.walls || []).find((w) => String(w.at).toUpperCase() === g);
   const isSel = (kind, id) => S.sel.some((s) => s.kind === kind && s.id === id);
-  const KIND = () => ({ column: t("Column"), wall: t("Wall"), beam: t("Beam"), panel: t("Slab panel") });
+  const KIND = () => ({ column: t("Column"), wall: t("Wall"), beam: t("Beam"), panel: t("Slab panel"),
+    slab: t("Slab"), fbeam: t("Foundation beam"), footing: t("Footing") });
 
   // ------------------------------------------------------------ icons (24×24, stroke)
   const P = {
@@ -171,6 +193,8 @@ const Structure = (() => {
     qty: '<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>',
     tag: '<path d="M3 12V3h9l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
     min: '<path d="M6 15l6-6 6 6"/>',
+    autosize: '<path d="M4 20L20 4"/><path d="M14 4h6v6"/><rect x="3" y="13" width="8" height="8"/><path d="M15 15l2 2 4-4"/>',
+    found: '<path d="M3 20h18"/><rect x="5" y="14" width="14" height="4"/><path d="M9 14V4h6v10"/>',
   };
   const icon = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${P[k] || ""}</svg>`;
 
@@ -251,12 +275,12 @@ const Structure = (() => {
     if (!(name in S.inp)) S.inp[name] = structuredClone(f.default);
     const input = scalarInput(f, S.inp[name], (v) => {
       S.inp[name] = v;
-      if (S.schema.fields.some((x) => x.show_if === name)) renderRibbon();
+      if (S.schema.fields.some((x) => x.show_if && x.show_if.split("=")[0] === name)) renderRibbon();
       renderSettings();
       commit();
     });
     input.style.width = `${width}px`;
-    const hidden = f.show_if && !S.inp[f.show_if];
+    const hidden = !shownIf(f);
     const lab = el("label", { class: `rb-ctl${hidden ? " off" : ""}`, title: f.help ? `${f.label} — ${f.help}` : f.label },
       el("span", {}, label || (SHORT[name] ? t(SHORT[name]) : f.label)), input, el("small", {}, f.unit || ""));
     if (hidden) input.disabled = true;
@@ -268,7 +292,7 @@ const Structure = (() => {
       S.inp[name] = e.target.checked; renderRibbon(); renderSettings(); commit();
     } } });
     cb.checked = !!S.inp[name];
-    if (f?.show_if && !S.inp[f.show_if]) cb.disabled = true;
+    if (!shownIf(f)) cb.disabled = true;
     return el("label", { class: "rb-chk", title: f?.help || label }, cb, el("span", {}, label));
   }
   function viewTog(key, label, fn) {
@@ -300,7 +324,8 @@ const Structure = (() => {
             btn("selwall", t("All walls"), "", () => selectAll("wall"))),
           col(btn("selfail", t("Failing members"), "", selectFailing), btn("clear", t("Clear"), "Esc", () => setSel([])))),
         group(t("Analysis"), btn("run", t("Run"), t("Run the analysis (F5)"), () => run(), { big: true, on: S.dirty }),
-          btn("auto", t("Auto"), t("Re-analyse automatically after every change"), () => { S.auto = !S.auto; renderRibbon(); if (S.auto && S.dirty) run(); }, { big: true, on: S.auto })),
+          btn("auto", t("Auto"), t("Re-analyse automatically after every change"), () => { S.auto = !S.auto; renderRibbon(); if (S.auto && S.dirty) run(); }, { big: true, on: S.auto }),
+          btn("autosize", t("Auto-size"), t("Enlarge members and adjust options until every Eurocode check passes"), autoSize, { big: true })),
         group(t("Views"), btn("plan", t("Plan"), t("Plan"), () => setView("plan"), { big: true, on: v("plan") }),
           btn("cube", "3D", "3D (Ctrl+3)", () => setView("3d"), { big: true, on: v("3d") }),
           btn("table", t("Table"), t("Table"), () => setView("table"), { big: true, on: v("table") }),
@@ -333,17 +358,26 @@ const Structure = (() => {
       ]],
       ["design", t("Design"), [
         group(t("Materials"), col(ctl("concrete", { width: 86 }), ctl("fyk")), col(ctl("cover"))),
-        group(t("Options"), col(tog("design", t("Design members")), tog("capacity", t("Capacity design")))),
+        group(t("Options"), col(tog("design", t("Design members")), tog("capacity", t("Capacity design"))),
+          col(tog("slabs", t("Design slabs")), tog("foundations", t("Design foundation")))),
+        group(t("Auto-size"), btn("autosize", t("Auto-size"), t("Enlarge members and adjust options until every Eurocode check passes"), autoSize, { big: true })),
         group(t("Member tables"), btn("table", t("Table"), "", () => setView("table"), { big: true, on: v("table") }),
           btn("selfail", t("Failing members"), "", selectFailing, { big: true }), btn("csv", t("Table CSV"), "", csv, { big: true })),
+      ]],
+      ["found", t("Foundation"), [
+        group(t("Foundation"), col(tog("foundations", t("Design foundation")), ctl("found_type", { width: 170 }))),
+        group(t("Foundation beams"), col(ctl("fb_B"), ctl("fb_bw")), col(ctl("fb_h"), ctl("ks"))),
+        group(t("Soil"), col(ctl("D_found"), ctl("phi_soil")), col(ctl("c_soil"), ctl("gamma_soil"))),
+        group(t("View"), btn("found", t("Foundation"), "", () => { S.opt.storey = "found"; saveView(); setView("plan"); }, { big: true, on: S.opt.storey === "found" })),
       ]],
       ["results", t("Results"), [
         group(t("Colour by"), col(...[["util", t("Utilisation")], ["rho", t("Steel ratio")], ["status", t("Pass / fail")]]
           .map(([k, lab]) => { const r = el("input", { type: "radio", name: "rb-col", on: { change: () => { S.opt.colour = k; saveView(); drawPlan(); } } }); r.checked = S.opt.colour === k; return el("label", { class: "rb-chk" }, r, el("span", {}, lab)); }))),
         group(t("Storey shown"), col((() => {
           const s = el("select", { on: { change: (e) => { S.opt.storey = e.target.value; saveView(); drawPlan(); } } },
-            el("option", { value: "all" }, t("All storeys")), ...S.inp.storeys.map((_, k) => el("option", { value: String(k + 1) }, `${t("Storey")} ${k + 1}`)));
-          s.value = S.opt.storey in { all: 1 } || +S.opt.storey <= nStorey ? S.opt.storey : "all";
+            el("option", { value: "all" }, t("All storeys")), ...S.inp.storeys.map((_, k) => el("option", { value: String(k + 1) }, `${t("Storey")} ${k + 1}`)),
+            el("option", { value: "found" }, t("Foundation")));
+          s.value = S.opt.storey in { all: 1, found: 1 } || +S.opt.storey <= nStorey ? S.opt.storey : "all";
           return s;
         })())),
         group(t("Labels"), col(viewTog("labels", t("Reinforcement")), viewTog("names", t("Names")))),
@@ -444,8 +478,8 @@ const Structure = (() => {
     const seen = new Set(), out = [];
     for (const [k, v] of Object.entries(m)) if (!v.ok) {
       const id = k.slice(k.indexOf(".") + 1);
-      const kind = v.kind === "beam" ? "beam" : v.kind === "wall" ? "wall" : "column";
-      if (!seen.has(kind + id)) { seen.add(kind + id); out.push({ kind, id }); }
+      const kind = { beam: "beam", wall: "wall", slab: "panel", column: "column" }[v.kind];
+      if (kind && !seen.has(kind + id)) { seen.add(kind + id); out.push({ kind, id }); }
     }
     setView("plan"); setSel(out);
   }
@@ -592,13 +626,13 @@ const Structure = (() => {
   // ------------------------------------------------------------ results per plan element
   function resultsFor(kind, id) {
     const m = S.res?.structure?.members || {};
-    const pref = kind === "beam" ? "B" : kind === "wall" ? "W" : "C";
-    return Object.entries(m).filter(([k]) => k.startsWith(pref) && k.slice(k.indexOf(".") + 1) === id)
+    const pref = { beam: "B", wall: "W", column: "C", panel: "S", slab: "S", fbeam: "FB", footing: "F" }[kind];
+    return Object.entries(m).filter(([k]) => k.split(".")[0].replace(/\d+$/, "") === pref && k.slice(k.indexOf(".") + 1) === id)
       .map(([k, v]) => ({ id: k, ...v })).sort((a, b) => a.storey - b.storey);
   }
   function shown(kind, id) {
     const r = resultsFor(kind, id);
-    if (S.opt.storey === "all" || kind === "wall") return r;
+    if (S.opt.storey === "all" || S.opt.storey === "found" || ["wall", "fbeam", "footing"].includes(kind)) return r;
     return r.filter((x) => String(x.storey) === S.opt.storey);
   }
   function colourFor(kind, id) {
@@ -608,7 +642,7 @@ const Structure = (() => {
     if (S.opt.colour === "status") return "#2e9b5f";
     if (S.opt.colour === "rho") {
       const rho = Math.max(...r.map((x) => x.rho));
-      const tt = kind === "column" ? (rho - 0.01) / 0.03 : kind === "wall" ? rho / 0.02 : rho / 0.03;
+      const tt = kind === "column" ? (rho - 0.01) / 0.03 : kind === "wall" ? rho / 0.02 : kind === "panel" ? rho / 0.006 : rho / 0.03;
       return heat(0.85 * tt);
     }
     return heat(0.85 * Math.max(...r.map((x) => x.util)) ** 2);
@@ -667,8 +701,14 @@ const Structure = (() => {
       const r = sv("rect", { x: X(xs[i] * 1000), y: Y(ys[j + 1] * 1000), width: (xs[i + 1] - xs[i]) * 1000,
         height: (ys[j + 1] - ys[j]) * 1000, class: `st-panel${open.has(id) ? " open" : ""}${isSel("panel", id) ? " sel" : ""}${S.opt.slabs ? "" : " hide"}`,
         fill: open.has(id) ? "url(#st-hatch)" : "" }, gPan);
-      sv("title", {}, r).textContent = `${t("Slab panel")} ${id}${open.has(id) ? ` — ${t("Open (no slab)")}` : ""}`;
+      const sr = open.has(id) ? [] : shown("panel", id);
+      const pc = sr.length ? colourFor("panel", id) : null;
+      if (pc && S.opt.storey !== "found") { r.style.fill = pc; r.style.fillOpacity = "0.28"; }
+      sv("title", {}, r).textContent = `${t("Slab panel")} ${id}${open.has(id) ? ` — ${t("Open (no slab)")}` : ""}` +
+        (sr.length ? `\n${sr.map((x) => `${t("Storey")} ${x.storey}: ${x.reinforcement} (η = ${x.util.toFixed(2)})`).join("\n")}` : "");
       tag(r, "panel", id);
+      if (S.opt.labels && sr.length && S.opt.storey !== "found") sv("text", { x: X((xs[i] + xs[i + 1]) * 500), y: Y((ys[j] + ys[j + 1]) * 500), "font-size": unit * 1.1, class: "st-rlbl", "text-anchor": "middle" }, gTxt)
+        .textContent = sr[sr.length - 1].reinforcement;
     }
     const ext = unit * 6, rb = unit * 2.2;
     for (let i = 0; i < nx; i++) {
@@ -723,8 +763,34 @@ const Structure = (() => {
         e.textContent = txt.replace(/ \(.*\)$/, "");
       }
     };
-    for (let j = 0; j < ny; j++) for (let i = 0; i < nx - 1; i++) beam(i, j, i + 1, j);
-    for (let i = 0; i < nx; i++) for (let j = 0; j < ny - 1; j++) beam(i, j, i, j + 1);
+    const foundView = S.opt.storey === "found";
+    if (!foundView) {
+      for (let j = 0; j < ny; j++) for (let i = 0; i < nx - 1; i++) beam(i, j, i + 1, j);
+      for (let i = 0; i < nx; i++) for (let j = 0; j < ny - 1; j++) beam(i, j, i, j + 1);
+    } else {
+      const m = S.res?.structure?.members || {};
+      const isBeams = String(S.inp.found_type || "").startsWith("Foundation beams");
+      for (const [k, v] of Object.entries(m)) {
+        if (v.kind === "fbeam" && isBeams) {
+          const [a, b] = k.slice(3).split("-").map(idx);
+          const x1 = X(xs[a[0]] * 1000), y1 = Y(ys[a[1]] * 1000), x2 = X(xs[b[0]] * 1000), y2 = Y(ys[b[1]] * 1000);
+          const ln = sv("line", { x1, y1, x2, y2, class: "st-beam", "stroke-width": (S.inp.fb_B || 1.2) * 1000 }, gBeam);
+          ln.style.stroke = v.ok ? heat(0.85 * Math.min(v.rho / 0.03, 1)) : "#e03b3b";
+          ln.style.strokeOpacity = "0.75";
+          sv("title", {}, ln).textContent = `${t("Foundation beam")} ${k.slice(3)}\n${v.reinforcement} (η = ${v.util.toFixed(2)})`;
+          if (S.opt.labels) sv("text", { x: (x1 + x2) / 2, y: (y1 + y2) / 2 + (y1 === y2 ? unit * 3 : 0), dx: y1 === y2 ? 0 : -unit * 3, "font-size": unit * 1.1, class: "st-rlbl", "text-anchor": y1 === y2 ? "middle" : "end" }, gTxt)
+            .textContent = v.reinforcement;
+        } else if (v.kind === "footing") {
+          const [i0, j0] = idx(k.slice(2));
+          const fx = v.inputs.Bx * 1000, fy = v.inputs.By * 1000;
+          const r = sv("rect", { x: X(xs[i0] * 1000) - fx / 2, y: Y(ys[j0] * 1000) - fy / 2, width: fx, height: fy, class: "st-pad" }, gBeam);
+          r.style.fill = v.ok ? heat(0.85 * v.util ** 2) : "#e03b3b";
+          sv("title", {}, r).textContent = `${t("Footing")} ${k.slice(2)}\n${v.reinforcement} (η = ${v.util.toFixed(2)})`;
+          if (S.opt.labels) sv("text", { x: X(xs[i0] * 1000), y: Y(ys[j0] * 1000) + fy / 2 + unit * 1.5, "font-size": unit * 1.1, class: "st-rlbl", "text-anchor": "middle" }, gTxt)
+            .textContent = v.reinforcement;
+        }
+      }
+    }
     const csz = L.col_sizes || {};
     for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
       const id = gl(i, j), cx = X(xs[i] * 1000), cy = Y(ys[j] * 1000);
@@ -998,13 +1064,16 @@ const Structure = (() => {
     const L = lay();
     const size = (kind, id) => {
       if (kind === "wall") { const w = wallAt(id); return w ? `${w.L} m × ${w.t}` : ""; }
+      if (kind === "panel") return `t = ${S.inp.slab_t}`;
+      if (kind === "fbeam") return `${S.inp.fb_bw}×${S.inp.fb_h}, B = ${S.inp.fb_B} m`;
+      if (kind === "footing") return "";
       const s = kind === "beam" ? (L.beam_sizes?.[id] || [S.inp.beam_b, S.inp.beam_h]) : (L.col_sizes?.[id] || [S.inp.col_b, S.inp.col_h]);
       return `${s[0]}×${s[1]}`;
     };
     return Object.entries(m).map(([k, v]) => {
       const id = k.slice(k.indexOf(".") + 1);
-      const kind = v.kind === "beam" ? "beam" : v.kind === "wall" ? "wall" : "column";
-      return { member: k, id, kind, type: KIND()[kind], storey: v.storey, section: size(kind, id), reinforcement: v.reinforcement,
+      const kind = { beam: "beam", wall: "wall", slab: "panel", fbeam: "fbeam", footing: "footing" }[v.kind] || "column";
+      return { member: k, id, kind, type: KIND()[v.kind] || KIND()[kind], storey: v.storey, section: size(kind, id), reinforcement: v.reinforcement,
         rho: v.rho * 100, util: v.util, ok: v.ok, status: v.ok ? t("Passes") : t("Fails"), notes: v.notes.join("; ") };
     });
   }
@@ -1046,6 +1115,47 @@ const Structure = (() => {
     const text = [head.join(";"), ...rows.map((r) => [r.member, r.type, r.storey, r.section, r.reinforcement, r.rho.toFixed(2),
       r.util.toFixed(3), r.status, r.notes].map(q).join(";"))].join("\r\n");
     download(`${fileName()}_members.csv`, "﻿" + text, "text/csv");
+  }
+
+  // ------------------------------------------------------------ automatic sizing
+  async function autoSize() {
+    const dlg = el("dialog", { class: "st-dlg" }, el("h3", {}, t("Automatic sizing…")),
+      el("p", { class: "muted" }, t("Running the complete calculation repeatedly — this can take a little while.")),
+      el("div", { class: "st-spin" }));
+    document.body.append(dlg);
+    dlg.addEventListener("close", () => dlg.remove());
+    dlg.addEventListener("cancel", (e) => e.preventDefault());
+    dlg.showModal();
+    let res;
+    try {
+      res = await api("/api/structure/autosize", { inputs: S.inp, project: state.project });
+    } catch (err) {
+      dlg.close();
+      alert(err.message);
+      if (err.license) licenseDialog();
+      return;
+    }
+    dlg.innerHTML = "";
+    const changes = res.log.flat().length;
+    dlg.append(el("h3", {}, `${res.passed ? "✔" : "⚠"} ${t("Auto-size")}`));
+    if (res.passed && !changes) dlg.append(el("p", {}, t("Nothing to change — every check already passes.")));
+    else if (res.passed) dlg.append(el("p", { class: "ok" }, t("All Eurocode checks pass after these changes:")));
+    if (changes) {
+      const list = el("ol", { class: "st-log" });
+      res.log.forEach((round, n) => list.append(el("li", {}, el("b", {}, `${t("Round")} ${n + 1}`),
+        el("ul", {}, ...round.map((c) => el("li", {}, c))))));
+      dlg.append(list);
+    }
+    if (!res.passed) {
+      dlg.append(el("p", { class: "bad" }, res.error || t("Still failing after the automatic changes — change these by hand:")),
+        el("ul", { class: "st-log" }, ...(res.failing || []).slice(0, 12).map((f) => el("li", {}, f))));
+    }
+    dlg.append(el("div", { class: "btns" },
+      el("button", { type: "button", class: "ghost", on: { click: () => dlg.close() } }, t("Cancel")),
+      el("button", { type: "button", class: "primary", disabled: changes ? null : "", on: { click: () => {
+        S.inp = res.inputs; dlg.close(); renderSettings(); renderRibbon(); commit();
+        if (!S.auto) run();
+      } } }, t("Apply"))));
   }
 
   // ------------------------------------------------------------ run

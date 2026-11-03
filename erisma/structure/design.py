@@ -99,7 +99,8 @@ def _col_candidates() -> list[dict]:
 
 
 def _beam_candidates() -> list[dict]:
-    out = [(n * float(d) ** 2, {"n_bars": n, "dia": d}) for d in BEAM_BARS for n in (2, 3, 4, 5)]
+    out = [(n * float(d) ** 2, {"n_bars": n, "dia": d}) for d in BEAM_BARS + ["32"]
+           for n in (2, 3, 4, 5, 6, 7, 8)]
     return [c for _, c in sorted(out, key=lambda t: t[0])]
 
 
@@ -168,9 +169,14 @@ def design_beams(beams: dict[str, int], seis: SeismicResult | None, uls: StaticR
                  quasi: StaticResult, b: float, h: float, concrete: str,
                  project: dict | None = None, fyk: float = 500.0,
                  cover: float = 30.0,
-                 sizes: dict[str, tuple[float, float]] | None = None) -> list[MemberDesign]:
+                 sizes: dict[str, tuple[float, float]] | None = None, e_factor: float = 1.0,
+                 dissipative: bool = True, sls: bool = True) -> list[MemberDesign]:
     """Bottom (sagging) and top (hogging) bars and links for each beam; ``beams``: id → storey;
-    ``sizes`` overrides (b, h) per beam."""
+    ``sizes`` overrides (b, h) per beam.
+
+    Foundation beams: ``e_factor`` = γ_Rd·Ω on the seismic action (EN 1998-1 4.4.2.6),
+    ``dissipative=False`` (no EN 1998-1 5.4.3.1.2 detailing, they stay elastic) and
+    ``sls=False`` (no span/depth check: their deflection is the soil settlement)."""
     module = get_module("ec2_rc_beam")
     cands = _beam_candidates()
     out = []
@@ -189,7 +195,7 @@ def design_beams(beams: dict[str, int], seis: SeismicResult | None, uls: StaticR
         hog = [("1.35G+1.5Q", max(-fu["My"].min(), 0.0))]
         V = [("1.35G+1.5Q", np.abs(fu["Vz"]).max())]
         if seis is not None:
-            env = seis.member_envelope(mid)
+            env = seis.member_envelope(mid) * e_factor
             fq = flex(quasi.forces(mid, 41))
             L = e.L
             for end, x in ((0, a1), (-1, a2)):
@@ -217,7 +223,7 @@ def design_beams(beams: dict[str, int], seis: SeismicResult | None, uls: StaticR
             utils.append(util)
             if util >= max(utils):
                 gov_all = f"{Mmax[0]} ({face})"
-        if seis is not None:
+        if seis is not None and dissipative:
             # EN 1998-1 5.4.3.1.2: ρ_min = 0.5 f_ctm/f_yk on both faces (4a) and, in the
             # critical regions, compression steel ≥ half the tension steel (4)
             fck = float(concrete.split("/")[0][1:])
@@ -234,18 +240,48 @@ def design_beams(beams: dict[str, int], seis: SeismicResult | None, uls: StaticR
         inp_v = {**base, "MEd": max(max(v for _, v in sag), 1e6) / 1e6, **picks["bottom"],
                  "n_comp": picks["top"]["n_bars"], "dia_comp": picks["top"]["dia"]}
         s_ok = None
-        for s in LINK_S:
-            p, u = _passes(module, {**inp_v, "link_s": s}, project)
-            if p:
-                s_ok, uv = s, u
+        for ld in ("8", "10", "12"):           # thicker links only when Ø8 is not enough
+            for s in LINK_S:
+                p, u = _passes(module, {**inp_v, "link_dia": ld, "link_s": s}, project)
+                if p:
+                    s_ok, uv = s, u
+                    inp_v["link_dia"] = ld
+                    break
+            if s_ok is not None:
                 break
         if s_ok is None:
             ok = False
             s_ok, uv = LINK_S[-1], _passes(module, {**inp_v, "link_s": LINK_S[-1]}, project)[1]
             notes.append("Shear cannot be resisted with Ø8 links — increase the beam width/depth")
+        # ---- SLS deflection: span/depth ratio, EN 1992-1-1 7.4.2
+        fck = float(concrete.split("/")[0][1:])
+        K = _continuity_K(uls.analysis, mid)
+        area = lambda c: c["n_bars"] * np.pi * float(c["dia"]) ** 2 / 4  # noqa: E731
+        d_b = h - cover - 8 - float(picks["bottom"]["dia"]) / 2
+        Lspan = e.Lf
+        Msag = max(v for _, v in sag)
+        As_req = Msag / (0.9 * d_b * fyk / 1.15) if Msag > 0 else 0.0
+        while sls:
+            ratio, lim = span_depth(Lspan, d_b, b, area(picks["bottom"]), area(picks["top"]),
+                                    As_req, fck, K)
+            if ratio <= lim:
+                break
+            nxt = next((c for c in cands if area(c) > area(picks["bottom"])), None)
+            if nxt is None or area(picks["bottom"]) >= 1.5 * max(As_req, 1.0):
+                break                      # extra steel no longer helps (factor capped at 1.5)
+            picks["bottom"] = nxt
+            notes.append("Bottom bars increased for deflection (EN 1992-1-1 7.4.2(2))")
+        u_defl = ratio / lim if sls else 0.0
+        if u_defl > 1.0:
+            ok = False
+            notes.append(Msg("Deflection: l/d = {r:.1f} > {l:.1f} (EN 1992-1-1 7.4.2) — "
+                             "increase the beam depth", r=ratio, l=lim))
+        utils.append(u_defl)
+        inp_v.update({**picks["bottom"]})
         reinf = (f"bottom {picks['bottom']['n_bars']}Ø{picks['bottom']['dia']}, "
-                 f"top {picks['top']['n_bars']}Ø{picks['top']['dia']}, Ø8/{s_ok:g}")
-        if seis is not None:
+                 f"top {picks['top']['n_bars']}Ø{picks['top']['dia']}, "
+                 f"Ø{inp_v['link_dia']}/{s_ok:g}")
+        if seis is not None and dissipative:
             # EN 1998-1 5.4.3.1.2(6): critical regions (length h_w at each end)
             dbl = min(float(picks["bottom"]["dia"]), float(picks["top"]["dia"]))
             s_cr = min(h / 4, 24 * 8, 225.0, 8 * dbl, s_ok)
@@ -253,8 +289,52 @@ def design_beams(beams: dict[str, int], seis: SeismicResult | None, uls: StaticR
             reinf += f" (ends Ø8/{s_cr:g} over {h:g} mm)"
         As = sum(p["n_bars"] * np.pi * float(p["dia"]) ** 2 / 4 for p in picks.values())
         out.append(MemberDesign(mid, "beam", k, reinf, max(utils + [uv]), ok, gov_all,
-                                {**inp_v, "link_s": s_ok}, "ec2_rc_beam", notes, As / (b * h)))
+                                {**inp_v, "link_s": s_ok}, "ec2_rc_beam",
+                                list(dict.fromkeys(notes)), As / (b * h)))
     return out
+
+
+def span_depth(L: float, d: float, b: float, As: float, As2: float, As_req: float,
+               fck: float, K: float) -> tuple[float, float]:
+    """EN 1992-1-1 7.4.2 — (l/d, limiting l/d).
+
+    Eq. 7.16a/b with ρ = A_s/(b d), ρ' = A_s2/(b d); × A_s,prov/A_s,req ≤ 1.5 (7.4.2(2),
+    Eq. 7.17); × 0.8 for flanged beams (b_eff/b_w > 3, the slab acts as flange); × 7/l_eff
+    for spans over 7 m.
+    """
+    r0 = np.sqrt(fck) * 1e-3
+    rho = max(As / (b * d), 1e-6)
+    rp = As2 / (b * d)
+    if rho <= r0:
+        lim = 11 + 1.5 * np.sqrt(fck) * r0 / rho + 3.2 * np.sqrt(fck) * (r0 / rho - 1) ** 1.5
+    else:
+        lim = 11 + 1.5 * np.sqrt(fck) * r0 / max(rho - rp, 1e-6) + \
+            np.sqrt(fck) / 12 * np.sqrt(rp / r0)
+    lim *= K * 0.8
+    if As_req > 0:
+        lim *= min(As / As_req, 1.5)
+    if L > 7000:
+        lim *= 7000 / L
+    return L / d, float(lim)
+
+
+def _continuity_K(analysis, mid: str) -> float:
+    """EN 1992-1-1 Table 7.4N: K = 1.0 simply supported, 1.3 end span, 1.5 interior span
+    (continuity = a collinear beam framing into the same node)."""
+    model = analysis.model
+    m = model.members[mid]
+    d0 = model.nodes[m.j].xyz - model.nodes[m.i].xyz
+    d0 = d0 / np.linalg.norm(d0)
+    cont = 0
+    for end in (m.i, m.j):
+        for o in model.members.values():
+            if o.id == mid or end not in (o.i, o.j) or not o.id.startswith("B"):
+                continue
+            d1 = model.nodes[o.j].xyz - model.nodes[o.i].xyz
+            if abs(abs(np.dot(d0, d1 / np.linalg.norm(d1))) - 1) < 1e-6:
+                cont += 1
+                break
+    return {0: 1.0, 1: 1.3, 2: 1.5}[cont]
 
 
 # --------------------------------------------------------------------- walls
@@ -446,21 +526,29 @@ def capacity_shears(columns: list[MemberDesign], beams: list[MemberDesign],
         if V / 1e3 <= d.inputs["VEd"]:
             continue
         inp = {**d.inputs, "VEd": V / 1e3}
-        for s in LINK_S:
-            if s > d.inputs["link_s"]:
-                continue
-            p, u = _passes(bmod, {**inp, "link_s": s}, project)
-            if p:
+        ld0 = d.inputs.get("link_dia", "8")
+        found = None
+        for ld in [x for x in ("8", "10", "12") if float(x) >= float(ld0)]:
+            for s in LINK_S:
+                if ld == ld0 and s > d.inputs["link_s"]:
+                    continue
+                p, u = _passes(bmod, {**inp, "link_dia": ld, "link_s": s}, project)
+                if p:
+                    found = (ld, s, u)
+                    break
+            if found:
                 break
-        else:
+        if not found:
             d.ok = False
             d.notes.append("Capacity-design shear exceeds the resistance with Ø8 links — "
                            "increase the beam width/depth")
-            s, u = LINK_S[-1], _passes(bmod, {**inp, "link_s": LINK_S[-1]}, project)[1]
+            found = ("12", LINK_S[-1], _passes(bmod, {**inp, "link_dia": "12",
+                                                      "link_s": LINK_S[-1]}, project)[1])
+        ld, s, u = found
         old = d.inputs["link_s"]
-        d.inputs = {**inp, "link_s": s}
+        d.inputs = {**inp, "link_dia": ld, "link_s": s}
         d.utilisation = max(d.utilisation, u)
-        d.reinforcement = d.reinforcement.replace(f"Ø8/{old:g}", f"Ø8/{s:g}", 1)
+        d.reinforcement = d.reinforcement.replace(f"Ø{ld0}/{old:g}", f"Ø{ld}/{s:g}", 1)
         d.notes.append(Msg("links from the capacity-design shear V = {v:.0f} kN (5.4.2.2)",
                            v=V / 1e3))
     for d in columns:
@@ -489,3 +577,234 @@ def capacity_shears(columns: list[MemberDesign], beams: list[MemberDesign],
         d.reinforcement = f"{nb}Ø{i['dia']}, Ø8/{s:g}"
         d.notes.append(Msg("links from the capacity-design shear V = {v:.0f} kN (5.4.2.3)",
                            v=V / 1e3))
+
+
+# --------------------------------------------------------------------- slabs
+
+SLAB_BARS = [(d, s) for d in ("8", "10", "12") for s in (200.0, 150.0, 125.0, 100.0)]
+
+
+def design_slabs(panels: list[dict], slab_t: float, concrete: str, g_finish: float,
+                 q_by_storey: dict[int, float], project=None, fyk: float = 500.0,
+                 cover: float = 25.0) -> list[MemberDesign]:
+    """Two-way slab panels with the EN 1992-1-1 slab module.
+
+    ``panels``: {"id", "lx", "ly" (mm, along X and Y), "cont": {"x0","x1","y0","y1": bool}}
+    — an edge is continuous when the neighbouring panel exists.  ``q_by_storey`` maps
+    storey → imposed load (N/mm²); storeys with equal loads share one design.
+    """
+    module = get_module("ec2_rc_slab")
+    cands = sorted(SLAB_BARS, key=lambda c: float(c[0]) ** 2 / c[1])
+    edge = lambda c: "Fixed / continuous" if c else "Simply supported"  # noqa: E731
+    out: list[MemberDesign] = []
+    for q in sorted(set(q_by_storey.values())):
+        storeys = [k for k, v in q_by_storey.items() if v == q]
+        for p in panels:
+            lx, ly, c = p["lx"], p["ly"], p["cont"]
+            if lx <= ly:   # module: l_x = short span; e1/e2 at x = 0 / l_x, e3/e4 at y = 0 / l_y
+                es = (c["x0"], c["x1"], c["y0"], c["y1"])
+                short, long_ = lx, ly
+            else:
+                es = (c["y0"], c["y1"], c["x0"], c["x1"])
+                short, long_ = ly, lx
+            base = {"type": "Two-way panel", "lx": short / 1000, "ly": long_ / 1000,
+                    "e1": edge(es[0]), "e2": edge(es[1]), "e3": edge(es[2]), "e4": edge(es[3]),
+                    "h": slab_t, "cover": cover, "concrete": concrete, "fyk": fyk,
+                    "g": g_finish * 1e3, "q": q * 1e3, "punch": False}
+            dense = cands[-1]
+            pick_b = pick_t = None
+            for cb in cands:
+                if _passes(module, {**base, "dia_b": cb[0], "s_b": cb[1], "dia_t": dense[0],
+                                    "s_t": dense[1]}, project)[0]:
+                    pick_b = cb
+                    break
+            notes = []
+            ok = pick_b is not None
+            pick_b = pick_b or dense
+            for ct in cands:
+                if _passes(module, {**base, "dia_b": pick_b[0], "s_b": pick_b[1], "dia_t": ct[0],
+                                    "s_t": ct[1]}, project)[0]:
+                    pick_t = ct
+                    break
+            ok = ok and pick_t is not None
+            pick_t = pick_t or dense
+            inp = {**base, "dia_b": pick_b[0], "s_b": pick_b[1], "dia_t": pick_t[0],
+                   "s_t": pick_t[1]}
+            util = _passes(module, inp, project)[1]
+            if not ok:
+                notes.append("No slab reinforcement passes — increase the slab thickness")
+            reinf = f"bottom Ø{pick_b[0]}/{pick_b[1]:g}, top Ø{pick_t[0]}/{pick_t[1]:g}"
+            As = np.pi * float(pick_b[0]) ** 2 / 4 * 1000 / pick_b[1]
+            for k in storeys:
+                out.append(MemberDesign(f"S{k}.{p['id']}", "slab", k, reinf, util, ok,
+                                        "1.35G+1.5Q", inp, "ec2_rc_slab", list(notes),
+                                        As / (1000 * slab_t)))
+    return sorted(out, key=lambda d: (d.storey, d.member))
+
+
+# --------------------------------------------------------------------- foundations
+
+FOOT_BARS = [(d, s) for d in ("12", "14", "16", "20") for s in (200.0, 150.0, 125.0, 100.0)]
+
+
+def _omega(d: MemberDesign | None, seis: SeismicResult, quasi: StaticResult, fcd: float,
+           fyd: float) -> float:
+    """EN 1998-1 4.4.2.6(2), (4): γ_Rd·Ω for the footing of a column, Ω = M_Rd/M_Ed at
+    the column base (≤ q), γ_Rd = 1.0 for q ≤ 3, 1.2 otherwise. Walls: from the flexure
+    check of the wall design (Ω = 1/η_flexure)."""
+    q = seis.q
+    g_rd = 1.0 if q <= 3 else 1.2
+    if d is None:
+        return g_rd * q
+    if d.kind == "wall":
+        c = get_module("ec8_rc_wall").calculate(d.inputs)
+        u = max((k.utilisation for k in c.checks if "Flexure" in k.description), default=0.0)
+        om = 1 / u if u > 0 else q
+    else:
+        f = quasi.forces(d.member, 2)
+        env = seis.member_envelope(d.member)
+        N = max(-f["N"][0] - env[0], 0.0)
+        oms = []
+        for direction, mq, e in (("X", f["Mz"][0], env[5]), ("Y", f["My"][0], env[4])):
+            MEd = abs(mq) + e
+            if MEd > 1e3:
+                oms.append(_col_MRd(d.inputs, direction, N, fcd, fyd) / MEd)
+        om = min(oms) if oms else q
+    return g_rd * min(max(om, 1.0), q)
+
+
+def design_footings(bases: dict[str, dict], res: dict[str, StaticResult],
+                    seis: SeismicResult | None, quasi: StaticResult, members: dict,
+                    soil: dict, concrete: str, project=None, fyk: float = 500.0,
+                    gamma_c: float = 1.5, gamma_s: float = 1.15,
+                    alpha_cc: float = 1.0) -> list[MemberDesign]:
+    """Pad footing under every column/wall with the EN 1997-1 footing module.
+
+    ``bases``: grid → {"node", "member" (base member id), "cx", "cy" (mm)};
+    ``soil``: {"phi", "c" (kPa), "gamma" (kN/m³), "D" (m), "approach"}.
+    Seismic actions follow EN 1998-1 4.4.2.6: E_Fd = E_F,G + γ_Rd Ω E_F,E.
+    """
+    module = get_module("ec7_pad_footing")
+    fck = float(concrete.split("/")[0][1:])
+    fcd, fyd = alpha_cc * fck / gamma_c, fyk / gamma_s
+    out = []
+    for g, b in bases.items():
+        n = b["node"]
+        RG, RQ = res["G"].reaction(n), res["Q"].reaction(n)
+        cx, cy = b["cx"], b["cy"]
+        common = {"cx": cx / 1000, "cy": cy / 1000, "D": soil["D"], "phi": soil["phi"],
+                  "c": soil["c"], "gamma": soil["gamma"], "approach": soil["approach"],
+                  "concrete": concrete, "fyk": fyk,
+                  "NG": max(RG[2], 0.0) / 1e3, "NQ": max(RQ[2], 0.0) / 1e3,
+                  "MxG": abs(RG[4]) / 1e6, "MxQ": abs(RQ[4]) / 1e6,
+                  "MyG": abs(RG[3]) / 1e6, "MyQ": abs(RQ[3]) / 1e6,
+                  "HxG": np.hypot(RG[0], RG[1]) / 1e3, "HxQ": np.hypot(RQ[0], RQ[1]) / 1e3}
+        combos = []
+        if seis is None:
+            combos.append(("1.35G+1.5Q", {**common, "seismic": False}))
+        else:
+            om = _omega(members.get(b["member"]), seis, quasi, fcd, fyd)
+            Rq = quasi.reaction(n)
+            E = seis.reaction_envelope(n) * om
+            for sgn, nm in ((+1, "G+ψ2Q+ΩE (N max)"), (-1, "G+ψ2Q+ΩE (N min)")):
+                combos.append((nm, {**common, "seismic": True,
+                                    "NE": max(Rq[2] + sgn * E[2], 0.0) / 1e3,
+                                    "MxE": (abs(Rq[4]) + E[4]) / 1e6,
+                                    "MyE": (abs(Rq[3]) + E[3]) / 1e6,
+                                    "HxE": (np.hypot(Rq[0], Rq[1]) + np.hypot(E[0], E[1])) / 1e3}))
+        # plan size: smallest passing (bisection over B with dense bars), then the lightest bars
+        c0 = max(cx, cy) / 1000
+        sizes = [round(c0 + 0.6 + 0.1 * i, 2) for i in range(0, 60)]
+
+        def geom(B):
+            ext = B - c0                      # same overhang on every side
+            Bx, By = cx / 1000 + ext, cy / 1000 + ext
+            h = min(max(0.5, round(ext / 2 / 0.6 / 0.05) * 0.05 + 0.05), 1.5, soil["D"])
+            return {"Bx": round(Bx, 2), "By": round(By, 2), "h": h}
+
+        dense = {"dia_x": "20", "s_x": 100.0, "dia_y": "20", "s_y": 100.0}
+
+        def ok_all(extra):
+            return all(_passes(module, {**inp, **extra}, project)[0] for _, inp in combos)
+
+        lo, hi, best = 0, len(sizes) - 1, None
+        if ok_all({**geom(sizes[hi]), **dense}):
+            while lo <= hi:
+                mid_ = (lo + hi) // 2
+                if ok_all({**geom(sizes[mid_]), **dense}):
+                    best, hi = mid_, mid_ - 1
+                else:
+                    lo = mid_ + 1
+        notes = []
+        if best is None:
+            gm = geom(sizes[-1])
+            notes.append("No footing up to this size passes — use a strip footing or a raft, "
+                         "or improve the soil data")
+            bars, ok = dense, False
+        else:
+            gm = geom(sizes[best])
+            bars, ok = None, True
+            for d, s in sorted(FOOT_BARS, key=lambda c: float(c[0]) ** 2 / c[1]):
+                cand = {"dia_x": d, "s_x": s, "dia_y": d, "s_y": s}
+                if ok_all({**gm, **cand}):
+                    bars = cand
+                    break
+            bars = bars or dense
+        util, gov = 0.0, ""
+        for nm, inp in combos:
+            u = _passes(module, {**inp, **gm, **bars}, project)[1]
+            if u >= util:
+                util, gov = u, nm
+        reinf = (f"{gm['Bx']:.2f}×{gm['By']:.2f}×{gm['h']:.2f} m, "
+                 f"Ø{bars['dia_x']}/{bars['s_x']:g} both ways")
+        gov_inp = {**dict(combos)[gov], **gm, **bars}
+        out.append(MemberDesign(f"F.{g}", "footing", 0, reinf, util, ok, gov, gov_inp,
+                                "ec7_pad_footing", notes, 0.0))
+    return out
+
+
+
+# --------------------------------------------------------------------- soil under foundation beams
+
+
+def strip_bearing(B: float, D: float, phi: float, c: float, gamma: float, g_phi: float = 1.0,
+                  g_c: float = 1.0, g_R: float = 1.0) -> float:
+    """Design bearing resistance of a long strip, EN 1997-1 Annex D.4 (drained, vertical
+    central load, s = i = 1): q_Rd = [c'_d N_c + γ D N_q + ½ γ B N_γ] / γ_R,v  (N/mm², mm)."""
+    import math
+
+    from ..design.geotech import bearing_factors
+
+    phid = math.atan(math.tan(math.radians(phi)) / g_phi)
+    Nq, Nc, Ng = bearing_factors(phid)
+    return (c / g_c * Nc + gamma * D * Nq + 0.5 * gamma * B * Ng) / g_R
+
+
+def soil_pressures(res: dict[str, StaticResult], quasi: StaticResult, seis: SeismicResult | None,
+                   e_factor: float, springs: dict[str, float], B: float, D: float, soil: dict,
+                   annex) -> list[dict]:
+    """Bearing check under foundation beams for every EC7 combination of the annex and the
+    seismic situation: p = R / (B·l_trib) at every spring node ≤ q_Rd of a strip of width B
+    (EN 1997-1 6.5.2; seismic: EN 1998-5 5.4.1.1 with its material factors).
+
+    ``springs``: node → tributary length (mm).  Returns one row per combination.
+    """
+    rows = []
+    approach = annex.approach("National Annex")
+    for combo in annex.combinations(approach):
+        gG, _gGf, gQ, gphi, gc, gRv = annex.combos[combo][:6]
+        qRd = strip_bearing(B, D, soil["phi"], soil["c"], soil["gamma"], gphi, gc, gRv)
+        worst = max(((gG * res["G"].reaction(n)[2] + gQ * res["Q"].reaction(n)[2]) / (B * L), n)
+                    for n, L in springs.items())
+        rows.append({"combo": combo, "p": worst[0], "node": worst[1], "qRd": qRd})
+    if seis is not None:
+        qRd = strip_bearing(B, D, soil["phi"], soil["c"], soil["gamma"], annex.seismic_gamma_phi,
+                            annex.seismic_gamma_c, 1.0)
+        best, low = (-1.0, ""), (1e30, "")
+        for n, L in springs.items():
+            R0, E = quasi.reaction(n)[2], seis.reaction_envelope(n)[2] * e_factor
+            best = max(best, ((R0 + E) / (B * L), n))
+            low = min(low, ((R0 - E) / (B * L), n))
+        rows.append({"combo": "G+ψ2Q+ΩE", "p": best[0], "node": best[1], "qRd": qRd,
+                     "p_min": low[0], "node_min": low[1]})
+    return rows

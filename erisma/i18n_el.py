@@ -2386,4 +2386,86 @@ EL: dict[str, str] = {
         "(4.4.2.3) και οι ικανοτικές τέμνουσες.",
     "Columns: braced = no (r_m = 1), l_0 = clear height.":
         "Υποστυλώματα: μη δεσμευμένα (r_m = 1), l_0 = καθαρό ύψος.",
+    # ------------------------------------------------------------ automatic sizing
+    "Column {g}: {a:g}×{b:g} → {c:g}×{d:g} mm": "Υποστύλωμα {g}: {a:g}×{b:g} → {c:g}×{d:g} mm",
+    "Beam {g}: {a:g}×{b:g} → {c:g}×{d:g} mm": "Δοκός {g}: {a:g}×{b:g} → {c:g}×{d:g} mm",
+    "Wall {g}: thickness {a:g} → {b:g} mm": "Τοίχωμα {g}: πάχος {a:g} → {b:g} mm",
+    "Wall {g}: length {a:g} → {b:g} m": "Τοίχωμα {g}: μήκος {a:g} → {b:g} m",
+    "Slabs: thickness {a:g} → {b:g} mm": "Πλάκες: πάχος {a:g} → {b:g} mm",
+    "Foundation beams: depth {a:g} → {b:g} mm": "Πεδιλοδοκοί: ύψος {a:g} → {b:g} mm",
+    "Foundation beams: web {a:g} → {b:g} mm": "Πεδιλοδοκοί: πλάτος κορμού {a:g} → {b:g} mm",
+    "Foundation beams: flange {a:g} → {b:g} m": "Πεδιλοδοκοί: πλάτος πέλματος {a:g} → {b:g} m",
+    "Isolated footings do not suffice: foundation beams are used instead":
+        "Τα μεμονωμένα πέδιλα δεν επαρκούν: χρησιμοποιούνται πεδιλοδοκοί",
+    "Storey drift in {d}: all columns {a:g} → {b:g} mm in {d}":
+        "Σχετική μετακίνηση κατά {d}: όλα τα υποστυλώματα {a:g} → {b:g} mm κατά {d}",
+    "Modes: {a} → {b}": "Ιδιομορφές: {a} → {b}",
+    "α_cr < 10: P-Δ analysis switched on": "α_cr < 10: ενεργοποιήθηκε η ανάλυση P-Δ",
+    # ------------------------------------------------------------ slabs, foundations, SLS
+    "Design the slabs (EN 1992-1-1)": "Διαστασιολόγηση πλακών (EN 1992-1-1)",
+    "Every slab panel as a two-way slab, continuous where a neighbour panel exists; bottom and top bars are chosen automatically.":
+        "Κάθε φάτνωμα ως διέρειστη πλάκα, συνεχής όπου υπάρχει γειτονικό φάτνωμα· ο κάτω και ο "
+        "άνω οπλισμός επιλέγονται αυτόματα.",
+    "Design the footings (EN 1997-1)": "Διαστασιολόγηση θεμελίωσης (EN 1997-1)",
+    "A pad footing under every column and wall, sized for bearing, sliding and eccentricity; seismic actions with capacity design (EN 1998-1 4.4.2.6).":
+        "Θεμελίωση κάτω από κάθε υποστύλωμα και τοίχωμα, για φέρουσα ικανότητα, ολίσθηση και "
+        "εκκεντρότητα· σεισμικές δράσεις με ικανοτικό σχεδιασμό (EN 1998-1 4.4.2.6).",
+    "Foundations": "Θεμελίωση",
+    "Foundation type": "Τύπος θεμελίωσης",
+    "Foundation beams (Winkler)": "Πεδιλοδοκοί (Winkler)",
+    "Isolated pad footings": "Μεμονωμένα πέδιλα",
+    "Foundation beams along the grid lines on elastic soil springs (part of the 3D model, as usual for seismic buildings), or pad footings under a fixed base.":
+        "Πεδιλοδοκοί κατά μήκος των αξόνων σε ελαστικά ελατήρια εδάφους (μέρος του 3D "
+        "προσομοιώματος, όπως συνηθίζεται στα αντισεισμικά κτίρια), ή μεμονωμένα πέδιλα με "
+        "πακτωμένη βάση.",
+    "Foundation beam flange width B": "Πλάτος πέλματος πεδιλοδοκού B",
+    "Foundation beam web width b_w": "Πλάτος κορμού πεδιλοδοκού b_w",
+    "Foundation beam depth h": "Ύψος πεδιλοδοκού h",
+    "Typical: loose sand 10–25, medium sand 25–60, dense sand 60–120, stiff clay 25–50 MN/m³ (or from a plate-load test / the geotechnical report).":
+        "Τυπικά: χαλαρή άμμος 10–25, μέσης πυκνότητας 25–60, πυκνή 60–120, στιφρή άργιλος "
+        "25–50 MN/m³ (ή από δοκιμή φόρτισης πλάκας / τη γεωτεχνική μελέτη).",
+    "Footings": "Πέδιλα",
+    "Foundation beams": "Πεδιλοδοκοί",
+    "Increase the founding depth or use a strip footing / raft.":
+        "Αυξήστε το βάθος θεμελίωσης ή χρησιμοποιήστε πεδιλοδοκούς / κοιτόστρωση.",
+    "Increase the foundation beam depth or width.": "Αυξήστε το ύψος ή το πλάτος των πεδιλοδοκών.",
+    "Critical slab panel {m} — full calculation": "Κρίσιμο φάτνωμα πλάκας {m} — πλήρης υπολογισμός",
+    "Critical footing {m} — full calculation": "Κρίσιμο πέδιλο {m} — πλήρης υπολογισμός",
+    "Critical foundation beam {m} — full calculation": "Κρίσιμος πεδιλοδοκός {m} — πλήρης υπολογισμός",
+    "No slab reinforcement passes — increase the slab thickness":
+        "Κανένας οπλισμός πλάκας δεν επαρκεί — αυξήστε το πάχος της πλάκας",
+    "No footing up to this size passes — use a strip footing or a raft, or improve the soil data":
+        "Κανένα πέδιλο μέχρι αυτό το μέγεθος δεν επαρκεί — χρησιμοποιήστε πεδιλοδοκούς ή "
+        "κοιτόστρωση, ή βελτιώστε τα στοιχεία εδάφους",
+    "Footings {a} and {b} overlap — use a strip footing or a raft":
+        "Τα πέδιλα {a} και {b} επικαλύπτονται — χρησιμοποιήστε πεδιλοδοκούς ή κοιτόστρωση",
+    "Bottom bars increased for deflection (EN 1992-1-1 7.4.2(2))":
+        "Αυξήθηκε ο κάτω οπλισμός λόγω βέλους (EN 1992-1-1 7.4.2(2))",
+    "Deflection: l/d = {r:.1f} > {l:.1f} (EN 1992-1-1 7.4.2) — increase the beam depth":
+        "Βέλος: l/d = {r:.1f} > {l:.1f} (EN 1992-1-1 7.4.2) — αυξήστε το ύψος της δοκού",
+    "Foundation beams B = {B:g} m, b_w × h = {bw:g} × {h:g} mm on Winkler springs k_s = {k:g} MN/m³ along the grid lines (part of the 3D model).":
+        "Πεδιλοδοκοί B = {B:g} m, b_w × h = {bw:g} × {h:g} mm σε ελατήρια Winkler k_s = {k:g} "
+        "MN/m³ κατά μήκος των αξόνων (μέρος του 3D προσομοιώματος).",
+    "γ_Rd · min(M_Rd/M_Ed of the columns, q)": "γ_Rd · min(M_Rd/M_Ed των υποστυλωμάτων, q)",
+    "Overstrength of the seismic action on the foundation":
+        "Υπεραντοχή της σεισμικής δράσης στη θεμελίωση",
+    "p_max [kPa]": "p_max [kPa]",
+    "Node": "Κόμβος",
+    "q_Rd [kPa]": "q_Rd [kPa]",
+    "Soil pressure p = R/(B·l) at the spring nodes; q_Rd of a strip of width B, EN 1997-1 Annex D (seismic: EN 1998-5 material factors)":
+        "Τάση εδάφους p = R/(B·l) στους κόμβους των ελατηρίων· q_Rd λωρίδας πλάτους B, EN 1997-1 "
+        "Παράρτημα D (σεισμός: συντελεστές υλικού EN 1998-5)",
+    "Soil bearing under the foundation beams ({c})": "Φέρουσα ικανότητα εδάφους κάτω από τους πεδιλοδοκούς ({c})",
+    "Widen the foundation beams (B), deepen them or use a raft.":
+        "Πλατύνετε το πέλμα των πεδιλοδοκών (B), θεμελιώστε βαθύτερα ή χρησιμοποιήστε κοιτόστρωση.",
+    "Uplift under the foundation beams at {n} in the seismic situation (p_min = {p:.0f} kPa): the linear springs carry tension there — check the uplift or widen the beams.":
+        "Ανασήκωση κάτω από τους πεδιλοδοκούς στο {n} στη σεισμική κατάσταση (p_min = {p:.0f} "
+        "kPa): τα γραμμικά ελατήρια παραλαμβάνουν εκεί εφελκυσμό — ελέγξτε την ανασήκωση ή "
+        "πλατύνετε τους πεδιλοδοκούς.",
+    "The column at {g} has no foundation beam — connect it to a neighbouring column or use pad footings":
+        "Το υποστύλωμα στο {g} δεν έχει πεδιλοδοκό — συνδέστε το με γειτονικό υποστύλωμα ή "
+        "χρησιμοποιήστε μεμονωμένα πέδιλα",
+    "whole frame, slabs and footings": "όλος ο φορέας, πλάκες και θεμελίωση",
+    "V_Ed ≤ V_Rd,c - only minimum shear reinforcement is required.":
+        "V_Ed ≤ V_Rd,c - απαιτείται μόνο ο ελάχιστος οπλισμός διάτμησης.",
 }

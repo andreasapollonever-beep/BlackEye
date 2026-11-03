@@ -472,3 +472,10 @@ button.danger{color:var(--fail)!important}
 .st-grid-table tr.bad td{color:var(--fail)}
 .st-grid-table tr.sel td{background:var(--accent-soft)}
 .rb-chk input,.st-f.chk input,.st-tbar input[type=checkbox]{width:auto;padding:0;accent-color:var(--accent2);flex:0 0 auto}
+
+.st-pad{stroke:var(--ink);stroke-width:20;opacity:.8}
+.st-dlg .ok{color:var(--pass)}.st-dlg .bad{color:var(--fail)}
+.st-log{max-height:50vh;overflow:auto;font-size:13px;padding-left:20px}
+.st-log ul{padding-left:16px;margin:2px 0 8px;color:var(--ink2)}
+.st-spin{width:34px;height:34px;margin:14px auto;border:4px solid var(--line2);border-top-color:var(--accent2);border-radius:50%;animation:stspin 1s linear infinite}
+@keyframes stspin{to{transform:rotate(360deg)}}

@@ -12,6 +12,7 @@ SCENARIOS = {
     "beam_analysis": [{}],
     "building_frame": [{}, {"seismic": False}, {"design": False, "n_modes": 3},
                        {"walls": [], "pdelta": True, "capacity": True},
+                       {"found_type": "Isolated pad footings", "walls": []},
                        {"capacity": False, "layout": {"omit_columns": ["B2"], "openings": ["A1"],
                                                       "beam_sizes": {"A2-A3": [300, 600]}}},
                        {"walls": [{"at": "A1", "dir": "X", "L": 1.0, "t": 150}], "ag": 0.4},

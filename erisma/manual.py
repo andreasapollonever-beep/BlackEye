@@ -320,6 +320,17 @@ reinforcement labels, jump to modes, storey checks and quantities in the report)
 elements (their sizes can then be changed together), the wheel zooms, the middle button pans and
 the right button opens a menu (properties, select all of the type, open in the member
 calculation, delete). The status bar shows the cursor coordinates and how many members pass.</p>
+<p><b>What is checked.</b> Columns (EC2 bending, biaxial, slenderness, shear; EC8 DCM
+detailing), beams (EC2 bending, shear, <b>deflection by span/depth 7.4.2</b>; EC8 detailing),
+walls (EC8 ductile walls), <b>slabs</b> (every panel as a two-way slab, continuous over
+neighbouring panels), the <b>foundation</b> — foundation beams on Winkler springs in the 3D
+model (EC2 design with the overstrength γ_Rd·Ω of EN 1998-1 4.4.2.6 and the EC7 bearing check of
+the soil under them) or isolated pad footings —, storey drifts, θ, α_cr, effective modal mass
+and capacity design (ΣM_Rc ≥ 1.3 ΣM_Rb, capacity shears).</p>
+<p><b>Auto-size</b> (Home or Design tab) repeats the complete calculation and enlarges what
+fails — columns, beams, walls, slab thickness, foundation beams, the number of modes, P-Δ —
+until every Eurocode check passes. It lists every change and applies it only when you press
+<b>Apply</b> (Ctrl+Z undoes it).</p>
 <p>The layout is the same on every storey (typical floor). The work is saved automatically in
 the browser; <b>Save</b> writes a project file that <b>Open</b> brings back.</p>""",
         "el": """
@@ -357,6 +368,18 @@ the browser; <b>Save</b> writes a project file that <b>Open</b> brings back.</p>
 στοιχεία (που αλλάζουν διατομή μαζί), η ροδέλα κάνει zoom, το μεσαίο πλήκτρο μετακινεί και το
 δεξί κλικ ανοίγει μενού (ιδιότητες, επιλογή όλων του τύπου, άνοιγμα στον υπολογισμό μέλους,
 διαγραφή). Η γραμμή κατάστασης δείχνει τις συντεταγμένες του δείκτη και πόσα μέλη επαρκούν.</p>
+<p><b>Τι ελέγχεται.</b> Υποστυλώματα (EC2 κάμψη, διαξονική, λυγηρότητα, διάτμηση· EC8
+κατασκευαστικές διατάξεις ΚΠΜ), δοκοί (EC2 κάμψη, διάτμηση, <b>βέλος με λόγο ανοίγματος/ύψους
+7.4.2</b>· EC8 διατάξεις), τοιχώματα (EC8 πλάστιμα τοιχώματα), <b>πλάκες</b> (κάθε φάτνωμα ως
+διέρειστη πλάκα, συνεχής πάνω από γειτονικά φατνώματα), η <b>θεμελίωση</b> — πεδιλοδοκοί σε
+ελατήρια Winkler μέσα στο 3D προσομοίωμα (EC2 με την υπεραντοχή γ_Rd·Ω του EN 1998-1 4.4.2.6 και
+έλεγχο φέρουσας ικανότητας εδάφους EC7) ή μεμονωμένα πέδιλα —, σχετικές μετακινήσεις, θ, α_cr,
+δρώσα ιδιομορφική μάζα και ικανοτικός σχεδιασμός (ΣM_Rc ≥ 1.3 ΣM_Rb, ικανοτικές τέμνουσες).</p>
+<p>Η <b>Αυτόματη διαστασιολόγηση</b> (καρτέλα Αρχική ή Σχεδιασμός) επαναλαμβάνει τον πλήρη
+υπολογισμό και μεγαλώνει ό,τι ανεπαρκεί — υποστυλώματα, δοκούς, τοιχώματα, πάχος πλάκας,
+πεδιλοδοκούς, αριθμό ιδιομορφών, P-Δ — μέχρι να περάσουν όλοι οι έλεγχοι των Ευρωκωδίκων.
+Δείχνει κάθε αλλαγή και την εφαρμόζει μόνο όταν πατήσετε <b>Εφαρμογή</b> (το Ctrl+Z την
+αναιρεί).</p>
 <p>Η διάταξη είναι ίδια σε όλους τους ορόφους (τυπικός όροφος). Η εργασία αποθηκεύεται
 αυτόματα στον browser· η <b>Αποθήκευση</b> γράφει αρχείο έργου που ανοίγει με το
 <b>Άνοιγμα</b>.</p>"""}),
@@ -809,7 +832,10 @@ NOTES: dict[str, dict[str, list[str]]] = {
                "Modal response spectrum analysis (CQC) in X and Y, accidental torsion ±0.05 L, "
                "E_X + 0.3 E_Y, drift d_r ν ≤ α h and θ (EN 1998-1 4.4.2.2) per storey.",
                "Every beam and column is designed by the EC2/EC8 modules with the lightest "
-               "passing bars; the critical members are printed in full."],
+               "passing bars; the critical members are printed in full.",
+               "Slabs per panel (EC2, two-way), beam deflection by span/depth (EC2 7.4.2) and "
+               "the foundation: beams on Winkler springs (EC2 + EC7 bearing, EN 1998-1 4.4.2.6 "
+               "overstrength) or pad footings (EC7)."],
         "el": ["Χωρικό πλαίσιο με στοιχεία Timoshenko και άκαμπτο διάφραγμα ανά όροφο· φορτία "
                "πλακών στις δοκούς με τον κανόνα των 45° (ακριβείς δυνάμεις πάκτωσης για "
                "τραπεζοειδή φορτία).",
@@ -817,7 +843,10 @@ NOTES: dict[str, dict[str, list[str]]] = {
                "±0.05 L, E_X + 0.3 E_Y, σχετικές μετακινήσεις d_r ν ≤ α h και θ (EN 1998-1 "
                "4.4.2.2) ανά όροφο.",
                "Κάθε δοκός και υποστύλωμα διαστασιολογείται με τα modules EC2/EC8 με τον "
-               "ελαφρύτερο επαρκή οπλισμό· τα κρίσιμα μέλη τυπώνονται αναλυτικά."]},
+               "ελαφρύτερο επαρκή οπλισμό· τα κρίσιμα μέλη τυπώνονται αναλυτικά.",
+               "Πλάκες ανά φάτνωμα (EC2, διέρειστες), βέλος δοκών με λόγο ανοίγματος/ύψους "
+               "(EC2 7.4.2) και θεμελίωση: πεδιλοδοκοί σε ελατήρια Winkler (EC2 + φέρουσα "
+               "ικανότητα EC7, υπεραντοχή EN 1998-1 4.4.2.6) ή μεμονωμένα πέδιλα (EC7)."]},
     "ec8_lateral_force": {
         "en": ["Type 1 design spectrum, T1 = C_t H^¾, λ = 0.85 when applicable, storey forces "
                "with a linear mode shape (Eq. 4.11)."],

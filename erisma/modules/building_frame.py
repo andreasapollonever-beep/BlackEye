@@ -18,9 +18,10 @@ from ..structure import (StructureError, analyse, analyse_pdelta, critical_load_
                          modal)
 from ..structure.builder import BuildingSpec, build
 from ..structure.builder import grid_label
-from ..structure.design import (capacity_design, capacity_shears, design_beams, design_columns,
-                                design_walls)
+from ..structure.design import (MemberDesign, capacity_design, capacity_shears, design_beams,
+                                design_columns, design_footings, design_slabs, design_walls)
 from ..structure.modal import ec8_spectrum
+from ..structure.model import Msg
 from ..structure.seismic import seismic_check
 
 CONCRETE = ["C20/25", "C25/30", "C30/37", "C35/45", "C40/50"]
@@ -113,6 +114,37 @@ class BuildingFrame(DesignModule):
                    "stiffness (all analyses)."),
         Field("design", "Design the reinforcement of all members", kind="bool", default=True,
               group="Design"),
+        Field("slabs", "Design the slabs (EN 1992-1-1)", kind="bool", default=True,
+              group="Design", show_if="design",
+              help="Every slab panel as a two-way slab, continuous where a neighbour panel "
+                   "exists; bottom and top bars are chosen automatically."),
+        Field("foundations", "Design the footings (EN 1997-1)", kind="bool", default=True,
+              group="Foundations", show_if="design",
+              help="A pad footing under every column and wall, sized for bearing, sliding and "
+                   "eccentricity; seismic actions with capacity design (EN 1998-1 4.4.2.6)."),
+        Field("found_type", "Foundation type", kind="choice", group="Foundations",
+              choices=["Foundation beams (Winkler)", "Isolated pad footings"],
+              default="Foundation beams (Winkler)",
+              help="Foundation beams along the grid lines on elastic soil springs (part of the "
+                   "3D model, as usual for seismic buildings), or pad footings under a fixed base."),
+        Field("fb_B", "Foundation beam flange width B", "m", 1.2, min=0.4, max=4.0,
+              group="Foundations", show_if="found_type=Foundation beams (Winkler)"),
+        Field("fb_bw", "Foundation beam web width b_w", "mm", 500.0, min=250, max=1000,
+              group="Foundations", show_if="found_type=Foundation beams (Winkler)"),
+        Field("fb_h", "Foundation beam depth h", "mm", 1200.0, min=500, max=2500,
+              group="Foundations", show_if="found_type=Foundation beams (Winkler)"),
+        Field("ks", "Modulus of subgrade reaction k_s", "MN/m³", 40.0, min=5, max=300,
+              group="Foundations", show_if="found_type=Foundation beams (Winkler)",
+              help="Typical: loose sand 10–25, medium sand 25–60, dense sand 60–120, stiff "
+                   "clay 25–50 MN/m³ (or from a plate-load test / the geotechnical report)."),
+        Field("D_found", "Founding depth D", "m", 1.2, min=0.5, max=5.0, group="Foundations",
+              show_if="foundations"),
+        Field("phi_soil", "Soil φ'k", "°", 30.0, min=15, max=45, group="Foundations",
+              show_if="foundations"),
+        Field("c_soil", "Soil c'k", "kN/m²", 5.0, min=0, max=100, group="Foundations",
+              show_if="foundations"),
+        Field("gamma_soil", "Soil γ", "kN/m³", 19.0, min=14, max=23, group="Foundations",
+              show_if="foundations"),
         Field("capacity", "Capacity design (EN 1998-1 DCM)", kind="bool", default=True,
               group="Design", show_if="design",
               help="ΣM_Rc ≥ 1.3 ΣM_Rb at the joints (4.4.2.3) and shears from the flexural "
@@ -134,9 +166,12 @@ class BuildingFrame(DesignModule):
             inp["cracked"] if seismic else 1.0, inp["g_finish"], inp["q"], inp["q_roof"],
             inp["g_wall"],
             [{"at": r["at"], "dir": r["dir"], "L": r["L"], "t": r["t"]} for r in inp["walls"]],
-            inp["layout"])
+            inp["layout"],
+            {"B": inp["fb_B"], "bw": inp["fb_bw"], "h": inp["fb_h"], "ks": inp["ks"], "n": 6}
+            if inp["found_type"].startswith("Foundation beams") else None)
         if inp["beam_h"] <= inp["slab_t"]:
             raise InputError("The beam depth must be greater than the slab thickness", "beam_h")
+        calc.issues = []   # machine-readable failures, used by the automatic sizing
         g_unf, _, g_q = na.combos["DA1-C1"][:3]
         psi0, psi1, psi2 = na.psi[inp["category"]]
         pdelta = seismic and inp["pdelta"]
@@ -157,9 +192,12 @@ class BuildingFrame(DesignModule):
         calc.heading("Global stability")
         calc.formula("α_cr", calc.tr("eigenvalue of (K + α K_G) φ = 0 for G + {p:g}Q", p=psi2),
                      acr, "", "Elastic critical load factor", ref="EN 1993-1-1 5.2.1(3)", dp=1)
-        calc.check_min("α_cr ≥ 10 (first-order analysis sufficient)", acr, 10.0, "",
-                       "EN 1993-1-1 Eq. 5.1",
-                       hint="Switch on P-Δ effects, or stiffen the structure.")
+        if not pdelta:
+            calc.check_min("α_cr ≥ 10 (first-order analysis sufficient)", acr, 10.0, "",
+                           "EN 1993-1-1 Eq. 5.1",
+                           hint="Switch on P-Δ effects, or stiffen the structure.")
+            if acr < 10:
+                calc.issues.append({"type": "acr"})
         if pdelta:
             calc.note("P-Δ: the geometric stiffness of the axial forces from G + {p:g}Q is "
                       "included in every analysis below.", p=psi2)
@@ -232,6 +270,8 @@ class BuildingFrame(DesignModule):
             calc.check_min(calc.tr("Σ effective mass in {d} ≥ 90 %", d=d),
                            float(md.cumulative(d)[-1]), 0.90, "", "EN 1998-1 4.3.3.3.1(3)",
                            hint="Increase the number of modes.")
+            if md.cumulative(d)[-1] < 0.90:
+                calc.issues.append({"type": "modes"})
 
         calc.heading("Design spectrum")
         sp = ec8_spectrum(inp["ag"], inp["ground"], inp["q_factor"], inp["importance"],
@@ -276,9 +316,14 @@ class BuildingFrame(DesignModule):
                 calc.check(calc.tr("Storey {i} drift {d}: d_r ν ≤ α h", i=s.index, d=d),
                            s.drift[d] * seis.nu, alpha * s.h, "mm", "EN 1998-1 4.4.3.2",
                            hint="Increase the column sizes or add walls to stiffen the building.")
+                if s.drift[d] * seis.nu > alpha * s.h:
+                    calc.issues.append({"type": "drift", "dir": d, "storey": s.index})
         th = seis.theta_max
         calc.check("Second-order sensitivity θ ≤ 0.30", th, 0.30, "", "EN 1998-1 4.4.2.2(4)",
                    hint="Stiffen the structure (larger columns or walls).")
+        if th > 0.3:
+            calc.issues.append({"type": "drift", "dir": "X", "storey": 0})
+            calc.issues.append({"type": "drift", "dir": "Y", "storey": 0})
         for d in ("X", "Y"):
             if seis.amplification[d] > 1.0:
                 calc.note("θ > 0.10 in {d}: seismic effects multiplied by 1/(1 − θ) = {a:.3f} "
@@ -320,11 +365,22 @@ class BuildingFrame(DesignModule):
                           project, inp["fyk"], inp["cover"])
         if seis is not None and inp["capacity"]:
             cls._capacity(calc, inp, spec, info, dc, db, quasi, seis, project)
+        ds = cls._slabs(inp, spec, info, project) if inp["slabs"] else []
+        df = []
+        if inp["foundations"] and info["fbeams"]:
+            df = cls._fbeams(calc, inp, spec, info, res, seis, uls, quasi, dc + dw, project)
+        elif inp["foundations"]:
+            df = cls._footings(calc, inp, spec, info, res, seis, quasi, dc + dw, project)
         for title, items, hint in (
                 ("Columns", dc, "Increase the column size or the concrete class."),
                 ("Beams", db, "Increase the beam size or the concrete class."),
                 ("Walls (critical region at the base)", dw,
-                 "Increase the wall length or thickness.")):
+                 "Increase the wall length or thickness."),
+                ("Slabs", ds, "Increase the slab thickness."),
+                ("Footings", [d for d in df if d.kind == "footing"],
+                 "Increase the founding depth or use a strip footing / raft."),
+                ("Foundation beams", [d for d in df if d.kind == "fbeam"],
+                 "Increase the foundation beam depth or width.")):
             if not items:
                 continue
             calc.heading(title, 2)
@@ -352,7 +408,12 @@ class BuildingFrame(DesignModule):
         from ..core import get_module
         for items, label in ((dc, "Critical column {m} — full calculation"),
                              (db, "Critical beam {m} — full calculation"),
-                             (dw, "Critical wall {m} — full calculation")):
+                             (dw, "Critical wall {m} — full calculation"),
+                             (ds, "Critical slab panel {m} — full calculation"),
+                             ([d for d in df if d.kind == "footing"],
+                              "Critical footing {m} — full calculation"),
+                             ([d for d in df if d.kind == "fbeam"],
+                              "Critical foundation beam {m} — full calculation")):
             if not items:
                 continue
             d = max(items, key=lambda d: d.utilisation)
@@ -364,7 +425,128 @@ class BuildingFrame(DesignModule):
                 if it.kind == "heading":
                     it.data["level"] = 2
                 calc.items.append(it)
-        return dc + db + dw
+        return dc + db + dw + ds + df
+
+    @staticmethod
+    def _slabs(inp, spec, info, project):
+        xs, ys, op = info["xs"], info["ys"], info["openings"]
+        nx, ny = len(xs), len(ys)
+
+        def exists(i, j):
+            return 0 <= i < nx - 1 and 0 <= j < ny - 1 and grid_label(i, j) not in op
+
+        panels = []
+        for i in range(nx - 1):
+            for j in range(ny - 1):
+                if not exists(i, j):
+                    continue
+                panels.append({"id": grid_label(i, j), "lx": xs[i + 1] - xs[i],
+                               "ly": ys[j + 1] - ys[j],
+                               "cont": {"x0": exists(i - 1, j), "x1": exists(i + 1, j),
+                                        "y0": exists(i, j - 1), "y1": exists(i, j + 1)}})
+        ns = len(spec.heights)
+        qs = {k: (spec.q_roof if k == ns else spec.q) for k in range(1, ns + 1)}
+        return design_slabs(panels, spec.slab_t, inp["concrete"], spec.g_finish, qs, project,
+                            inp["fyk"])
+
+    @staticmethod
+    def _fbeams(calc, inp, spec, info, res, seis, uls, quasi, vertical, project):
+        """Foundation beams: EC2 design of every segment (elastic, EN 1998-1 4.4.2.6) and the
+        EC7 bearing check of the soil under them."""
+        from ..structure.design import _omega, soil_pressures
+        na = get_annex(calc.project.annex)
+        fck = float(inp["concrete"].split("/")[0][1:])
+        fcd, fyd = na.alpha_cc * fck / na.gamma_c, inp["fyk"] / na.gamma_s
+        ef = 1.0
+        if seis is not None:
+            vd = {d.member: d for d in vertical}
+            ef = max(_omega(vd.get(mid), seis, quasi, fcd, fyd)
+                     for mid in info["columns"] + info["walls"] if mid[1:3] == "1.")
+        calc.heading("Foundation beams", 2)
+        calc.text("Foundation beams B = {B:g} m, b_w × h = {bw:g} × {h:g} mm on Winkler springs "
+                  "k_s = {k:g} MN/m³ along the grid lines (part of the 3D model).",
+                  B=inp["fb_B"] / 1000, bw=inp["fb_bw"], h=inp["fb_h"], k=inp["ks"] * 1e3)
+        if seis is not None:
+            calc.formula("γ_Rd Ω", "γ_Rd · min(M_Rd/M_Ed of the columns, q)", ef, "",
+                         "Overstrength of the seismic action on the foundation",
+                         ref="EN 1998-1 4.4.2.6", dp=2)
+        subs = {mid: 0 for ids in info["fbeams"].values() for mid in ids}
+        dsub = design_beams(subs, seis, uls, quasi, inp["fb_bw"], inp["fb_h"], inp["concrete"],
+                            project, inp["fyk"], 50.0, e_factor=ef, dissipative=False, sls=False)
+        by = {d.member: d for d in dsub}
+        out = []
+        area = lambda n, d: n * np.pi * float(d) ** 2 / 4  # noqa: E731
+        for key, ids in info["fbeams"].items():
+            parts = [by[i] for i in ids]
+            gov = max(parts, key=lambda d: d.utilisation)
+            bot = max(parts, key=lambda d: area(d.inputs["n_bars"], d.inputs["dia"])).inputs
+            top = max(parts, key=lambda d: area(d.inputs["n_comp"], d.inputs["dia_comp"])).inputs
+            s_min = min(d.inputs["link_s"] for d in parts)
+            ld = max(d.inputs.get("link_dia", "8") for d in parts)
+            reinf = (f"bottom {bot['n_bars']}Ø{bot['dia']}, top {top['n_comp']}Ø{top['dia_comp']}, "
+                     f"Ø{ld}/{s_min:g}")
+            notes = list(dict.fromkeys(n for d in parts for n in d.notes))
+            As = area(bot["n_bars"], bot["dia"]) + area(top["n_comp"], top["dia_comp"])
+            out.append(MemberDesign(f"FB.{key}", "fbeam", 0, reinf, gov.utilisation,
+                                    all(d.ok for d in parts), gov.governing, gov.inputs,
+                                    "ec2_rc_beam", notes, As / (inp["fb_bw"] * inp["fb_h"])))
+        # soil pressures under the beams
+        an = res["G"].analysis
+        springs = {n: s.springs[2] / (inp["ks"] * inp["fb_B"]) for n, s in an.model.supports.items()
+                   if s.springs[2]}
+        soil = {"phi": inp["phi_soil"], "c": inp["c_soil"], "gamma": inp["gamma_soil"]}
+        rows = soil_pressures(res, quasi, seis, ef, springs, inp["fb_B"], inp["D_found"], soil, na)
+        calc.table(["Combination", "p_max [kPa]", "Node", "q_Rd [kPa]"],
+                   [[r["combo"], f"{r['p'] * 1e3:.0f}", r["node"], f"{r['qRd'] * 1e3:.0f}"]
+                    for r in rows],
+                   caption="Soil pressure p = R/(B·l) at the spring nodes; q_Rd of a strip of "
+                           "width B, EN 1997-1 Annex D (seismic: EN 1998-5 material factors)")
+        for r in rows:
+            calc.check(calc.tr("Soil bearing under the foundation beams ({c})", c=r["combo"]),
+                       r["p"], r["qRd"], "kN/m²", "EN 1997-1 6.5.2",
+                       hint="Widen the foundation beams (B), deepen them or use a raft.")
+            if r["p"] > r["qRd"]:
+                calc.issues.append({"type": "soil"})
+            if r.get("p_min", 0.0) < 0:
+                calc.warn("Uplift under the foundation beams at {n} in the seismic situation "
+                          "(p_min = {p:.0f} kPa): the linear springs carry tension there — "
+                          "check the uplift or widen the beams.", n=r["node_min"],
+                          p=r["p_min"] * 1e3)
+        return out
+
+    @staticmethod
+    def _footings(calc, inp, spec, info, res, seis, quasi, vertical, project):
+        na = get_annex(calc.project.annex)
+        bases = {}
+        for mid in info["columns"] + info["walls"]:
+            if not mid.startswith(("C1.", "W1.")):
+                continue
+            g = mid.split(".", 1)[1]
+            w = info["wall_spec"].get(g) if mid.startswith("W") else None
+            cx, cy = ((w["L"], w["t"]) if w["dir"] == "X" else (w["t"], w["L"])) if w \
+                else info["sizes"][mid]
+            bases[g] = {"node": f"{g}@0", "member": mid, "cx": cx, "cy": cy}
+        soil = {"phi": inp["phi_soil"], "c": inp["c_soil"] * 1e3, "gamma": inp["gamma_soil"] * 1e6,
+                "D": inp["D_found"] / 1000, "approach": "National Annex"}
+        df = design_footings(bases, res, seis, quasi, {d.member: d for d in vertical}, soil,
+                             inp["concrete"], project, inp["fyk"], na.gamma_c, na.gamma_s,
+                             na.alpha_cc)
+        # neighbouring footings must not overlap (otherwise a strip footing or raft is needed)
+        xs, ys = info["xs"], info["ys"]
+        by = {d.member.split(".", 1)[1]: d for d in df}
+        from ..structure.builder import grid_label as gl
+        for g, d in by.items():
+            i = next(i for i in range(len(xs)) for j in range(len(ys)) if gl(i, j) == g)
+            j = next(j for i2 in range(len(xs)) for j in range(len(ys)) if gl(i2, j) == g)
+            for (i2, j2, gap, key) in ((i + 1, j, (xs[i + 1] - xs[i]) / 1000 if i + 1 < len(xs)
+                                        else 0, "Bx"),
+                                       (i, j + 1, (ys[j + 1] - ys[j]) / 1000 if j + 1 < len(ys)
+                                        else 0, "By")):
+                o = by.get(gl(i2, j2)) if gap else None
+                if o and (d.inputs[key] + o.inputs[key]) / 2 > gap - 0.1:
+                    d.notes.append(Msg("Footings {a} and {b} overlap — use a strip footing or "
+                                       "a raft", a=g, b=gl(i2, j2)))
+        return df
 
     @staticmethod
     def _capacity(calc, inp, spec, info, dc, db, quasi, seis, project):
@@ -405,6 +587,8 @@ class BuildingFrame(DesignModule):
         by_storey: dict[int, list] = {}
         for r in res:
             by_storey.setdefault(int(r.node.split("@")[1]), []).append(r)
+            if not r.ok:
+                calc.issues.append({"type": "joint", "grid": r.node.split("@")[0]})
         for k, rows in sorted(by_storey.items()):
             worst = min(rows, key=lambda r: r.ratio)
             calc.check_min(calc.tr("Storey {k}: ΣM_Rc ≥ 1.3 ΣM_Rb (joint {j})", k=k,
@@ -414,7 +598,7 @@ class BuildingFrame(DesignModule):
     @staticmethod
     def _results(calc, info, seis, designs) -> dict:
         """Per-member results for the graphical workspace (Erisma Structure)."""
-        out = {"members": {}, "storeys": [], "periods": []}
+        out = {"members": {}, "storeys": [], "periods": [], "issues": getattr(calc, "issues", [])}
         for d in designs:
             out["members"][d.member] = {
                 "kind": d.kind, "storey": d.storey, "ok": d.ok, "util": d.utilisation,
@@ -434,14 +618,28 @@ class BuildingFrame(DesignModule):
 
     @staticmethod
     def _quantities(spec, info, an, designs) -> dict:
+        inp_D = lambda i: i["D"] * 1000  # noqa: E731  (founding depth, m → mm)
         """Concrete, formwork and (if designed) reinforcement of the whole frame."""
         model = an.model
         rho_s = 7850e-9  # kg/mm³
         conc = form = steel = 0.0
         des = {d.member: d for d in designs}
+        fb = (spec.foundation or {})
         for mem in model.members.values():
             L = model.length(mem)
             vertical = abs(model.nodes[mem.i].z - model.nodes[mem.j].z) > 1
+            if mem.id.startswith("FB."):      # foundation beam (inverted T)
+                hf = min(250.0, fb["h"] / 3)
+                conc += (fb["bw"] * fb["h"] + (fb["B"] - fb["bw"]) * hf) * L
+                form += 2 * fb["h"] * L
+                d = des.get("FB." + mem.id.split(".")[1])
+                if d:
+                    i = d.inputs
+                    As = (i["n_bars"] * float(i["dia"]) ** 2 + i["n_comp"]
+                          * float(i["dia_comp"]) ** 2) * np.pi / 4
+                    per = 2 * (fb["bw"] + fb["h"] - 4 * 50.0)
+                    steel += As * L * 1.1 + 50.3 * per * L / i["link_s"]
+                continue
             if vertical:
                 g = mem.id.split(".", 1)[1]
                 w = info["wall_spec"].get(g) if mem.id.startswith("W") else None
@@ -477,7 +675,29 @@ class BuildingFrame(DesignModule):
         A = info["plan_area"] * len(spec.heights)
         conc += A * spec.slab_t
         form += A
+        exc = 0.0
+        for d in designs:
+            if d.kind == "slab":   # bottom bars both ways everywhere, top bars ≈ half the area
+                i = d.inputs
+                xs_, ys_ = info["xs"], info["ys"]
+                gi = d.member.split(".", 1)[1]
+                area = next(((xs_[a + 1] - xs_[a]) * (ys_[b + 1] - ys_[b])
+                             for a in range(len(xs_) - 1) for b in range(len(ys_) - 1)
+                             if grid_label(a, b) == gi), 0.0)
+                ab = np.pi * float(i["dia_b"]) ** 2 / 4 / i["s_b"]
+                at = np.pi * float(i["dia_t"]) ** 2 / 4 / i["s_t"]
+                steel += area * (2 * ab + at)
+            elif d.kind == "footing":
+                i = d.inputs
+                Bx, By, hf = i["Bx"] * 1000, i["By"] * 1000, i["h"] * 1000
+                conc += Bx * By * hf
+                form += 2 * (Bx + By) * hf
+                a = np.pi * float(i["dia_x"]) ** 2 / 4
+                steel += a * (By / i["s_x"]) * Bx + a * (Bx / i["s_y"]) * By
+                exc += (Bx + 600) * (By + 600) * inp_D(i)
         out = {"concrete": conc * 1e-9, "formwork": form * 1e-6}
+        if exc:
+            out["excavation"] = exc * 1e-9
         if steel:
             out["rebar"] = steel * rho_s
         return out
@@ -498,6 +718,8 @@ class BuildingFrame(DesignModule):
         has_design = bool(designs)
         sc.layer("frame", "Frame (colour = reinforcement ratio ρ)" if has_design else "Frame")
         sc.layer("slabs", "Slabs")
+        if spec.foundation:
+            sc.layer("found", "Foundation beams")
         if seis is not None:
             sc.layer("mode", "Mode 1 (deformed)", visible=False)
         sc.layer("grid", "Grid labels")
@@ -507,10 +729,21 @@ class BuildingFrame(DesignModule):
                 des[mid] = des[f"W1.{mid.split('.', 1)[1]}"]
         m = lambda v: v / 1000  # noqa: E731
         model = an.model
+        fb = spec.foundation or {}
         for mem in model.members.values():
             a, b = model.nodes[mem.i], model.nodes[mem.j]
             c = ((a.x + b.x) / 2, (a.z + b.z) / 2, (a.y + b.y) / 2)
             vertical = abs(a.z - b.z) > 1
+            if mem.id.startswith("FB."):
+                L = model.length(mem)
+                along_x = abs(a.x - b.x) > 1
+                size = (L, fb["h"], fb["B"]) if along_x else (fb["B"], fb["h"], L)
+                c = (c[0], -fb["h"] / 2, c[2])
+                d = des.get("FB." + mem.id.split(".")[1])
+                col = PALETTE["concrete"] if d is None else "#e03b3b" if not d.ok else \
+                    heat_color(0.85 * min(d.rho / 0.03, 1.0))
+                sc.box("found", tuple(m(v) for v in c), tuple(m(v) for v in size), col)
+                continue
             if vertical:
                 w = info["wall_spec"].get(mem.id.split(".", 1)[1]) if mem.id.startswith("W") \
                     else None
@@ -536,6 +769,17 @@ class BuildingFrame(DesignModule):
                 col = heat_color(0.85 * min(max(t, 0.0), 1.0))
             sc.box("frame", tuple(m(v) for v in c), tuple(m(v) for v in size), col)
         xs, ys, zs = info["xs"], info["ys"], info["zs"]
+        pads = [d for d in designs if d.kind == "footing"]
+        if pads:
+            sc.layer("found", "Footings")
+        for d in pads:
+            g = d.member.split(".", 1)[1]
+            n = model.nodes.get(f"{g}@0")
+            if n is None:
+                continue
+            i = d.inputs
+            col = "#e03b3b" if not d.ok else PALETTE["concrete"]
+            sc.box("found", (m(n.x), -i["h"] / 2, m(n.y)), (i["Bx"], i["h"], i["By"]), col)
         for z in zs[1:]:
             for i in range(len(xs) - 1):
                 for j in range(len(ys) - 1):

@@ -157,6 +157,15 @@ def run_module(module_id: str, req: RunRequest) -> dict[str, Any]:
                        "structure": getattr(calc, "structure", None)})
 
 
+@app.post("/api/structure/autosize")
+def structure_autosize(req: RunRequest) -> dict[str, Any]:
+    """Erisma Structure: enlarge members / switch options until every check passes."""
+    from ..structure.autosize import autosize
+
+    _check_license(_lang(req.lang))
+    return _json_safe(autosize(req.inputs, req.project, _lang(req.lang)))
+
+
 class OptimiseRequest(RunRequest):
     variables: list[dict[str, Any]] = Field(default_factory=list)
 

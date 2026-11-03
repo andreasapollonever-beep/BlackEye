@@ -64,6 +64,15 @@ class SeismicResult:
         ey = self._directional("Y", self.rs["Y"].end_forces[k], self.torsion["Y"].end_forces[k])
         return np.maximum(ex + 0.3 * ey, 0.3 * ex + ey)
 
+    def reaction_envelope(self, node) -> np.ndarray:
+        """|E| of the 6 support reactions at ``node`` (components, torsion, θ included)."""
+        z = np.zeros(6)
+        ex = self._directional("X", self.rs["X"].reactions.get(str(node), z),
+                               self.torsion["X"].reactions.get(str(node), z))
+        ey = self._directional("Y", self.rs["Y"].reactions.get(str(node), z),
+                               self.torsion["Y"].reactions.get(str(node), z))
+        return np.maximum(ex + 0.3 * ey, 0.3 * ex + ey)
+
     def displacement_envelope(self, node) -> np.ndarray:
         i = self.modes.analysis.dofmap.index[str(node)]
         ex = self._directional("X", self.rs["X"].u[i], self.torsion["X"].u[i])

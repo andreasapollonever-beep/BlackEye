@@ -108,7 +108,7 @@ def _building(i, c):
     q = getattr(c, "building_qty", None)
     if not q:
         return {}, ""
-    return dict(q), "whole frame — slab reinforcement and foundations not included"
+    return dict(q), "whole frame, slabs and footings"
 
 
 @quantity("ec2_rc_slab")
