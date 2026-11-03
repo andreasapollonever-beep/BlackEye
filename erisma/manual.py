@@ -308,6 +308,18 @@ member, with its design forces, in the member calculation.</li>
 <li><b>Report and 3D:</b> the <b>3D</b> and <b>Report</b> buttons (Ctrl+3) show the model
 and the full step-by-step report, which prints with Ctrl+P.</li>
 </ol>
+<p><b>The ribbon</b> groups the commands as in professional structural software:
+<b>File</b> (new, open, save, print, HTML report, CSV table) · <b>Home</b> (undo/redo, delete,
+select all columns/beams/walls or the failing members, <b>Run</b> F5 and the <b>Auto</b> switch for
+large models, views) · <b>Model</b> (element tools, grid wizard, add/remove axes and storeys,
+default sections) · <b>Loads</b> · <b>Seismic</b> · <b>Design</b> (materials, options, member
+table) · <b>Results</b> (colour by utilisation, steel ratio or pass/fail, the storey shown,
+reinforcement labels, jump to modes, storey checks and quantities in the report) · <b>View</b>
+(zoom, fit, what is shown, full screen) · <b>Help</b>. Double-click a tab to collapse the ribbon.</p>
+<p>In the plan: <b>Shift+click</b> adds to the selection, dragging a window selects several
+elements (their sizes can then be changed together), the wheel zooms, the middle button pans and
+the right button opens a menu (properties, select all of the type, open in the member
+calculation, delete). The status bar shows the cursor coordinates and how many members pass.</p>
 <p>The layout is the same on every storey (typical floor). The work is saved automatically in
 the browser; <b>Save</b> writes a project file that <b>Open</b> brings back.</p>""",
         "el": """
@@ -331,6 +343,20 @@ the browser; <b>Save</b> writes a project file that <b>Open</b> brings back.</p>
 <li><b>Τεύχος και 3D:</b> τα κουμπιά <b>3D</b> και <b>Τεύχος</b> (Ctrl+3) δείχνουν το
 μοντέλο και το πλήρες αναλυτικό τεύχος, που εκτυπώνεται με Ctrl+P.</li>
 </ol>
+<p><b>Το ribbon</b> ομαδοποιεί τις εντολές όπως στα επαγγελματικά στατικά προγράμματα:
+<b>Αρχείο</b> (νέο, άνοιγμα, αποθήκευση, εκτύπωση, τεύχος HTML, πίνακας CSV) · <b>Αρχική</b>
+(αναίρεση/επανάληψη, διαγραφή, επιλογή όλων των υποστυλωμάτων/δοκών/τοιχωμάτων ή των ανεπαρκών
+μελών, <b>Επίλυση</b> F5 και διακόπτης <b>Αυτόματα</b> για μεγάλα μοντέλα, προβολές) ·
+<b>Μοντέλο</b> (εργαλεία στοιχείων, οδηγός καννάβου, προσθήκη/αφαίρεση αξόνων και ορόφων,
+προεπιλεγμένες διατομές) · <b>Φορτία</b> · <b>Σεισμός</b> · <b>Σχεδιασμός</b> (υλικά, επιλογές,
+πίνακας μελών) · <b>Αποτελέσματα</b> (χρωματισμός κατά εκμετάλλευση, ποσοστό οπλισμού ή επάρκεια,
+όροφος προβολής, ετικέτες οπλισμού, μετάβαση σε ιδιομορφές, ελέγχους ορόφων και ποσότητες του
+τεύχους) · <b>Προβολή</b> (zoom, προσαρμογή, τι εμφανίζεται, πλήρης οθόνη) · <b>Βοήθεια</b>.
+Διπλό κλικ σε καρτέλα συμπτύσσει το ribbon.</p>
+<p>Στην κάτοψη: <b>Shift+κλικ</b> προσθέτει στην επιλογή, το σύρσιμο παραθύρου επιλέγει πολλά
+στοιχεία (που αλλάζουν διατομή μαζί), η ροδέλα κάνει zoom, το μεσαίο πλήκτρο μετακινεί και το
+δεξί κλικ ανοίγει μενού (ιδιότητες, επιλογή όλων του τύπου, άνοιγμα στον υπολογισμό μέλους,
+διαγραφή). Η γραμμή κατάστασης δείχνει τις συντεταγμένες του δείκτη και πόσα μέλη επαρκούν.</p>
 <p>Η διάταξη είναι ίδια σε όλους τους ορόφους (τυπικός όροφος). Η εργασία αποθηκεύεται
 αυτόματα στον browser· η <b>Αποθήκευση</b> γράφει αρχείο έργου που ανοίγει με το
 <b>Άνοιγμα</b>.</p>"""}),
