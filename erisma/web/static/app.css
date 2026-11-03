@@ -490,3 +490,12 @@ button.danger{color:var(--fail)!important}
 .st-dbar span{color:var(--muted);white-space:nowrap;overflow:hidden}
 #st-3d .v3d-results{display:none}
 .st-f.chk{display:flex;gap:8px;align-items:center}
+.st-loads{pointer-events:none}
+.st-lrect{fill:rgba(142,108,196,.18);stroke:#8e6cc4;stroke-dasharray:60 40}
+.st-lline{stroke:#8e6cc4;stroke-dasharray:80 40}
+.st-lpt{fill:rgba(142,108,196,.3);stroke:#8e6cc4}
+.st-ltxt{fill:#b69cf0;text-anchor:middle;dominant-baseline:central;font-family:inherit;font-weight:600}
+.rb-row{display:flex;gap:4px;margin-top:3px}
+.rb-row select,.rb-grp select{max-width:190px}
+.st-dlg.wide{min-width:640px;max-width:90vw}
+.st-dlg input{background:var(--input);color:var(--ink);border:1px solid var(--line2);border-radius:4px;padding:3px 5px}

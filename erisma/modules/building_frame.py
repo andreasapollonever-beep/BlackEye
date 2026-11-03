@@ -20,6 +20,7 @@ from ..structure.builder import BuildingSpec, build
 from ..structure.builder import grid_label
 from ..structure.design import (MemberDesign, capacity_design, capacity_shears, design_beams,
                                 design_columns, design_footings, design_slabs, design_walls)
+from ..structure.combinations import Case, generate
 from ..structure.modal import ec8_spectrum
 from ..structure.model import Msg
 from ..structure.seismic import seismic_check
@@ -65,6 +66,9 @@ class BuildingFrame(DesignModule):
                        Field("t", "Thickness", "mm", 250.0, min=150, max=600)],
               help="A wall replaces the column at that grid point (e.g. B1). Beams framing "
                    "along the wall get rigid end zones of half its length."),
+        Field("loads", "Load cases and combinations", kind="json", default={}, group="Loads",
+              help="Extra load cases (permanent, imposed, snow) with area, line and point loads, "
+                   "and user combinations — edited in Erisma Structure."),
         Field("layout", "Plan layout", kind="json", default={}, group="Grid",
               help="Missing columns/beams, slab openings and member sizes — drawn in "
                    "Erisma Structure."),
@@ -182,27 +186,40 @@ class BuildingFrame(DesignModule):
             {"B": inp["fb_B"], "bw": inp["fb_bw"], "h": inp["fb_h"], "ks": inp["ks"], "n": 6}
             if inp["found_type"].startswith("Foundation beams") else
             {"type": "raft", "t": inp["raft_t"], "over": inp["raft_over"], "ks": inp["ks"],
-             "mesh": inp["raft_mesh"]} if inp["found_type"].startswith("Raft") else None)
+             "mesh": inp["raft_mesh"]} if inp["found_type"].startswith("Raft") else None,
+            cls._user_cases(inp))
         if inp["beam_h"] <= inp["slab_t"]:
             raise InputError("The beam depth must be greater than the slab thickness", "beam_h")
         calc.issues = []   # machine-readable failures, used by the automatic sizing
         g_unf, _, g_q = na.combos["DA1-C1"][:3]
         psi0, psi1, psi2 = na.psi[inp["category"]]
         pdelta = seismic and inp["pdelta"]
+        cases = cls._cases(inp, na, spec)
+        combos = generate(cases, g_unf, g_q, (inp["loads"] or {}).get("combos"))
+        qp = next(c for c in combos if c.kind == "SLS-qp").factors
         try:
             model, info = build(spec)
-            an = analyse_pdelta(model, {"G": 1.0, "Q": psi2}) if pdelta else analyse(model)
+            an = analyse_pdelta(model, qp) if pdelta else analyse(model)
             lin = analyse(model) if pdelta else an
-            acr = critical_load_factor(lin, {"G": 1.0, "Q": psi2})
+            acr = critical_load_factor(lin, qp)
         except StructureError as exc:
             fld = "walls" if "Wall" in exc.text else "layout" if (
                 "Layout" in exc.text or "Slab panel" in exc.text or "Beam {g}" in exc.text) else None
             raise InputError(exc.message(calc.lang), fld) from exc
         res = an.run_all()
-        uls = an.combine(res, {"G": g_unf, "Q": g_q}, "ULS")
-        quasi = an.combine(res, {"G": 1.0, "Q": psi2}, "G+ψ2Q")
+        ulss = [(c.name, an.combine(res, c.factors, c.name)) for c in combos
+                if c.kind in ("ULS", "user")]
+        uls = ulss
+        quasi = an.combine(res, qp, "G+ψ2Q")
+        # characteristic sums for the foundation modules (permanent / variable)
+        gsum = {c.name: 1.0 for c in cases if c.type == "G"}
+        qsum = {c.name: 1.0 for c in cases if c.type != "G"}
+        res_agg = {"G": an.combine(res, gsum, "ΣG"),
+                   "Q": an.combine(res, qsum, "ΣQ") if qsum else res["G"].scaled(0.0, "ΣQ")}
+        calc.combos, calc.cases, calc._res_agg = combos, cases, res_agg
 
         cls._model_section(calc, spec, info, an, res)
+        cls._loads_section(calc, cases, combos, res)
         calc.heading("Global stability")
         calc.formula("α_cr", calc.tr("eigenvalue of (K + α K_G) φ = 0 for G + {p:g}Q", p=psi2),
                      acr, "", "Elastic critical load factor", ref="EN 1993-1-1 5.2.1(3)", dp=1)
@@ -217,14 +234,14 @@ class BuildingFrame(DesignModule):
                       "included in every analysis below.", p=psi2)
         seis = None
         if seismic:
-            seis = cls._seismic_section(calc, inp, na, an, psi2, info)
+            seis = cls._seismic_section(calc, inp, na, an, psi2, info, cases)
         designs = []
         if inp["design"]:
             designs = cls._design_section(calc, inp, spec, info, res, seis, uls, quasi,
                                           (g_unf, g_q, psi2))
         calc.building_qty = cls._quantities(spec, info, an, designs)
         calc.structure = cls._results(calc, info, seis, designs)
-        calc._uls, calc._quasi = uls, quasi
+        calc._uls, calc._quasi = uls[0][1], quasi
         calc.model3d = cls._scene(calc, spec, info, an, seis, designs)
 
     # ---------------------------------------------------------------- model
@@ -256,7 +273,7 @@ class BuildingFrame(DesignModule):
                   "trapezoids on the long sides). Beam self-weight is taken below the slab only; "
                   "columns with their full section.")
         rows = []
-        for case in ("G", "Q"):
+        for case in res:
             r = res[case]
             R = sum(v[2] for v in r.reactions.values())
             rows.append([case, f"{-r.applied[2] / 1e3:.1f}", f"{R / 1e3:.1f}",
@@ -268,6 +285,63 @@ class BuildingFrame(DesignModule):
                      "Average dead load per floor area", dp=2)
 
     # -------------------------------------------------------------- seismic
+    @staticmethod
+    def _user_cases(inp) -> list[dict]:
+        """User load cases from the json field, converted to N and mm."""
+        out = []
+        for c in (inp["loads"] or {}).get("cases", []):
+            name = str(c.get("name", "")).strip()
+            if not name or name in ("G", "Q"):
+                raise InputError("Load case names must be unique and different from G and Q",
+                                 "loads")
+            loads = []
+            for ld in c.get("loads", []):
+                k = ld.get("kind")
+                d = {**ld}
+                if k == "area":
+                    d["q"] = float(ld.get("q", 0)) * 1e-3          # kN/m² → N/mm²
+                elif k == "line":
+                    d["w"] = float(ld.get("w", 0))                 # kN/m = N/mm
+                elif k == "point":
+                    d["F"] = float(ld.get("F", 0)) * 1e3           # kN → N
+                else:
+                    continue
+                loads.append(d)
+            out.append({"name": name, "type": c.get("type", "G"),
+                        "category": c.get("category", "A"), "loads": loads})
+        return out
+
+    @staticmethod
+    def _cases(inp, na, spec) -> list:
+        cases = [Case("G", "G"), Case("Q", "Q", tuple(na.psi[inp["category"]]))]
+        for c in spec.cases:
+            if c["type"] == "G":
+                cases.append(Case(c["name"], "G"))
+            elif c["type"] == "S":
+                cases.append(Case(c["name"], "S", tuple(na.psi["snow_low"])))
+            else:
+                cases.append(Case(c["name"], "Q", tuple(na.psi.get(c.get("category", "A"),
+                                                                   na.psi["A"]))))
+        return cases
+
+    @staticmethod
+    def _loads_section(calc, cases, combos, res) -> None:
+        calc.heading("Load cases and combinations (EN 1990)")
+        tname = {"G": calc.tr("permanent"), "Q": calc.tr("imposed"), "S": calc.tr("snow")}
+        calc.table(["Load case", "Type", "ψ0", "ψ1", "ψ2", "Σ F_z [kN]"],
+                   [[c.name, tname[c.type], *([f"{v:g}" for v in c.psi] if c.type != "G" else
+                                              ["—"] * 3),
+                     f"{-res[c.name].applied[2] / 1e3:.1f}"] for c in cases],
+                   caption="G: self-weight, slabs and finishes; Q: imposed load of the floors; "
+                           "further cases as defined by the engineer")
+        kinds = {"ULS": calc.tr("ULS 6.10"), "user": calc.tr("user"),
+                 "SLS-char": calc.tr("SLS characteristic"), "SLS-freq": calc.tr("SLS frequent"),
+                 "SLS-qp": calc.tr("SLS quasi-permanent"), "seismic": calc.tr("seismic 6.12b")}
+        calc.table(["Combination", "Kind", "Expression"],
+                   [[c.name, kinds[c.kind], c.text()] for c in combos],
+                   caption="Members are designed for the envelope of all ULS combinations and "
+                           "of the seismic combination G + Σψ2Q ± E")
+
     @staticmethod
     def _regularity_section(calc, inp, an, md, info) -> float:
         """EN 1998-1 4.2.3: regularity in plan and elevation, torsional flexibility → q."""
@@ -319,12 +393,13 @@ class BuildingFrame(DesignModule):
         return q_used
 
     @classmethod
-    def _seismic_section(cls, calc, inp, na, an, psi2, info):
+    def _seismic_section(cls, calc, inp, na, an, psi2, info, cases):
         psiE = inp["phi_E"] * psi2
         calc.heading("Masses and modal analysis")
         calc.formula("ψ_E", "φ ψ_2", psiE, "", "Combination coefficient for the mass",
                      ref="EN 1998-1 4.2.4", dp=2)
-        md = modal(an, {"G": 1.0, "Q": psiE}, n_modes=inp["n_modes"])
+        source = {c.name: (1.0 if c.type == "G" else inp["phi_E"] * c.psi[2]) for c in cases}
+        md = modal(an, source, n_modes=inp["n_modes"])
         calc.formula("M", "Σ (G + ψ_E Q) / g", md.total_mass["X"] * 1e3, "",
                      "Seismic mass above the base [t]", dp=1)
         kind = {"X": calc.tr("translation X"), "Y": calc.tr("translation Y"),
@@ -444,11 +519,13 @@ class BuildingFrame(DesignModule):
         ds = cls._slabs(inp, spec, info, project) if inp["slabs"] else []
         df = []
         if inp["foundations"] and info.get("raft"):
-            df = cls._raft(calc, inp, spec, info, res, seis, uls, quasi, dc + dw, psi2)
+            df = cls._raft(calc, inp, spec, info, calc._res_agg, seis, uls, quasi, dc + dw, psi2)
         elif inp["foundations"] and info["fbeams"]:
-            df = cls._fbeams(calc, inp, spec, info, res, seis, uls, quasi, dc + dw, project)
+            df = cls._fbeams(calc, inp, spec, info, calc._res_agg, seis, uls, quasi, dc + dw,
+                             project)
         elif inp["foundations"]:
-            df = cls._footings(calc, inp, spec, info, res, seis, quasi, dc + dw, project)
+            df = cls._footings(calc, inp, spec, info, calc._res_agg, seis, quasi, dc + dw,
+                               project)
         for title, items, hint in (
                 ("Columns", dc, "Increase the column size or the concrete class."),
                 ("Beams", db, "Increase the beam size or the concrete class."),
@@ -524,6 +601,14 @@ class BuildingFrame(DesignModule):
                                         "y0": exists(i, j - 1), "y1": exists(i, j + 1)}})
         ns = len(spec.heights)
         qs = {k: (spec.q_roof if k == ns else spec.q) for k in range(1, ns + 1)}
+        # user area loads: the largest per panel over the storeys (conservative)
+        from ..structure.builder import _sel
+        for p_ in panels:
+            for c in spec.cases:
+                for ld in c["loads"]:
+                    if ld.get("kind") == "area" and _sel(ld.get("panels"), p_["id"]):
+                        key = "g_extra" if c["type"] == "G" else "q_extra"
+                        p_[key] = p_.get(key, 0.0) + ld["q"]
         return design_slabs(panels, spec.slab_t, inp["concrete"], spec.g_finish, qs, project,
                             inp["fyk"])
 
@@ -807,6 +892,9 @@ class BuildingFrame(DesignModule):
                                         for e in r["elements"]],
                            "punching": [{"grid": p["grid"], "util": float(p["util"])}
                                         for p in r["punching"]]}
+        if getattr(calc, "combos", None):
+            out["cases"] = [{"name": c.name, "type": c.type} for c in calc.cases]
+            out["combos"] = [{"name": c.name, "kind": c.kind, "text": c.text()} for c in calc.combos]
         mt = getattr(calc, "modes_table", None)
         if mt:
             out["modes"] = [{k: (v if isinstance(v, (str, int)) else round(float(v), 4))

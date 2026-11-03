@@ -88,6 +88,13 @@ def _search(module, candidates: list[dict], combos: list[tuple[str, dict]],
     return -1, best_fail[0], best_fail[1]
 
 
+def ulist(uls) -> list[tuple[str, StaticResult]]:
+    """ULS combinations as [(name, result)]; a single result is accepted for convenience."""
+    if isinstance(uls, (list, tuple)):
+        return list(uls)
+    return [("1.35G+1.5Q", uls)]
+
+
 def _col_candidates() -> list[dict]:
     out = []
     for d in COL_BARS:
@@ -121,8 +128,8 @@ def design_columns(res: dict[str, StaticResult], seis: SeismicResult | None, uls
                 "L": (hs - beam_h) / 1000, "k_h": 1.0, "k_b": 1.0, "braced": False,
                 "seismic": seis is not None, "phi_ef": 0.8}
         combos, notes = [], []
-        f = uls.forces(mid, 2)
-        combos.append(("1.35G+1.5Q", {**base, **_col_actions(f, None, 1.0)}))
+        for nm, r_ in ulist(uls):
+            combos.append((nm, {**base, **_col_actions(r_.forces(mid, 2), None, 1.0)}))
         if seis is not None:
             env = seis.member_envelope(mid)
             fq = quasi.forces(mid, 2)
@@ -183,17 +190,20 @@ def design_beams(beams: dict[str, int], seis: SeismicResult | None, uls: StaticR
     b0, h0 = b, h
     for mid, k in beams.items():
         b, h = (sizes or {}).get(mid, (b0, h0))
-        e = uls.analysis.elements[uls.analysis.member_index[mid]]
+        an_ = ulist(uls)[0][1].analysis
+        e = an_.elements[an_.member_index[mid]]
         a1, a2 = e.oi, e.L - e.oj   # faces of the supports (rigid zones of walls)
 
         def flex(f):  # keep the flexible part: design moments at the faces (EC2 5.3.2.2(3))
             keep = (f["x"] >= a1 - 1e-6) & (f["x"] <= a2 + 1e-6)
             return {k: v[keep] for k, v in f.items()}
 
-        fu = flex(uls.forces(mid, 41))
-        sag = [("1.35G+1.5Q", max(fu["My"].max(), 0.0))]
-        hog = [("1.35G+1.5Q", max(-fu["My"].min(), 0.0))]
-        V = [("1.35G+1.5Q", np.abs(fu["Vz"]).max())]
+        sag, hog, V = [], [], []
+        for nm, r_ in ulist(uls):
+            fu = flex(r_.forces(mid, 41))
+            sag.append((nm, max(fu["My"].max(), 0.0)))
+            hog.append((nm, max(-fu["My"].min(), 0.0)))
+            V.append((nm, np.abs(fu["Vz"]).max()))
         if seis is not None:
             env = seis.member_envelope(mid) * e_factor
             fq = flex(quasi.forces(mid, 41))
@@ -255,7 +265,7 @@ def design_beams(beams: dict[str, int], seis: SeismicResult | None, uls: StaticR
             notes.append("Shear cannot be resisted with Ø8 links — increase the beam width/depth")
         # ---- SLS deflection: span/depth ratio, EN 1992-1-1 7.4.2
         fck = float(concrete.split("/")[0][1:])
-        K = _continuity_K(uls.analysis, mid)
+        K = _continuity_K(an_, mid)
         area = lambda c: c["n_bars"] * np.pi * float(c["dia"]) ** 2 / 4  # noqa: E731
         d_b = h - cover - 8 - float(picks["bottom"]["dia"]) / 2
         Lspan = e.Lf
@@ -362,11 +372,11 @@ def design_walls(walls: dict[str, dict], seis: SeismicResult | None, uls: Static
                 "Hw": sum(heights) / 1000, "storeys": len(heights), "concrete": concrete,
                 "fyk": fyk, "cover": cover, "lc": lc}
         combos = []
-        fu = uls.forces(mid, 2)
-        combos.append(("1.35G+1.5Q", {**base, "NEd": max(-fu["N"][0], 1e3) / 1e3,
-                                      "MEd": abs(fu[strong][0]) / 1e6,
-                                      "VEd": np.abs(fu["Vy" if strong == "Mz" else "Vz"]).max()
-                                      / 1e3}))
+        for nm, r_ in ulist(uls):
+            fu = r_.forces(mid, 2)
+            combos.append((nm, {**base, "NEd": max(-fu["N"][0], 1e3) / 1e3,
+                                "MEd": abs(fu[strong][0]) / 1e6,
+                                "VEd": np.abs(fu["Vy" if strong == "Mz" else "Vz"]).max() / 1e3}))
         if seis is not None:
             env = seis.member_envelope(mid)
             fq = quasi.forces(mid, 2)
@@ -610,7 +620,8 @@ def design_slabs(panels: list[dict], slab_t: float, concrete: str, g_finish: flo
             base = {"type": "Two-way panel", "lx": short / 1000, "ly": long_ / 1000,
                     "e1": edge(es[0]), "e2": edge(es[1]), "e3": edge(es[2]), "e4": edge(es[3]),
                     "h": slab_t, "cover": cover, "concrete": concrete, "fyk": fyk,
-                    "g": g_finish * 1e3, "q": q * 1e3, "punch": False}
+                    "g": (g_finish + p.get("g_extra", 0.0)) * 1e3,
+                    "q": (q + p.get("q_extra", 0.0)) * 1e3, "punch": False}
             dense = cands[-1]
             pick_b = pick_t = None
             for cb in cands:

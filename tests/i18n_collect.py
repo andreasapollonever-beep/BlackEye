@@ -14,6 +14,10 @@ SCENARIOS = {
                        {"walls": [], "pdelta": True, "capacity": True},
                        {"found_type": "Isolated pad footings", "walls": []},
                        {"found_type": "Foundation beams (Winkler)"},
+                       {"loads": {"cases": [{"name": "S", "type": "S", "loads": [
+                           {"kind": "area", "panels": "all", "storeys": "roof", "q": 0.8}]},
+                           {"name": "Q2", "type": "Q", "category": "B", "loads": []}],
+                           "combos": [{"name": "U", "factors": {"G": 1.0}}]}},
                        {"raft_t": 400, "raft_over": 0.0},
                        {"capacity": False, "layout": {"omit_columns": ["B2"], "openings": ["A1"],
                                                       "beam_sizes": {"A2-A3": [300, 600]}}},

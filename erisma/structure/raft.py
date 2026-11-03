@@ -25,6 +25,7 @@ import numpy as np
 
 from ..design.ec2 import section_capacity
 from ..design.geotech import bearing_factors
+from .design import ulist
 
 KEYS = ("Mx", "My", "Mxy", "Qx", "Qy")
 MESH = [(d, s) for d in ("12", "14", "16", "20", "25") for s in (250.0, 200.0, 150.0, 125.0, 100.0)]
@@ -111,7 +112,7 @@ def design_raft(raft: dict, an, res, uls, quasi, seis, ef: float, columns: dict,
     rows = []
     for p in plates:
         pid = p["id"]
-        cases = [_vec(uls.plate_forces(pid))]
+        cases = [_vec(r_.plate_forces(pid)) for _, r_ in ulist(uls)]
         if seis is not None:
             q0, e = _vec(quasi.plate_forces(pid)), _seismic_env(seis, pid) * ef
             cases += [q0 + e * s for s in (np.array([1, 1, 1, 1, 1]), np.array([-1, -1, -1, -1, -1]))]
@@ -186,9 +187,8 @@ def design_raft(raft: dict, an, res, uls, quasi, seis, ef: float, columns: dict,
                   if math.hypot(max(abs(an.model.nodes[m].x - n.x) - c1 / 2, 0),
                                 max(abs(an.model.nodes[m].y - n.y) - c2 / 2, 0)) <= 2 * d]
         cases = []
-        Nu = -uls.forces(mid, 2)["N"][0]
-        dVu = sum(uls.reaction(m)[2] for m in inside)
-        cases.append(("ULS", Nu, dVu))
+        for nm, r_ in ulist(uls):
+            cases.append((nm, -r_.forces(mid, 2)["N"][0], sum(r_.reaction(m)[2] for m in inside)))
         if seis is not None:
             f = quasi.forces(mid, 2)
             env = seis.member_envelope(mid)

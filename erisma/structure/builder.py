@@ -71,6 +71,10 @@ class BuildingSpec:
     # foundation: None = fixed base; {"B", "bw", "h" (mm), "ks" (N/mm³), "n"} = foundation beams
     # (inverted T: flange width B, web bw, depth h) on Winkler springs along the grid lines
     foundation: dict | None = None
+    # user load cases: [{"name", "type": G|Q|S, "loads": [{"kind": "area", "panels", "storeys",
+    #   "q" (N/mm²)} | {"kind": "line", "beams", "storeys", "w" (N/mm)} |
+    #   {"kind": "point", "points", "storeys", "F" (N, downwards)}]}]; "all" or lists
+    cases: list[dict] = field(default_factory=list)
     labels: dict[str, str] = field(default_factory=dict)
 
     def check(self) -> None:
@@ -118,6 +122,17 @@ class BuildingSpec:
             if bh[1] <= self.slab_t:
                 raise StructureError("Beam {g}: the depth must be greater than the slab "
                                      "thickness", g=key)
+
+
+def _sel(choice, value, ns: int | None = None) -> bool:
+    """Selection of storeys / panels: "all", "roof" (storeys), or a list."""
+    if choice in (None, "all"):
+        return True
+    if choice == "roof":
+        return value == ns
+    if choice == "floors":
+        return ns is not None and value != ns
+    return value in choice or str(value) in [str(c) for c in choice]
 
 
 def grid_segments(nx: int, ny: int) -> list[str]:
@@ -263,13 +278,34 @@ def build(spec: BuildingSpec) -> tuple[Model, dict]:
                 share = lambda a, b: min(a, b) / 2 * (a - min(a, b) / 2)  # noqa: E731
                 scale = sum(share(a, b) for _, a, b in edges) / \
                     sum(share(a, b) for _, a, b in present)
+                panel_loads = [("G", p_g), ("Q", q)]
+                for uc in spec.cases:            # user area loads on this panel / storey
+                    for ld in uc.get("loads", []):
+                        if ld.get("kind") == "area" and _sel(ld.get("storeys"), k, ns) and \
+                                _sel(ld.get("panels"), grid_label(i, j)):
+                            panel_loads.append((uc["name"], ld["q"]))
                 for bid, a, b in present:
-                    for case, p in (("G", p_g), ("Q", q)):
+                    for case, p in panel_loads:
                         if not p:
                             continue
                         for x1, x2, w1, w2 in tributary(a, b, p * scale):
                             m.load_member(case, bid, wz=-w1, w2=(0.0, 0.0, -w2),
                                           a=x1 / a, b=x2 / a)
+        for uc in spec.cases:                    # user line and point loads
+            m.case(uc["name"])
+            for ld in uc.get("loads", []):
+                if not _sel(ld.get("storeys"), k, ns):
+                    continue
+                if ld.get("kind") == "line":
+                    for key in (ld.get("beams") or []):
+                        if f"B{k}.{key}" in m.members:
+                            m.load_member(uc["name"], f"B{k}.{key}", wz=-ld["w"])
+                elif ld.get("kind") == "point":
+                    for g in (ld.get("points") or []):
+                        ij = next(((a, b) for a in range(nx) for b in range(ny)
+                                   if grid_label(a, b) == g), None)
+                        if ij:
+                            m.load_node(uc["name"], node_id(*ij, k), Fz=-ld["F"])
         used = {mm.i for mm in m.members.values()} | {mm.j for mm in m.members.values()}
         level = [node_id(i, j, k) for i in range(nx) for j in range(ny)
                  if node_id(i, j, k) in used]

@@ -105,6 +105,23 @@ Object.assign(UI.el, {
   "torsionally flexible": "στρεπτικά εύκαμπτο", "torsionally stiff": "στρεπτικά δύσκαμπτο",
   "q used": "q που χρησιμοποιήθηκε", "Mode": "Ιδιομορφή", "torsion": "στρέψη",
   "Drift d_r·ν / (α·h) per storey": "Σχετική μετακίνηση d_r·ν / (α·h) ανά όροφο",
+  "Load case": "Φόρτιση", "New case": "Νέα φόρτιση", "Rename": "Μετονομασία", "Delete case": "Διαγραφή φόρτισης",
+  "Permanent G": "Μόνιμα G", "Imposed Q": "Κινητά Q", "Snow S": "Χιόνι S", "Apply loads": "Εφαρμογή φορτίων",
+  "Area load": "Επιφανειακό", "Line load": "Γραμμικό", "Point load": "Σημειακό", "Value": "Τιμή",
+  "On storeys": "Σε ορόφους", "All floors": "Όλοι οι όροφοι", "Roof": "Δώμα", "Combinations": "Συνδυασμοί",
+  "Combinations…": "Συνδυασμοί…", "Built-in case — edit its loads in the Loads tab values":
+    "Ενσωματωμένη φόρτιση — αλλάξτε τις τιμές της στα πεδία της καρτέλας",
+  "Click slab panels to add / remove the area load of the current case.":
+    "Κάντε κλικ σε φατνώματα για προσθήκη / αφαίρεση του επιφανειακού φορτίου της τρέχουσας φόρτισης.",
+  "Click beams to add / remove the line load of the current case.":
+    "Κάντε κλικ σε δοκούς για προσθήκη / αφαίρεση του γραμμικού φορτίου της τρέχουσας φόρτισης.",
+  "Click grid points to add / remove the point load of the current case.":
+    "Κάντε κλικ σε κόμβους για προσθήκη / αφαίρεση του σημειακού φορτίου της τρέχουσας φόρτισης.",
+  "Name of the new load case": "Όνομα νέας φόρτισης", "New name": "Νέο όνομα",
+  "Generated (EN 1990)": "Αυτόματοι (EN 1990)", "User combinations": "Συνδυασμοί χρήστη",
+  "Add combination": "Προσθήκη συνδυασμού", "Save": "Αποθήκευση", "Kind": "Είδος", "Expression": "Έκφραση",
+  "Run the analysis to see the generated combinations.": "Εκτελέστε την ανάλυση για να δείτε τους αυτόματους συνδυασμούς.",
+  "Category": "Κατηγορία",
   "Raft": "Κοιτόστρωση", "Thickness t": "Πάχος t", "Overhang": "Πρόβολος", "Mesh": "Πλέγμα",
   "Raft: demand / basic mesh": "Κοιτόστρωση: απαίτηση / βασικός οπλισμός",
   "additional bars": "πρόσθετος οπλισμός", "Punching": "Διάτρηση",
@@ -121,6 +138,7 @@ const Structure = (() => {
   const VKEY = "erisma.structure.view";
   const S = { schema: null, inp: null, tool: "select", sel: [], res: null, view: "plan", tab: "home",
     hist: [], hpos: -1, timer: null, runId: 0, built: false, auto: true, dirty: false, vb: null, layers: {},
+    lcase: null, lval: { area: 2.0, line: 5.0, point: 20.0 }, lstorey: "all",
     opt: { colour: "util", storey: "all", labels: false, names: true, dims: true, axes: true, slabs: true,
       ribbonMin: false, onlyFail: false, filter: "", sort: ["member", 1] } };
   Object.assign(S.opt, store.get(VKEY, {}));
@@ -210,6 +228,11 @@ const Structure = (() => {
     diagN: '<path d="M3 12h18"/><rect x="3" y="7" width="18" height="5" fill="currentColor" fill-opacity=".25"/>',
     defl: '<path d="M3 6h18" stroke-dasharray="2 2"/><path d="M3 6c6 10 12 10 18 0"/>',
     mode: '<path d="M6 21V5M18 21V5" stroke-dasharray="2 2"/><path d="M6 21c0-8 4-12 8-16M18 21c0-8-4-12-8-16"/>',
+    aload: '<rect x="3" y="12" width="18" height="8"/><path d="M6 3v7M12 3v7M18 3v7M4 8l2 2 2-2M10 8l2 2 2-2M16 8l2 2 2-2"/>',
+    lload: '<path d="M3 18h18" stroke-width="3"/><path d="M5 6v9M10 6v9M15 6v9M20 6v9M3 6h18"/>',
+    pload: '<path d="M12 3v14M8 13l4 4 4-4"/><path d="M4 21h16"/>',
+    combo: '<path d="M4 6h16M4 12h10M4 18h6"/><path d="M17 15l3 3-3 3"/>',
+    newcase: '<path d="M5 3h10l4 4v14H5z"/><path d="M12 10v6M9 13h6"/>',
     autosize: '<path d="M4 20L20 4"/><path d="M14 4h6v6"/><rect x="3" y="13" width="8" height="8"/><path d="M15 15l2 2 4-4"/>',
     found: '<path d="M3 20h18"/><rect x="5" y="14" width="14" height="4"/><path d="M9 14V4h6v10"/>',
   };
@@ -364,9 +387,40 @@ const Structure = (() => {
           col(ctl("beam_b", { width: 62 }), ctl("beam_h", { width: 62 })), col(ctl("slab_t", { width: 62 }))),
       ]],
       ["loads", t("Loads"), [
-        group(t("Area loads"), col(ctl("g_finish"), ctl("q")), col(ctl("q_roof"))),
-        group(t("Line loads"), col(ctl("g_wall"))),
-        group(t("Use"), col(ctl("category", { width: 60 }))),
+        group(t("Area loads"), col(ctl("g_finish"), ctl("q")), col(ctl("q_roof"), ctl("g_wall")), col(ctl("category", { width: 60 }))),
+        group(t("Load case"), col((() => {
+          const sel = el("select", { on: { change: (e) => { S.lcase = e.target.value || null; renderRibbon(); drawPlan(); } } },
+            el("option", { value: "" }, `G / Q — ${t("Built-in case — edit its loads in the Loads tab values")}`),
+            ...ucases().map((c) => el("option", { value: c.name }, c.name)));
+          sel.value = S.lcase || "";
+          sel.style.width = "190px";
+          return sel;
+        })(), (() => {
+          const c = curCase();
+          const ty = el("select", { disabled: c ? null : "", on: { change: (e) => { c.type = e.target.value; commit(); renderRibbon(); } } },
+            el("option", { value: "G" }, t("Permanent G")), el("option", { value: "Q" }, t("Imposed Q")), el("option", { value: "S" }, t("Snow S")));
+          ty.value = c?.type || "G";
+          const cat = el("select", { disabled: c && c.type === "Q" ? null : "", title: t("Category"), on: { change: (e) => { c.category = e.target.value; commit(); } } },
+            ..."ABCDE".split("").map((x) => el("option", { value: x }, x)));
+          cat.value = c?.category || "A";
+          return el("div", { class: "rb-row" }, ty, cat);
+        })()), col(btn("newcase", t("New case"), "", newCase), btn("tag", t("Rename"), "", renameCase, { disabled: !curCase() }),
+          btn("del", t("Delete case"), "", deleteCase, { disabled: !curCase() }))),
+        group(t("Apply loads"), btn("aload", t("Area load"), t("Click slab panels to add / remove the area load of the current case."), () => setTool("aload"), { big: true, on: S.tool === "aload" }),
+          btn("lload", t("Line load"), t("Click beams to add / remove the line load of the current case."), () => setTool("lload"), { big: true, on: S.tool === "lload" }),
+          btn("pload", t("Point load"), t("Click grid points to add / remove the point load of the current case."), () => setTool("pload"), { big: true, on: S.tool === "pload" }),
+          col(...[["area", "kN/m²"], ["line", "kN/m"], ["point", "kN"]].map(([k, u]) => el("label", { class: "rb-ctl" },
+            el("span", {}, t({ area: "Area load", line: "Line load", point: "Point load" }[k])),
+            el("input", { type: "number", step: "0.5", value: S.lval[k], style: "width:60px", on: { change: (e) => { S.lval[k] = parseFloat(e.target.value) || 0; } } }),
+            el("small", {}, u)))),
+          col(el("label", { class: "rb-ctl" }, el("span", {}, t("On storeys")), (() => {
+            const ss = el("select", { on: { change: (e) => { S.lstorey = e.target.value; } } },
+              el("option", { value: "all" }, t("All floors")), el("option", { value: "roof" }, t("Roof")),
+              ...S.inp.storeys.map((_, k) => el("option", { value: String(k + 1) }, `${t("Storey")} ${k + 1}`)));
+            ss.value = S.lstorey;
+            return ss;
+          })(), el("small", {}, "")))),
+        group(t("Combinations"), btn("combo", t("Combinations…"), "", combosDialog, { big: true })),
       ]],
       ["seismic", t("Seismic"), [
         group(t("Seismic design"), col(tog("seismic", "EN 1998-1"))),
@@ -442,7 +496,7 @@ const Structure = (() => {
       }));
     const tabsRow = el("div", { class: "rb-tabs" }, qat,
       ...all.map(([id, label]) => el("button", { type: "button", class: `rb-tab${id === S.tab ? " on" : ""}${id === "file" ? " file" : ""}`,
-        on: { click: () => { S.tab = id; if (S.opt.ribbonMin) { S.opt.ribbonMin = false; saveView(); } renderRibbon(); },
+        on: { click: () => { S.tab = id; if (S.opt.ribbonMin) { S.opt.ribbonMin = false; saveView(); } renderRibbon(); drawPlan(); },
           dblclick: () => { S.opt.ribbonMin = !S.opt.ribbonMin; saveView(); renderRibbon(); } } }, label)),
       el("span", { class: "grow" }),
       el("span", { class: "rb-title" }, "Erisma Structure"),
@@ -456,8 +510,12 @@ const Structure = (() => {
   const HINTS = () => ({ select: `${t("Click a column, wall, beam or slab panel in the plan.")} ${t("Shift+click adds to the selection; drag a window to select several.")}`,
     column: t("Click a grid point to place a column."), wallX: t("Click a grid point to place a wall."),
     wallY: t("Click a grid point to place a wall."), beam: t("Click between two grid points to add or remove a beam."),
-    opening: t("Click a slab panel to open or close it.") });
-  const TOOLN = () => ({ select: t("Select"), column: t("Column"), wallX: t("Wall X"), wallY: t("Wall Y"), beam: t("Beam"), opening: t("Opening") });
+    opening: t("Click a slab panel to open or close it."),
+    aload: t("Click slab panels to add / remove the area load of the current case."),
+    lload: t("Click beams to add / remove the line load of the current case."),
+    pload: t("Click grid points to add / remove the point load of the current case.") });
+  const TOOLN = () => ({ select: t("Select"), column: t("Column"), wallX: t("Wall X"), wallY: t("Wall Y"), beam: t("Beam"), opening: t("Opening"),
+    aload: t("Area load"), lload: t("Line load"), pload: t("Point load") });
   function setTool(id) {
     S.tool = id;
     $("#st-hint").textContent = HINTS()[id];
@@ -892,6 +950,34 @@ const Structure = (() => {
       if (S.opt.names) sv("text", { x: cx + unit * 1.2, y: cy - unit * 1.2, "font-size": unit * 1.7, class: "st-plbl" }, gTxt).textContent = id;
       if (S.opt.names && csz[id] && kind === "column") sv("text", { x: cx + unit * 1.2, y: cy + unit * 1.0, "font-size": unit * 1.2, class: "st-mname" }, gTxt).textContent = `${csz[id][0]}×${csz[id][1]}`;
     }
+    // loads of the current user load case
+    const c = (S.tab === "loads" || ["aload", "lload", "pload"].includes(S.tool)) ? curCase() : null;
+    if (c) {
+      const gL = sv("g", { class: "st-loads" }, svg);
+      const stTxt = (st) => (st === "all" ? "" : st === "roof" ? ` (${t("Roof")})` : ` (${t("Storey")} ${st.join(",")})`);
+      for (const ld of c.loads) {
+        if (ld.kind === "area") for (const pid of ld.panels || []) {
+          const [i0, j0] = idx(pid);
+          if (i0 >= nx - 1 || j0 >= ny - 1) continue;
+          const x0 = xs[i0] * 1000, x1 = xs[i0 + 1] * 1000, y0 = ys[j0] * 1000, y1 = ys[j0 + 1] * 1000;
+          sv("rect", { x: X(x0) + unit, y: Y(y1) + unit, width: x1 - x0 - 2 * unit, height: y1 - y0 - 2 * unit, class: "st-lrect", "stroke-width": unit * 0.3 }, gL);
+          sv("text", { x: (x0 + x1) / 2, y: Y((y0 + y1) / 2), "font-size": unit * 1.8, class: "st-ltxt" }, gL).textContent = `${ld.q} kN/m²${stTxt(ld.storeys)}`;
+        }
+        if (ld.kind === "line") for (const key of ld.beams || []) {
+          const [a, b] = key.split("-").map(idx);
+          const x1 = X(xs[a[0]] * 1000), y1 = Y(ys[a[1]] * 1000), x2 = X(xs[b[0]] * 1000), y2 = Y(ys[b[1]] * 1000);
+          sv("line", { x1, y1, x2, y2, class: "st-lline", "stroke-width": unit * 0.6 }, gL);
+          sv("text", { x: (x1 + x2) / 2, y: (y1 + y2) / 2 - unit * 1.5, "font-size": unit * 1.5, class: "st-ltxt" }, gL).textContent = `${ld.w} kN/m${stTxt(ld.storeys)}`;
+        }
+        if (ld.kind === "point") for (const g of ld.points || []) {
+          const [i0, j0] = idx(g);
+          if (i0 >= nx || j0 >= ny) continue;
+          const cx = X(xs[i0] * 1000), cy = Y(ys[j0] * 1000);
+          sv("circle", { cx, cy, r: unit * 1.8, class: "st-lpt", "stroke-width": unit * 0.4 }, gL);
+          sv("text", { x: cx, y: cy - unit * 2.6, "font-size": unit * 1.5, class: "st-ltxt" }, gL).textContent = `↓ ${ld.F} kN${stTxt(ld.storeys)}`;
+        }
+      }
+    }
     S.gSel = sv("g", {}, svg);
   }
 
@@ -1020,6 +1106,9 @@ const Structure = (() => {
       else setSel([{ kind, id }]);
       return;
     }
+    if (tool === "aload" && kind === "panel") return toggleLoad("area", id);
+    if (tool === "lload" && kind === "beam") return toggleLoad("line", id);
+    if (tool === "pload" && point) return toggleLoad("point", id);
     if (tool === "column" && point) {
       S.inp.walls = (S.inp.walls || []).filter((w) => String(w.at).toUpperCase() !== id);
       L.omit_columns = arr("omit_columns").filter((g) => g !== id);
@@ -1187,6 +1276,78 @@ const Structure = (() => {
     const text = [head.join(";"), ...rows.map((r) => [r.member, r.type, r.storey, r.section, r.reinforcement, r.rho.toFixed(2),
       r.util.toFixed(3), r.status, r.notes].map(q).join(";"))].join("\r\n");
     download(`${fileName()}_members.csv`, "﻿" + text, "text/csv");
+  }
+
+  // ------------------------------------------------------------ load cases
+  const L_ = () => (S.inp.loads ||= { cases: [], combos: [] });
+  const ucases = () => (L_().cases ||= []);
+  const curCase = () => ucases().find((c) => c.name === S.lcase) || null;
+  function newCase() {
+    const name = prompt(t("Name of the new load case"), `G${ucases().filter((c) => c.type === "G").length + 2}`);
+    if (!name || name === "G" || name === "Q" || ucases().some((c) => c.name === name)) return;
+    ucases().push({ name, type: "G", category: "A", loads: [] });
+    S.lcase = name; renderRibbon(); commit();
+  }
+  function renameCase() {
+    const c = curCase(); if (!c) return;
+    const name = prompt(t("New name"), c.name);
+    if (!name || name === "G" || name === "Q" || ucases().some((x) => x.name === name)) return;
+    for (const cb of L_().combos || []) if (cb.factors?.[c.name] != null) { cb.factors[name] = cb.factors[c.name]; delete cb.factors[c.name]; }
+    c.name = name; S.lcase = name; renderRibbon(); commit();
+  }
+  function deleteCase() {
+    const c = curCase(); if (!c) return;
+    L_().cases = ucases().filter((x) => x !== c);
+    S.lcase = ucases()[0]?.name || null; renderRibbon(); commit();
+  }
+  const storeySel = () => (S.lstorey === "all" ? "all" : S.lstorey === "roof" ? "roof" : [Number(S.lstorey)]);
+  function toggleLoad(kind, id) {
+    const c = curCase();
+    if (!c) { newCase(); return; }
+    const key = { area: "panels", line: "beams", point: "points" }[kind];
+    const st = JSON.stringify(storeySel());
+    const ld = c.loads.find((l) => l.kind === kind && JSON.stringify(l.storeys) === st && Array.isArray(l[key]) && l[key].includes(id));
+    if (ld) {
+      ld[key] = ld[key].filter((x) => x !== id);
+      if (!ld[key].length) c.loads = c.loads.filter((l) => l !== ld);
+    } else {
+      const val = S.lval[kind];
+      let grp = c.loads.find((l) => l.kind === kind && JSON.stringify(l.storeys) === st && Array.isArray(l[key]) &&
+        (l.q ?? l.w ?? l.F) === val);
+      if (!grp) { grp = { kind, storeys: storeySel(), [key]: [], [kind === "area" ? "q" : kind === "line" ? "w" : "F"]: val }; c.loads.push(grp); }
+      grp[key].push(id);
+    }
+    commit();
+  }
+  function combosDialog() {
+    const r = S.res?.structure || {};
+    const names = (r.cases || [{ name: "G" }, { name: "Q" }]).map((c) => c.name);
+    const user = structuredClone(L_().combos || []);
+    const dlg = el("dialog", { class: "st-dlg wide" });
+    const draw = () => {
+      dlg.innerHTML = "";
+      dlg.append(el("h3", {}, t("Combinations")), el("h4", {}, t("Generated (EN 1990)")));
+      if (r.combos) {
+        dlg.append(el("table", { class: "st-res" }, el("tr", {}, el("th", {}, t("Combination")), el("th", {}, t("Kind")), el("th", {}, t("Expression"))),
+          ...r.combos.filter((c) => c.kind !== "user").map((c) => el("tr", {}, el("td", {}, c.name), el("td", {}, c.kind), el("td", {}, c.text)))));
+      } else dlg.append(el("p", { class: "muted" }, t("Run the analysis to see the generated combinations.")));
+      dlg.append(el("h4", {}, t("User combinations")));
+      const tb = el("table", { class: "st-res" }, el("tr", {}, el("th", {}, t("Combination")), ...names.map((n) => el("th", {}, n)), el("th", {}, "")));
+      user.forEach((cb, k) => {
+        cb.factors ||= {};
+        tb.append(el("tr", {}, el("td", {}, el("input", { value: cb.name || "", on: { change: (e) => { cb.name = e.target.value; } } })),
+          ...names.map((n) => el("td", {}, el("input", { type: "number", step: "0.05", value: cb.factors[n] ?? "", style: "width:64px",
+            on: { change: (e) => { const v = parseFloat(e.target.value); if (Number.isFinite(v)) cb.factors[n] = v; else delete cb.factors[n]; } } }))),
+          el("td", {}, el("button", { type: "button", class: "mini", on: { click: () => { user.splice(k, 1); draw(); } } }, "×"))));
+      });
+      dlg.append(tb, el("button", { type: "button", class: "mini add", on: { click: () => { user.push({ name: `User ${user.length + 1}`, factors: { G: 1.35 } }); draw(); } } }, `+ ${t("Add combination")}`),
+        el("div", { class: "btns" }, el("button", { type: "button", class: "ghost", on: { click: () => dlg.close() } }, t("Cancel")),
+          el("button", { type: "button", class: "primary", on: { click: () => { L_().combos = user; dlg.close(); commit(); } } }, t("Save"))));
+    };
+    draw();
+    document.body.append(dlg);
+    dlg.addEventListener("close", () => dlg.remove());
+    dlg.showModal();
   }
 
   // ------------------------------------------------------------ automatic sizing
