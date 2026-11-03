@@ -2060,4 +2060,8 @@ EL: dict[str, str] = {
     'One-way slab': 'Πλάκα μίας διεύθυνσης',
     'Two-way slab (l_y/l_x ≤ 1.5)': 'Διασταυρούμενη πλάκα (l_y/l_x ≤ 1.5)',
     'Two-way slab (1.5 < l_y/l_x ≤ 2)': 'Διασταυρούμενη πλάκα (1.5 < l_y/l_x ≤ 2)',
+    'The 30-day trial has ended — enter your licence key (Licence button at the top).': 'Η δοκιμή 30 ημερών έληξε — εισαγάγετε το κλειδί άδειας (κουμπί «Άδεια» στην κορυφή).',
+    'This is not an Erisma licence key': 'Αυτό δεν είναι κλειδί άδειας Erisma',
+    'The licence key is damaged — copy it again': 'Το κλειδί άδειας είναι κατεστραμμένο — αντιγράψτε το ξανά',
+    'The licence key is not valid': 'Το κλειδί άδειας δεν είναι έγκυρο',
 }

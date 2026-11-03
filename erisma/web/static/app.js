@@ -43,7 +43,13 @@ const UI = {
     "NA to CYS EN 1998-1, zonation map": "χάρτης ζωνών ΕΠ CYS EN 1998-1",
     "Location is not available in this browser.": "Η θέση δεν είναι διαθέσιμη σε αυτόν τον browser.",
     "Search places…": "Αναζήτηση τοποθεσίας…",
-    "Drawing for AutoCAD (DXF)": "Σχέδιο για AutoCAD (DXF)", "Manual": "Εγχειρίδιο", "User manual (F1)": "Εγχειρίδιο χρήσης (F1)",
+    "Drawing for AutoCAD (DXF)": "Σχέδιο για AutoCAD (DXF)", "Licence": "Άδεια χρήσης",
+    "Trial: {n} days left": "Δοκιμαστική: {n} ημέρες", "Trial ended": "Η δοκιμή έληξε",
+    "Licensed to {n}": "Άδεια: {n}", "Enter your licence key": "Εισαγωγή κλειδιού άδειας",
+    "Paste the key you received (ERISMA-…)": "Επικολλήστε το κλειδί που λάβατε (ERISMA-…)",
+    "Activate": "Ενεργοποίηση", "Licence activated — thank you!": "Η άδεια ενεργοποιήθηκε — ευχαριστούμε!",
+    "Erisma is free to try for 30 days. Buy a licence to continue after the trial.":
+      "Το Erisma δοκιμάζεται δωρεάν 30 ημέρες. Για συνέχεια μετά τη δοκιμή χρειάζεται άδεια.", "Manual": "Εγχειρίδιο", "User manual (F1)": "Εγχειρίδιο χρήσης (F1)",
     "How this calculation works (F1)": "Πώς λειτουργεί ο υπολογισμός (F1)",
     "Arithmetic allowed, e.g. 2*3,5": "Επιτρέπονται πράξεις, π.χ. 2*3,5", "Not a number": "Δεν είναι αριθμός",
     "Duplicate row": "Αντιγραφή γραμμής", "Tip: paste rows from Excel (Ctrl+V)": "Συμβουλή: επικόλληση γραμμών από Excel (Ctrl+V)",
@@ -100,6 +106,7 @@ async function api(path, body) {
     const d = data.detail;
     const err = new Error(typeof d === "object" && d ? d.message : d || res.statusText);
     err.field = d?.field;
+    err.license = !!d?.license;
     throw err;
   }
   return data;
@@ -691,6 +698,7 @@ async function run() {
     status.className = "err";
     status.textContent = `⚠ ${err.message}`;
     if (err.field) markInvalid(err.field);
+    if (err.license) licenseDialog();
   }
 }
 
@@ -840,6 +848,36 @@ const actions = {
 };
 $("#btn-print").onclick = actions.print;
 $("#btn-manual").onclick = () => openManual();
+const tf = (k, o) => t(k).replace(/\{(\w+)\}/g, (_, x) => o[x]);
+async function refreshLicense() {
+  const b = $("#btn-license");
+  try {
+    const st = await api("/api/license");
+    b.className = `lic ${st.state}`;
+    b.textContent = st.state === "licensed" ? `✓ ${tf("Licensed to {n}", { n: st.name })}`
+      : st.state === "trial" ? `⏳ ${tf("Trial: {n} days left", { n: st.days_left })}` : `⚠ ${t("Trial ended")}`;
+    return st;
+  } catch { b.hidden = true; return null; }
+}
+function licenseDialog() {
+  const inp = el("textarea", { rows: "4", class: "lickey", placeholder: t("Paste the key you received (ERISMA-…)") });
+  const msg = el("p", { class: "muted small" }, t("Erisma is free to try for 30 days. Buy a licence to continue after the trial."));
+  const d = el("dialog", { class: "linkdlg" }, el("h3", {}, `🔑 ${t("Enter your licence key")}`), msg, inp,
+    el("div", { class: "btns" }, el("button", { type: "button", class: "ghost", on: { click: () => d.close() } }, t("Cancel")),
+      el("button", { type: "button", class: "primary", on: { click: async () => {
+        try {
+          const r = await fetch("/api/license", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: inp.value }) });
+          const j = await r.json();
+          if (!r.ok) throw new Error(j.detail || r.statusText);
+          msg.textContent = t("Licence activated — thank you!"); msg.className = "ok";
+          await refreshLicense(); setTimeout(() => { d.close(); if (state.schema) run(); }, 900);
+        } catch (err) { msg.textContent = err.message; msg.className = "err"; }
+      } } }, t("Activate"))));
+  d.addEventListener("close", () => d.remove());
+  document.body.append(d); d.showModal();
+}
+$("#btn-license").onclick = licenseDialog;
+refreshLicense();
 $("#btn-dxf").onclick = async () => {
   const res = await fetch(`/api/modules/${state.schema.id}/dxf`, { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ inputs: state.inputs, project: state.project, lang: LANG }) });

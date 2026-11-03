@@ -16,6 +16,7 @@ from ..core import InputError, all_modules, get_module
 from ..design import sitezones
 from ..design.annex import ANNEXES
 from ..i18n import LANGS, tr
+from .. import license as lic
 from ..manual import build_manual
 from ..drawings import make as make_dxf, supported as dxf_supported
 from ..optimize import optimise, spec
@@ -116,9 +117,35 @@ def module_dxf(module_id: str, req: RunRequest):
                     headers={"Content-Disposition": f'attachment; filename="{module_id}.dxf"'})
 
 
+class LicenseRequest(BaseModel):
+    key: str = ""
+
+
+@app.get("/api/license")
+def license_status() -> dict[str, Any]:
+    return lic.status()
+
+
+@app.post("/api/license")
+def license_activate(req: LicenseRequest) -> dict[str, Any]:
+    try:
+        lic.activate(req.key)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return lic.status()
+
+
+def _check_license(lang: str) -> None:
+    if not lic.allowed():
+        raise HTTPException(402, {"message": tr("The 30-day trial has ended — enter your licence "
+                                                "key (Licence button at the top).", lang),
+                                  "field": None, "license": True})
+
+
 @app.post("/api/modules/{module_id}/run")
 def run_module(module_id: str, req: RunRequest) -> dict[str, Any]:
     mod = _module(module_id)
+    _check_license(_lang(req.lang))
     try:
         calc = mod.calculate(req.inputs, req.project, _lang(req.lang))
     except InputError as exc:

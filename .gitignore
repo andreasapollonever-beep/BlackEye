@@ -8,3 +8,4 @@ dist/
 .pytest_cache/
 *.html
 !erisma/web/static/*.html
+*private_key*

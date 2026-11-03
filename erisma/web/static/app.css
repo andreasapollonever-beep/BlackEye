@@ -321,3 +321,9 @@ table.cmp td{vertical-align:top}table.cmp td.ok{color:var(--pass,#2e9b5f);font-w
 table.cmp td.ko{color:var(--fail);font-weight:700}table.cmp tr.best td{background:var(--accent-soft)}
 table.cmp td.num{text-align:right;white-space:nowrap}table.cmp tr.tot td{font-weight:700;border-top:2px solid var(--line)}
 #btn-opt{font-size:13px}
+
+button.lic{font-size:11.5px}button.lic.trial{color:#e3a008}button.lic.expired{color:var(--fail);font-weight:700}
+button.lic.licensed{color:var(--pass,#2e9b5f)}
+textarea.lickey{width:100%;font:12px ui-monospace,monospace;background:var(--input);color:var(--ink);
+border:1px solid var(--line2);border-radius:6px;padding:6px}
+.linkdlg p.ok{color:var(--pass,#2e9b5f)}
