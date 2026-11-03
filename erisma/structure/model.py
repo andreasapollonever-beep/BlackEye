@@ -51,6 +51,19 @@ class StructureError(ValueError):
         return tr(self.text, lang, **kw)
 
 
+class Msg(str):
+    """A warning that can be shown in any language: ``str(msg)`` is English,
+    ``msg.text``/``msg.kw`` are the template and values for :func:`erisma.i18n.tr`."""
+
+    def __new__(cls, text: str, **kw):
+        obj = super().__new__(cls, text.format(**kw))
+        obj.text, obj.kw = text, kw
+        return obj
+
+    def message(self, lang: str = "en") -> str:
+        return tr(self.text, lang, **self.kw)
+
+
 # --------------------------------------------------------------------- materials
 
 
@@ -323,7 +336,8 @@ class Model:
         used = {m.i for m in self.members.values()} | {m.j for m in self.members.values()}
         for nid in self.nodes:
             if nid not in used:
-                warnings.append(f"Node {nid} is not connected to any member and is ignored")
+                warnings.append(Msg("Node {n} is not connected to any member and is ignored",
+                                    n=nid))
         seen: dict[str, str] = {}
         for d in self.diaphragms:
             if len(d.nodes) < 2:

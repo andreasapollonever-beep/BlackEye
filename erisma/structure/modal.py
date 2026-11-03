@@ -19,7 +19,7 @@ from typing import Callable
 import numpy as np
 
 from .loads import totals
-from .model import G_ACC, StructureError
+from .model import G_ACC, Msg, StructureError
 from .solver import Analysis, StaticResult
 
 _DIR = {"X": 0, "Y": 1, "Z": 2}
@@ -242,8 +242,9 @@ def response_spectrum(modes: ModalResult, Sd: Callable[[np.ndarray], np.ndarray]
     ratio = float(modes.meff[direction].sum() / modes.total_mass[direction])
     warnings = []
     if ratio < 0.90:
-        warnings.append(f"The modes used activate {ratio:.0%} of the mass in {direction} "
-                        "(< 90 %, EN 1998-1 4.3.3.3.1(3)) — increase the number of modes")
+        warnings.append(Msg("The modes used activate {r:.0f} % of the mass in {d} (< 90 %, "
+                            "EN 1998-1 4.3.3.3.1(3)) — increase the number of modes",
+                            r=100 * ratio, d=direction))
     return SpectrumResult(direction, combination.upper(), T, sd, np.abs(Vn), V, u, ends, reac,
                           ratio, warnings, an, results, rho)
 

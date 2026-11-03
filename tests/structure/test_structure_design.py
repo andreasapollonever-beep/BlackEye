@@ -32,7 +32,9 @@ def test_columns_are_designed_and_reproducible(frame):
     d = max(out, key=lambda d: d.utilisation)
     calc = get_module("ec2_rc_column").calculate(d.inputs)
     assert calc.passed
-    assert calc.max_utilisation == pytest.approx(d.utilisation)
+    strength = max(k.utilisation for k in calc.checks if not k.is_min)
+    assert strength == pytest.approx(d.utilisation)
+    assert 0.01 <= d.rho <= 0.04  # EN 1998-1 5.4.3.2.2(1)
     # ULS axial force of a ground column = its share of the load take-down
     f = uls.forces("C1.A1", 2)
     assert -f["N"][0] > 0

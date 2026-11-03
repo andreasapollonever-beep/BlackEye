@@ -103,6 +103,14 @@ def _col(i, c):
             "formwork": 2 * (b + h) * L / 1e6}, "per column"
 
 
+@quantity("building_frame")
+def _building(i, c):
+    q = getattr(c, "building_qty", None)
+    if not q:
+        return {}, ""
+    return dict(q), "whole frame — slab reinforcement and foundations not included"
+
+
 @quantity("ec2_rc_slab")
 def _slab(i, c):
     lx = i["lx"]

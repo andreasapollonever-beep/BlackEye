@@ -31,6 +31,8 @@ LINK_S = [250.0, 200.0, 150.0, 125.0, 100.0, 75.0]
 
 @dataclass
 class MemberDesign:
+    """Result for one member; ``rho`` = longitudinal steel ratio A_s / A_c."""
+
     member: str
     kind: str                       # "column" | "beam"
     storey: int
@@ -41,14 +43,22 @@ class MemberDesign:
     inputs: dict                    # module inputs of the governing combination
     module: str
     notes: list[str] = field(default_factory=list)
+    rho: float = 0.0
 
 
 def _passes(module, inp: dict, project: dict | None) -> tuple[bool, float]:
+    """(all checks pass, strength utilisation).
+
+    The utilisation reported excludes minimum-detailing checks (ρ_min, …): with
+    automatic bar selection those are always ≈ 1 and would hide how hard the
+    member actually works.
+    """
     try:
         c = module.calculate(inp, project)
     except InputError:
         return False, float("inf")
-    return c.passed, c.max_utilisation
+    util = max((k.utilisation for k in c.checks if not k.is_min), default=0.0)
+    return c.passed, util
 
 
 def _search(module, candidates: list[dict], combos: list[tuple[str, dict]],
@@ -126,8 +136,9 @@ def design_columns(res: dict[str, StaticResult], seis: SeismicResult | None, uls
         n_bars = 4 * pick["nb"] - 4
         reinf = f"{n_bars}Ø{pick['dia']}, Ø8/{pick['s']:g}"
         gov_inp = {**(dict(combos)[gov] if gov else combos[0][1]), **pick}
+        rho = n_bars * np.pi * float(pick["dia"]) ** 2 / 4 / (b * h)
         out.append(MemberDesign(mid, "column", k, reinf, util, idx >= 0, gov, gov_inp,
-                                "ec2_rc_column", notes))
+                                "ec2_rc_column", notes, rho))
     return out
 
 
@@ -221,6 +232,7 @@ def design_beams(beams: dict[str, int], seis: SeismicResult | None, uls: StaticR
             s_cr = min(h / 4, 24 * 8, 225.0, 8 * dbl, s_ok)
             s_cr = 5 * int(s_cr // 5)
             reinf += f" (ends Ø8/{s_cr:g} over {h:g} mm)"
+        As = sum(p["n_bars"] * np.pi * float(p["dia"]) ** 2 / 4 for p in picks.values())
         out.append(MemberDesign(mid, "beam", k, reinf, max(utils + [uv]), ok, gov_all,
-                                {**inp_v, "link_s": s_ok}, "ec2_rc_beam", notes))
+                                {**inp_v, "link_s": s_ok}, "ec2_rc_beam", notes, As / (b * h)))
     return out

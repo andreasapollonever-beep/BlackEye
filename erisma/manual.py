@@ -731,6 +731,21 @@ NOTES: dict[str, dict[str, list[str]]] = {
                "μ_1 C_e C_t s_k."],
         "el": ["q_p(z) κατά Εξ. 4.8 με c_dir = c_season = 1· τοίχοι κατά Πίνακα 7.1· χιόνι στη "
                "στέγη μ_1 C_e C_t s_k."]},
+    "building_frame": {
+        "en": ["3D frame of Timoshenko beam elements with a rigid diaphragm per floor; slab loads "
+               "to the beams by the 45° rule (exact fixed-end forces for trapezoids).",
+               "Modal response spectrum analysis (CQC) in X and Y, accidental torsion ±0.05 L, "
+               "E_X + 0.3 E_Y, drift d_r ν ≤ α h and θ (EN 1998-1 4.4.2.2) per storey.",
+               "Every beam and column is designed by the EC2/EC8 modules with the lightest "
+               "passing bars; the critical members are printed in full."],
+        "el": ["Χωρικό πλαίσιο με στοιχεία Timoshenko και άκαμπτο διάφραγμα ανά όροφο· φορτία "
+               "πλακών στις δοκούς με τον κανόνα των 45° (ακριβείς δυνάμεις πάκτωσης για "
+               "τραπεζοειδή φορτία).",
+               "Ιδιομορφική ανάλυση φάσματος απόκρισης (CQC) κατά X και Y, τυχηματική στρέψη "
+               "±0.05 L, E_X + 0.3 E_Y, σχετικές μετακινήσεις d_r ν ≤ α h και θ (EN 1998-1 "
+               "4.4.2.2) ανά όροφο.",
+               "Κάθε δοκός και υποστύλωμα διαστασιολογείται με τα modules EC2/EC8 με τον "
+               "ελαφρύτερο επαρκή οπλισμό· τα κρίσιμα μέλη τυπώνονται αναλυτικά."]},
     "ec8_lateral_force": {
         "en": ["Type 1 design spectrum, T1 = C_t H^¾, λ = 0.85 when applicable, storey forces "
                "with a linear mode shape (Eq. 4.11)."],

@@ -20,7 +20,7 @@ import numpy as np
 
 from .modal import (G_ACC, DesignSpectrum, ModalResult, SpectrumResult, nodal_masses,
                     response_spectrum)
-from .model import LoadCase, NodalLoad, StructureError
+from .model import LoadCase, Msg, NodalLoad, StructureError
 from .solver import Analysis, StaticResult
 
 
@@ -194,10 +194,11 @@ def seismic_check(analysis: Analysis, modes: ModalResult, spectrum: DesignSpectr
         th = max(s.theta[d] for s in storeys)
         amp[d] = 1.0 / (1.0 - th) if 0.1 < th <= 0.3 else 1.0
         if th > 0.3:
-            warnings.append(f"θ = {th:.2f} > 0.30 in {d}: not allowed (EN 1998-1 4.4.2.2(4)) — "
-                            "stiffen the structure")
+            warnings.append(Msg("θ = {t:.2f} > 0.30 in {d}: not allowed (EN 1998-1 4.4.2.2(4)) — "
+                                "stiffen the structure", t=th, d=d))
         elif th > 0.2:
-            warnings.append(f"θ = {th:.2f} > 0.20 in {d}: a second-order analysis is required")
+            warnings.append(Msg("θ = {t:.2f} > 0.20 in {d}: a second-order analysis is required",
+                                t=th, d=d))
     for r in rs.values():
         warnings += r.warnings
     return SeismicResult(spectrum, modes, rs, torsion, storeys, q, nu, alpha, T1, Fb, amp,

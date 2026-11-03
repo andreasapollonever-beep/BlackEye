@@ -2108,4 +2108,197 @@ EL: dict[str, str] = {
     "Combination refers to load case {c}, which was not analysed":
         "Ο συνδυασμός αναφέρεται στη φόρτιση {c}, η οποία δεν επιλύθηκε",
     "The combination is empty": "Ο συνδυασμός είναι κενός",
+    # ------------------------------------------------------------ building_frame
+    "RC building — 3D analysis and design": "Κτίριο Ο/Σ — 3D ανάλυση και διαστασιολόγηση",
+    "Give the grid, storeys, sizes and loads: 3D model, modal response spectrum analysis, drift and θ checks and the reinforcement of every beam and column.":
+        "Δώστε κάνναβο, ορόφους, διαστάσεις και φορτία: 3D προσομοίωμα, ιδιομορφική ανάλυση "
+        "φάσματος απόκρισης, έλεγχοι σχετικών μετακινήσεων και θ και οπλισμός κάθε δοκού και "
+        "υποστυλώματος.",
+    "Grid": "Κάνναβος",
+    "Spans along X": "Ανοίγματα κατά X",
+    "Spans along Y": "Ανοίγματα κατά Y",
+    "Grid lines 1, 2, 3… along X; one row per bay.":
+        "Άξονες 1, 2, 3… κατά X· μία γραμμή ανά άνοιγμα.",
+    "Grid lines A, B, C… along Y; one row per bay.":
+        "Άξονες A, B, C… κατά Y· μία γραμμή ανά άνοιγμα.",
+    "Storeys (bottom up)": "Όροφοι (από κάτω προς τα πάνω)",
+    "Floor-to-floor heights; the base is fixed.": "Ύψη ορόφων· η βάση είναι πακτωμένη.",
+    "Members": "Μέλη",
+    "Column side along X": "Πλευρά υποστυλώματος κατά X",
+    "Column side along Y": "Πλευρά υποστυλώματος κατά Y",
+    "Beam width": "Πλάτος δοκού",
+    "Beam depth (incl. slab)": "Ύψος δοκού (με την πλάκα)",
+    "Slab thickness": "Πάχος πλάκας",
+    "Finishes and partitions g": "Επικαλύψεις και διαχωριστικά g",
+    "Floor finishes, screed, light partitions.": "Επικαλύψεις δαπέδου, γαρμπιλομωσαϊκό, ελαφρά διαχωριστικά.",
+    "Imposed load q": "Κινητό φορτίο q",
+    "EN 1991-1-1: dwellings 2.0, offices 3.0, assembly 4.0–5.0 kN/m².":
+        "EN 1991-1-1: κατοικίες 2.0, γραφεία 3.0, συνάθροιση 4.0–5.0 kN/m².",
+    "Roof imposed load": "Κινητό φορτίο δώματος",
+    "Facade walls on perimeter beams": "Τοιχοποιίες όψεων στις περιμετρικές δοκούς",
+    "e.g. 3.6 kN/m² brick wall × 2.2 m = 8 kN/m. Not on the roof.":
+        "π.χ. τοίχος 3.6 kN/m² × 2.2 m = 8 kN/m. Όχι στο δώμα.",
+    "Use category (ψ factors)": "Κατηγορία χρήσης (συντελεστές ψ)",
+    "EN 1990 Table A1.1: A dwellings, B offices, C assembly, D shopping, E storage.":
+        "EN 1990 Πίνακας A1.1: A κατοικίες, B γραφεία, C συνάθροιση, D καταστήματα, E αποθήκες.",
+    "Seismic design (EN 1998-1)": "Αντισεισμικός σχεδιασμός (EN 1998-1)",
+    "In g. Pick a zone with the buttons of the selected National Annex.":
+        "Σε g. Επιλέξτε ζώνη με τα κουμπιά του επιλεγμένου Εθνικού Προσαρτήματος.",
+    "RC frame DCM multi-storey: 3.0·αu/α1 = 3.0·1.3 = 3.9.":
+        "Πλαισιακό Ο/Σ ΚΠΜ πολυώροφο: 3.0·αu/α1 = 3.0·1.3 = 3.9.",
+    "φ for ψ_E = φ ψ_2 (mass)": "φ για ψ_E = φ ψ_2 (μάζα)",
+    "EN 1998-1 Table 4.2: 1.0 roof, 0.8 correlated storeys, 0.5 independently occupied storeys.":
+        "EN 1998-1 Πίνακας 4.2: 1.0 δώμα, 0.8 συσχετισμένοι όροφοι, 0.5 ανεξάρτητα "
+        "χρησιμοποιούμενοι όροφοι.",
+    "Non-structural elements (drift limit)": "Μη φέροντα στοιχεία (όριο σχετικής μετακίνησης)",
+    "Brittle non-structural elements (α = 0.005)": "Ψαθυρά μη φέροντα στοιχεία (α = 0.005)",
+    "Ductile non-structural elements (α = 0.0075)": "Όλκιμα μη φέροντα στοιχεία (α = 0.0075)",
+    "No interfering non-structural elements (α = 0.010)":
+        "Χωρίς αλληλεπιδρώντα μη φέροντα στοιχεία (α = 0.010)",
+    "Cracked stiffness factor": "Συντελεστής ρηγματωμένης δυσκαμψίας",
+    "EN 1998-1 4.3.1(7): 50 % of the uncracked stiffness.":
+        "EN 1998-1 4.3.1(7): 50 % της αρηγμάτωτης δυσκαμψίας.",
+    "Number of modes": "Αριθμός ιδιομορφών",
+    "Design the reinforcement of all members": "Διαστασιολόγηση οπλισμού όλων των μελών",
+    "Structural model": "Στατικό προσομοίωμα",
+    "3D frame of {nx}×{ny} grid lines and {ns} storeys: {nc} columns and {nb} beams, fixed at the base, a rigid diaphragm at every floor (EN 1998-1 4.3.1(4)).":
+        "Χωρικό πλαίσιο {nx}×{ny} αξόνων και {ns} ορόφων: {nc} υποστυλώματα και {nb} δοκοί, "
+        "πάκτωση στη βάση, άκαμπτο διάφραγμα σε κάθε όροφο (EN 1998-1 4.3.1(4)).",
+    "Plan {x:.2f} × {y:.2f} m": "Κάτοψη {x:.2f} × {y:.2f} m",
+    "Height above the base": "Ύψος από τη βάση",
+    "Cracked stiffness": "Ρηγματωμένη δυσκαμψία",
+    "Timoshenko 3D beam elements (bending, shear, axial and torsional stiffness); {n} unknown displacements.":
+        "Χωρικά γραμμικά στοιχεία Timoshenko (καμπτική, διατμητική, αξονική και στρεπτική "
+        "δυσκαμψία)· {n} άγνωστες μετακινήσεις.",
+    "Gravity loads": "Κατακόρυφα φορτία",
+    "Slab self-weight and finishes": "Ίδιο βάρος πλάκας και επικαλύψεις",
+    "Slab loads reach the beams by the 45° rule (triangles on the short sides, trapezoids on the long sides). Beam self-weight is taken below the slab only; columns with their full section.":
+        "Τα φορτία των πλακών μεταφέρονται στις δοκούς με τον κανόνα των 45° (τρίγωνα στις "
+        "μικρές πλευρές, τραπέζια στις μεγάλες). Το ίδιο βάρος των δοκών λαμβάνεται κάτω από την "
+        "πλάκα· τα υποστυλώματα με πλήρη διατομή.",
+    "Load case": "Φόρτιση",
+    "Σ loads [kN]": "Σ φορτίων [kN]",
+    "Σ reactions [kN]": "Σ αντιδράσεων [kN]",
+    "Residual [N]": "Υπόλοιπο [N]",
+    "Equilibrium check — the reactions balance the applied loads":
+        "Έλεγχος ισορροπίας — οι αντιδράσεις εξισορροπούν τα φορτία",
+    "Average dead load per floor area": "Μέσο μόνιμο φορτίο ανά επιφάνεια ορόφου",
+    "Masses and modal analysis": "Μάζες και ιδιομορφική ανάλυση",
+    "Combination coefficient for the mass": "Συντελεστής συνδυασμού για τη μάζα",
+    "Seismic mass above the base [t]": "Σεισμική μάζα πάνω από τη βάση [t]",
+    "Mode": "Ιδιομορφή",
+    "T [s]": "T [s]",
+    "m_X [%]": "m_X [%]",
+    "Σm_X [%]": "Σm_X [%]",
+    "m_Y [%]": "m_Y [%]",
+    "Σm_Y [%]": "Σm_Y [%]",
+    "Periods and effective modal masses": "Ιδιοπερίοδοι και δρώσες ιδιομορφικές μάζες",
+    "Σ effective mass in {d} ≥ 90 %": "Σ δρώσας μάζας κατά {d} ≥ 90 %",
+    "Increase the number of modes.": "Αυξήστε τον αριθμό των ιδιομορφών.",
+    "Design spectrum": "Φάσμα σχεδιασμού",
+    "q": "q",
+    "EN 1998-1 Table 3.2 (National Annex), Type 1": "EN 1998-1 Πίνακας 3.2 (Εθνικό Προσάρτημα), Τύπος 1",
+    "Design spectrum and fundamental period": "Φάσμα σχεδιασμού και θεμελιώδης ιδιοπερίοδος",
+    "Response spectrum analysis": "Ανάλυση φάσματος απόκρισης",
+    "Modal responses combined with CQC (5 % damping), both horizontal directions; accidental eccentricity ±0.05 L (4.3.2) as storey torsional moments (4.3.3.3.3); E = max(E_X + 0.3 E_Y, 0.3 E_X + E_Y) (4.3.3.5.1).":
+        "Επαλληλία ιδιομορφικών αποκρίσεων με CQC (απόσβεση 5 %), και οι δύο οριζόντιες "
+        "διευθύνσεις· τυχηματική εκκεντρότητα ±0.05 L (4.3.2) ως στρεπτικές ροπές ορόφων "
+        "(4.3.3.3.3)· E = max(E_X + 0.3 E_Y, 0.3 E_X + E_Y) (4.3.3.5.1).",
+    "Base shear in {d}": "Τέμνουσα βάσης κατά {d}",
+    "Storey checks": "Έλεγχοι ορόφων",
+    "Displacement reduction factor": "Μειωτικός συντελεστής μετακινήσεων",
+    "Drift limit ratio": "Λόγος ορίου σχετικής μετακίνησης",
+    "V_X [kN]": "V_X [kN]",
+    "V_Y [kN]": "V_Y [kN]",
+    "d_r,X [mm]": "d_r,X [mm]",
+    "d_r,Y [mm]": "d_r,Y [mm]",
+    "m [t]": "m [t]",
+    "θ_X": "θ_X",
+    "θ_Y": "θ_Y",
+    "η": "η",
+    "d_r = q d_e (4.3.4) at the most stressed column line; θ = P_tot d_r / (V_tot h) (Eq. 4.28)":
+        "d_r = q d_e (4.3.4) στη δυσμενέστερη θέση υποστυλώματος· θ = P_tot d_r / (V_tot h) "
+        "(Εξ. 4.28)",
+    "Storey {i} drift {d}: d_r ν ≤ α h": "Όροφος {i}, σχετική μετακίνηση {d}: d_r ν ≤ α h",
+    "Increase the column sizes or add walls to stiffen the building.":
+        "Αυξήστε τις διατομές των υποστυλωμάτων ή προσθέστε τοιχώματα για να δυσκαμψύνετε το κτίριο.",
+    "Second-order sensitivity θ ≤ 0.30": "Ευαισθησία 2ας τάξης θ ≤ 0.30",
+    "Stiffen the structure (larger columns or walls).":
+        "Δυσκαμψύνετε τον φορέα (μεγαλύτερα υποστυλώματα ή τοιχώματα).",
+    "θ > 0.10 in {d}: seismic effects multiplied by 1/(1 − θ) = {a:.3f} (4.4.2.2(3)).":
+        "θ > 0.10 κατά {d}: τα σεισμικά εντατικά πολλαπλασιάζονται επί 1/(1 − θ) = {a:.3f} "
+        "(4.4.2.2(3)).",
+    "θ ≤ 0.10 in every storey: second-order effects need not be considered.":
+        "θ ≤ 0.10 σε όλους τους ορόφους: τα φαινόμενα 2ας τάξης δεν χρειάζεται να ληφθούν υπόψη.",
+    "θ = {t:.2f} > 0.30 in {d}: not allowed (EN 1998-1 4.4.2.2(4)) — stiffen the structure":
+        "θ = {t:.2f} > 0.30 κατά {d}: δεν επιτρέπεται (EN 1998-1 4.4.2.2(4)) — δυσκαμψύνετε τον φορέα",
+    "θ = {t:.2f} > 0.20 in {d}: a second-order analysis is required":
+        "θ = {t:.2f} > 0.20 κατά {d}: απαιτείται ανάλυση 2ας τάξης",
+    "The modes used activate {r:.0f} % of the mass in {d} (< 90 %, EN 1998-1 4.3.3.3.1(3)) — increase the number of modes":
+        "Οι ιδιομορφές που χρησιμοποιήθηκαν ενεργοποιούν {r:.0f} % της μάζας κατά {d} (< 90 %, "
+        "EN 1998-1 4.3.3.3.1(3)) — αυξήστε τον αριθμό των ιδιομορφών",
+    "Node {n} is not connected to any member and is ignored":
+        "Ο κόμβος {n} δεν συνδέεται με κανένα μέλος και αγνοείται",
+    "Member design": "Διαστασιολόγηση μελών",
+    "ULS {g:g}G + {q:g}Q (EN 1990 6.10)": "ΟΚΑ {g:g}G + {q:g}Q (EN 1990 6.10)",
+    "seismic G + {p:g}Q ± E (6.12b)": "σεισμικός G + {p:g}Q ± E (6.12b)",
+    "Every beam and column is designed with the EN 1992/1998 modules of this program; the lightest bars that pass all checks are chosen. Combinations: {c}.":
+        "Κάθε δοκός και υποστύλωμα διαστασιολογείται με τα modules EN 1992/1998 του "
+        "προγράμματος· επιλέγεται ο ελαφρύτερος οπλισμός που ικανοποιεί όλους τους ελέγχους. "
+        "Συνδυασμοί: {c}.",
+    "Columns: braced = no (r_m = 1), l_0 = clear height; capacity design (ΣM_Rc ≥ 1.3 ΣM_Rb, 4.4.2.3) and capacity-design shears are not yet included.":
+        "Υποστυλώματα: μη δεσμευμένα (r_m = 1), l_0 = καθαρό ύψος· ο ικανοτικός σχεδιασμός "
+        "(ΣM_Rc ≥ 1.3 ΣM_Rb, 4.4.2.3) και οι ικανοτικές τέμνουσες δεν περιλαμβάνονται ακόμη.",
+    "Columns": "Υποστυλώματα",
+    "Beams": "Δοκοί",
+    "Governing": "Κρίσιμος",
+    "{t}, storey {k}: max utilisation ({m})": "{t}, όροφος {k}: μέγιστη εκμετάλλευση ({m})",
+    "Increase the column size or the concrete class.":
+        "Αυξήστε τη διατομή του υποστυλώματος ή την κατηγορία σκυροδέματος.",
+    "Increase the beam size or the concrete class.":
+        "Αυξήστε τη διατομή της δοκού ή την κατηγορία σκυροδέματος.",
+    "Member {m}: {n}": "Μέλος {m}: {n}",
+    "No bar arrangement passes — increase the column size":
+        "Καμία διάταξη ράβδων δεν επαρκεί — αυξήστε τη διατομή του υποστυλώματος",
+    "No bottom bar arrangement passes — increase the beam size":
+        "Καμία διάταξη κάτω οπλισμού δεν επαρκεί — αυξήστε τη διατομή της δοκού",
+    "No top bar arrangement passes — increase the beam size":
+        "Καμία διάταξη άνω οπλισμού δεν επαρκεί — αυξήστε τη διατομή της δοκού",
+    "Shear cannot be resisted with Ø8 links — increase the beam width/depth":
+        "Η τέμνουσα δεν παραλαμβάνεται με συνδετήρες Ø8 — αυξήστε το πλάτος/ύψος της δοκού",
+    "Bottom bars increased for EN 1998-1 5.4.3.1.2 (ρ_min, ρ' ≥ 0.5ρ)":
+        "Αυξήθηκε ο κάτω οπλισμός λόγω EN 1998-1 5.4.3.1.2 (ρ_min, ρ' ≥ 0.5ρ)",
+    "Top bars increased for EN 1998-1 5.4.3.1.2 (ρ_min, ρ' ≥ 0.5ρ)":
+        "Αυξήθηκε ο άνω οπλισμός λόγω EN 1998-1 5.4.3.1.2 (ρ_min, ρ' ≥ 0.5ρ)",
+    "Column in tension under the seismic combination — check it as a tie":
+        "Εφελκυόμενο υποστύλωμα στον σεισμικό συνδυασμό — ελέγξτε το ως ελκυστήρα",
+    "Critical column {m} — full calculation": "Κρίσιμο υποστύλωμα {m} — πλήρης υπολογισμός",
+    "Critical beam {m} — full calculation": "Κρίσιμη δοκός {m} — πλήρης υπολογισμός",
+    "Design actions from the combination {c}.": "Εντατικά σχεδιασμού από τον συνδυασμό {c}.",
+    "Frame": "Φορέας",
+    "Frame (colour = reinforcement ratio ρ)": "Φορέας (χρώμα = ποσοστό οπλισμού ρ)",
+    "Light reinforcement": "Μικρό ποσοστό οπλισμού",
+    "Heavy reinforcement": "Μεγάλο ποσοστό οπλισμού",
+    "Fails — resize": "Ανεπαρκές — αλλάξτε διατομή",
+    "ρ [%]": "ρ [%]",
+    "η = strength utilisation of the chosen bars (minimum-detailing rules are satisfied separately)":
+        "η = εκμετάλλευση αντοχής του επιλεγμένου οπλισμού (οι κανόνες ελάχιστου οπλισμού "
+        "ικανοποιούνται χωριστά)",
+    "Slabs": "Πλάκες",
+    "Mode 1 (deformed)": "Ιδιομορφή 1 (παραμορφωμένος)",
+    "Grid labels": "Άξονες καννάβου",
+    "T_1 = {t:.3f} s": "T_1 = {t:.3f} s",
+    "Add at least one row": "Προσθέστε τουλάχιστον μία γραμμή",
+    "The beam depth must be greater than the slab thickness":
+        "Το ύψος της δοκού πρέπει να είναι μεγαλύτερο από το πάχος της πλάκας",
+    "Seismic checks need floors: define a rigid diaphragm at each level":
+        "Οι σεισμικοί έλεγχοι χρειάζονται ορόφους: ορίστε άκαμπτο διάφραγμα σε κάθε στάθμη",
+    "Floor {d} has no columns or walls below it": "Ο όροφος {d} δεν έχει υποστυλώματα ή τοιχώματα από κάτω",
+    "Give at least one value for {w}": "Δώστε τουλάχιστον μία τιμή για {w}",
+    "All {w} must be greater than zero": "Όλες οι τιμές {w} πρέπει να είναι μεγαλύτερες του μηδενός",
+    "Load case {c}, member {m}: the loaded part must satisfy 0 ≤ start < end ≤ 1 (fractions of the length)":
+        "Φόρτιση {c}, μέλος {m}: το φορτιζόμενο τμήμα πρέπει να ικανοποιεί 0 ≤ αρχή < τέλος ≤ 1 "
+        "(κλάσματα του μήκους)",
+    "whole frame — slab reinforcement and foundations not included":
+        "όλος ο φορέας — χωρίς τον οπλισμό των πλακών και τις θεμελιώσεις",
 }
