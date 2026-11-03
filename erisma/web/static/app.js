@@ -19,7 +19,7 @@ const UI = {
     "+ Add row": "+ Προσθήκη γραμμής", "Remove row": "Διαγραφή γραμμής", "Not an Erisma project file": "Δεν είναι αρχείο έργου Erisma",
     "Layers": "Επίπεδα", "Labels": "Ετικέτες", "Front": "Όψη", "Top": "Κάτοψη", "Save image": "Αποθήκευση εικόνας",
     "Drag to rotate · right-drag to pan · scroll to zoom": "Σύρετε για περιστροφή · δεξί κλικ για μετακίνηση · ροδέλα για zoom",
-    "Shortcuts: Ctrl+S save · Ctrl+O open · Ctrl+P print · Ctrl+3 3D view": "Συντομεύσεις: Ctrl+S αποθήκευση · Ctrl+O άνοιγμα · Ctrl+P εκτύπωση · Ctrl+3 3D",
+    "Shortcuts: Ctrl+S save · Ctrl+O open · Ctrl+P print · Ctrl+3 3D · Ctrl+Z undo · Enter next field · ↑↓ change value · F1 manual": "Συντομεύσεις: Ctrl+S αποθήκευση · Ctrl+O άνοιγμα · Ctrl+P εκτύπωση · Ctrl+3 3D",
     "No calculations match": "Δεν βρέθηκαν υπολογισμοί",
     "Home": "Αρχική", "Welcome to Erisma": "Καλώς ήρθατε στο Erisma",
     "Choose a calculation to start. Results, checks and the report update while you type.":
@@ -43,6 +43,12 @@ const UI = {
     "NA to CYS EN 1998-1, zonation map": "χάρτης ζωνών ΕΠ CYS EN 1998-1",
     "Location is not available in this browser.": "Η θέση δεν είναι διαθέσιμη σε αυτόν τον browser.",
     "Search places…": "Αναζήτηση τοποθεσίας…",
+    "Arithmetic allowed, e.g. 2*3,5": "Επιτρέπονται πράξεις, π.χ. 2*3,5", "Not a number": "Δεν είναι αριθμός",
+    "Duplicate row": "Αντιγραφή γραμμής", "Tip: paste rows from Excel (Ctrl+V)": "Συμβουλή: επικόλληση γραμμών από Excel (Ctrl+V)",
+    "Changed from the example values": "Αλλαγμένα από τις τιμές του παραδείγματος",
+    "Click to collapse / expand": "Κλικ για σύμπτυξη / ανάπτυξη", "Back to the example value": "Επαναφορά στην τιμή του παραδείγματος",
+    "Shortcuts: Ctrl+S save · Ctrl+O open · Ctrl+P print · Ctrl+3 3D · Ctrl+Z undo · Enter next field · ↑↓ change value · F1 manual":
+      "Συντομεύσεις: Ctrl+S αποθήκευση · Ctrl+O άνοιγμα · Ctrl+P εκτύπωση · Ctrl+3 3D · Ctrl+Z αναίρεση · Enter επόμενο πεδίο · ↑↓ αλλαγή τιμής · F1 εγχειρίδιο",
   },
 };
 let LANG = (() => { try { return localStorage.getItem("erisma.lang") || "el"; } catch { return "el"; } })();
@@ -106,7 +112,7 @@ function translateChrome() {
   $("#home-search").placeholder = t("Search calculations…");
   $("#map-search").placeholder = t("Search places…");
   document.querySelectorAll(".lang button").forEach((b) => b.classList.toggle("on", b.dataset.lang === LANG));
-  $("#shortcuts").textContent = t("Shortcuts: Ctrl+S save · Ctrl+O open · Ctrl+P print · Ctrl+3 3D view");
+  $("#shortcuts").textContent = t("Shortcuts: Ctrl+S save · Ctrl+O open · Ctrl+P print · Ctrl+3 3D · Ctrl+Z undo · Enter next field · ↑↓ change value · F1 manual");
 }
 
 // ------------------------------------------------------------- sidebar
@@ -209,6 +215,27 @@ function renderProject() {
 }
 
 // ------------------------------------------------------------------ form
+// Numbers: Greek comma decimals ("1,5") and simple arithmetic ("2*3,5", "(4+2)/2", "1,5^2").
+function parseNum(str) {
+  if (typeof str === "number") return str;
+  const s = String(str ?? "").trim().replace(/,/g, ".").replace(/\^/g, "**");
+  if (s === "") return null;
+  if (!/^[0-9+\-*/().\s eE]+$/.test(s)) return NaN;
+  try {
+    const v = Function(`"use strict"; return (${s});`)();  // only digits and operators reach here
+    return typeof v === "number" && Number.isFinite(v) ? v : NaN;
+  } catch { return NaN; }
+}
+const fmtNum = (v) => (v === null || v === undefined || v === "" ? "" :
+  (LANG === "el" ? String(+(+v).toPrecision(10)).replace(".", ",") : String(+(+v).toPrecision(10))));
+const isExpr = (s) => /[+*/()^]|\d\s*-\s*\d/.test(String(s));
+
+function stepFor(v) {
+  const a = Math.abs(v);
+  if (!a) return 0.1;
+  return 10 ** (Math.floor(Math.log10(a)) - 1);
+}
+
 function scalarInput(f, value, onChange) {
   if (f.kind === "choice") {
     const labels = f.choice_labels || f.choices;
@@ -226,30 +253,154 @@ function scalarInput(f, value, onChange) {
     c.checked = !!(value ?? f.default);
     return c;
   }
-  return el("input", { type: "number", step: "any", inputmode: "decimal", value: value ?? f.default ?? "",
-    min: f.min ?? undefined, max: f.max ?? undefined,
-    on: { input: (e) => onChange(e.target.value === "" ? null : Number(e.target.value)) } });
+  const range = [f.min != null ? `≥ ${fmtNum(f.min)}` : "", f.max != null ? `≤ ${fmtNum(f.max)}` : ""]
+    .filter(Boolean).join(" · ");
+  const inp = el("input", { type: "text", inputmode: "decimal", class: "num", value: fmtNum(value ?? f.default),
+    title: [range, t("Arithmetic allowed, e.g. 2*3,5")].filter(Boolean).join(" — "), spellcheck: "false" });
+  const commit = (raw, final) => {
+    const v = parseNum(raw);
+    const bad = Number.isNaN(v) || (v !== null && ((f.min != null && v < f.min) || (f.max != null && v > f.max)));
+    inp.classList.toggle("bad", bad);
+    inp.dataset.eval = !bad && v !== null && isExpr(raw) ? `= ${fmtNum(v)}` : "";
+    inp.parentElement?.setAttribute("data-eval", inp.dataset.eval);
+    if (bad) {
+      inp.title = Number.isNaN(v) ? t("Not a number") : range;
+      return;
+    }
+    if (final && v !== null && isExpr(raw)) { inp.value = fmtNum(v); inp.parentElement?.setAttribute("data-eval", ""); }
+    onChange(f.kind === "int" && v !== null ? Math.round(v) : v);
+  };
+  inp.addEventListener("input", () => commit(inp.value, false));
+  inp.addEventListener("blur", () => { if (inp.isConnected) commit(inp.value, true); });
+  inp.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      const v = parseNum(inp.value) ?? 0;
+      if (Number.isNaN(v)) return;
+      e.preventDefault();
+      let st = f.kind === "int" ? 1 : stepFor(v);
+      if (e.shiftKey) st *= 10;
+      let nv = +(v + (e.key === "ArrowUp" ? st : -st)).toPrecision(12);
+      if (f.min != null) nv = Math.max(nv, f.min);
+      if (f.max != null) nv = Math.min(nv, f.max);
+      inp.value = fmtNum(nv);
+      commit(inp.value, true);
+    }
+  });
+  return inp;
 }
 
+// Enter moves to the next input (like a spreadsheet); Shift+Enter goes back.
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" || !e.target.closest?.("#inputs") || e.target.tagName === "BUTTON") return;
+  const all = [...document.querySelectorAll("#inputs input, #inputs select")]
+    .filter((n) => n.offsetParent !== null);
+  const i = all.indexOf(e.target);
+  if (i < 0) return;
+  e.preventDefault();
+  e.target.blur();
+  all[Math.max(0, Math.min(all.length - 1, i + (e.shiftKey ? -1 : 1)))]?.focus();
+  all[i + (e.shiftKey ? -1 : 1)]?.select?.();
+});
+
+// ---------------------------------------------------------- undo / redo
+const hist = { stack: [], pos: -1, timer: null };
+function snapshot() {
+  if (hist.lock) return;
+  clearTimeout(hist.timer);
+  hist.timer = setTimeout(() => {
+    const snap = JSON.stringify(state.inputs);
+    if (hist.stack[hist.pos] === snap) return;
+    hist.stack = hist.stack.slice(0, hist.pos + 1);
+    hist.stack.push(snap);
+    if (hist.stack.length > 100) hist.stack.shift();
+    hist.pos = hist.stack.length - 1;
+  }, 500);
+}
+function resetHistory() { hist.stack = [JSON.stringify(state.inputs)]; hist.pos = 0; }
+function undo(dir) {
+  const np = hist.pos + dir;
+  if (np < 0 || np >= hist.stack.length) return;
+  hist.lock = true;  // the focused field's blur must not record a new step
+  document.activeElement?.blur?.();
+  clearTimeout(hist.timer);
+  hist.pos = np;
+  state.inputs = JSON.parse(hist.stack[np]);
+  renderForm();
+  hist.lock = false;
+  schedule();
+}
+
+// ------------------------------------------------------------- tables
 function tableEditor(f) {
   const rows = state.inputs[f.name] ||= structuredClone(f.default || []);
   const wrap = el("div", { class: "tblwrap", id: `f-${f.name}` });
+  const changed = () => { snapshot(); schedule(); };
   const draw = () => {
     wrap.innerHTML = "";
-    const head = el("tr", {}, ...f.columns.map((c) => el("th", {}, c.label + (c.unit ? ` [${c.unit}]` : ""))), el("th"));
-    const body = rows.map((r, i) => el("tr", {},
-      ...f.columns.map((c) => el("td", {}, scalarInput(c, r[c.name], (v) => { r[c.name] = v; schedule(); }))),
-      el("td", {}, el("button", { type: "button", class: "tbl-del", title: t("Remove row"),
-        on: { click: () => { rows.splice(i, 1); draw(); schedule(); } } }, "×"))));
-    wrap.append(el("div", { class: "tbl-title" }, f.label),
+    const head = el("tr", {}, el("th", { class: "rn" }, "#"),
+      ...f.columns.map((c) => el("th", {}, c.label + (c.unit ? ` [${c.unit}]` : ""))), el("th"));
+    const body = rows.map((r, i) => el("tr", {}, el("td", { class: "rn" }, String(i + 1)),
+      ...f.columns.map((c, j) => {
+        const cell = scalarInput(c, r[c.name], (v) => { r[c.name] = v; changed(); });
+        cell.dataset.row = i; cell.dataset.col = j;
+        return el("td", {}, cell);
+      }),
+      el("td", { class: "rowbtns" },
+        el("button", { type: "button", class: "tbl-dup", title: t("Duplicate row"),
+          on: { click: () => { rows.splice(i + 1, 0, structuredClone(r)); draw(); changed(); } } }, "⧉"),
+        el("button", { type: "button", class: "tbl-del", title: t("Remove row"),
+          on: { click: () => { rows.splice(i, 1); draw(); changed(); } } }, "×"))));
+    wrap.append(el("div", { class: "tbl-title" }, f.label,
+      el("span", { class: "tbl-tip" }, t("Tip: paste rows from Excel (Ctrl+V)"))),
       el("table", { class: "tbl" }, el("thead", {}, head), el("tbody", {}, ...body)),
       el("button", { type: "button", class: "tbl-add", on: { click: () => {
-        rows.push(Object.fromEntries(f.columns.map((c) => [c.name, c.default])));
-        draw(); schedule();
+        const last = rows[rows.length - 1];
+        rows.push(last ? structuredClone(last) : Object.fromEntries(f.columns.map((c) => [c.name, c.default])));
+        draw(); changed();
+        wrap.querySelector(`[data-row="${rows.length - 1}"][data-col="0"]`)?.focus();
       } } }, t("+ Add row")));
   };
+  // Paste a block of cells copied from Excel / LibreOffice (tab-separated).
+  wrap.addEventListener("paste", (e) => {
+    const cell = e.target.closest?.("[data-row]");
+    const text = e.clipboardData?.getData("text/plain") || "";
+    if (!cell || !/[\t\n]/.test(text.trim())) return;
+    e.preventDefault();
+    cell.blur();  // commit the cell first so its blur cannot overwrite the pasted value
+    const r0 = +cell.dataset.row, c0 = +cell.dataset.col;
+    text.replace(/\r/g, "").split("\n").filter((l) => l.trim() !== "").forEach((line, di) => {
+      const ri = r0 + di;
+      if (!rows[ri]) rows[ri] = Object.fromEntries(f.columns.map((c) => [c.name, c.default]));
+      line.split("\t").forEach((val, dj) => {
+        const col = f.columns[c0 + dj];
+        if (!col) return;
+        if (col.kind === "choice") {
+          const k = col.choices.findIndex((c, idx) => c === val.trim() || (col.choice_labels || [])[idx] === val.trim());
+          if (k >= 0) rows[ri][col.name] = col.choices[k];
+        } else if (col.kind === "text") rows[ri][col.name] = val.trim();
+        else { const v = parseNum(val); if (v !== null && !Number.isNaN(v)) rows[ri][col.name] = v; }
+      });
+    });
+    draw(); changed();
+  });
   draw();
   return wrap;
+}
+
+// --------------------------------------------------------------- form
+const sameVal = (a, b) => (a === b) || (a != null && b != null && String(a) === String(b)) ||
+  (typeof a === "number" && typeof b === "number" && Math.abs(a - b) < 1e-12);
+const collapsedKey = () => `erisma.collapsed.${state.schema.id}`;
+
+function markChanged(row, f) {
+  const ch = !sameVal(state.inputs[f.name], f.default);
+  row.classList.toggle("changed", ch);
+  const fs = row.closest("fieldset");
+  if (fs) {
+    const n = fs.querySelectorAll(".field.changed").length;
+    const badge = fs.querySelector("legend .cnt");
+    if (badge) { badge.textContent = n ? `● ${n}` : ""; badge.title = t("Changed from the example values"); }
+  }
 }
 
 function renderForm() {
@@ -257,23 +408,51 @@ function renderForm() {
   form.innerHTML = "";
   const groups = {};
   state.schema.fields.forEach((f) => (groups[f.group] ||= []).push(f));
+  const collapsed = new Set(store.get(collapsedKey(), []));
   for (const [g, fields] of Object.entries(groups)) {
-    const fs = el("fieldset", {}, el("legend", {}, g));
+    const legend = el("legend", { tabindex: "0", title: t("Click to collapse / expand") },
+      el("span", { class: "chev" }, "▾"), g, el("span", { class: "cnt" }));
+    const fs = el("fieldset", { class: collapsed.has(g) ? "closed" : "" }, legend);
+    const toggle = () => {
+      fs.classList.toggle("closed");
+      const cur = new Set(store.get(collapsedKey(), []));
+      fs.classList.contains("closed") ? cur.add(g) : cur.delete(g);
+      store.set(collapsedKey(), [...cur]);
+    };
+    legend.addEventListener("click", toggle);
+    legend.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
     for (const f of fields) {
       if (f.kind === "table") { fs.append(tableEditor(f)); continue; }
       if (!(f.name in state.inputs)) state.inputs[f.name] = f.default;
       const id = `f-${f.name}`;
+      let row;
       const input = scalarInput(f, state.inputs[f.name], (v) => {
-        state.inputs[f.name] = v; clearInvalid(); updateVisibility(); schedule();
+        state.inputs[f.name] = v; clearInvalid(); updateVisibility(); markChanged(row, f); snapshot(); schedule();
       });
       input.id = id;
-      const row = el("div", { class: "field", "data-name": f.name, "data-show-if": f.show_if || null }, el("label", { for: id }, f.label),
+      const reset = el("button", { type: "button", class: "fld-reset", tabindex: "-1",
+        title: `${t("Back to the example value")}: ${f.kind === "choice" ? (f.choice_labels || f.choices)[f.choices.indexOf(f.default)] ?? f.default : f.kind === "bool" ? (f.default ? "✓" : "✗") : fmtNum(f.default)}`,
+        on: { click: () => {
+          state.inputs[f.name] = f.default;
+          renderForm(); snapshot(); schedule();
+        } } }, "↺");
+      const info = f.help ? el("button", { type: "button", class: "fld-info", tabindex: "-1", title: f.help,
+        on: { click: () => row.classList.toggle("showhelp") } }, "i") : "";
+      row = el("div", { class: "field", "data-name": f.name, "data-show-if": f.show_if || null },
+        el("label", { for: id }, f.label, info, reset),
         el("div", { class: "inp" }, input, el("span", {}, f.unit || "")));
       if (f.help) row.append(el("div", { class: "help" }, f.help));
       if (f.name === "ag") row.append(zoneChips(input));
+      input.addEventListener("focus", () => row.classList.add("focus"));
+      input.addEventListener("blur", () => row.classList.remove("focus"));
       fs.append(row);
+      markChanged(row, f);
     }
     form.append(fs);
+    fs.querySelectorAll(".field").forEach((r) => {
+      const f = fields.find((x) => x.name === r.dataset.name);
+      if (f) markChanged(r, f);
+    });
   }
   updateVisibility();
 }
@@ -423,6 +602,7 @@ async function selectModule(id, inputs) {
   pushRecent(id);
   renderNav();
   renderForm();
+  resetHistory();
   run();
 }
 
@@ -628,6 +808,9 @@ $("#file-open").onchange = async (e) => {
 document.addEventListener("keydown", (e) => {
   if (!(e.ctrlKey || e.metaKey)) return;
   const k = e.key.toLowerCase();
+  if ((k === "z" || k === "y") && state.schema && !document.body.classList.contains("at-home")) {
+    e.preventDefault(); undo(k === "y" || e.shiftKey ? 1 : -1); return;
+  }
   const map = { s: actions.save, o: actions.open, p: actions.print, 3: () => showTab(currentTab === "model" ? "report" : "model"),
     k: () => { const box = document.body.classList.contains("at-home") ? $("#home-search") : $("#search"); setSide(false); box.focus(); box.select(); } };
   if (map[k]) { e.preventDefault(); map[k](); }
