@@ -2301,4 +2301,70 @@ EL: dict[str, str] = {
         "(κλάσματα του μήκους)",
     "whole frame — slab reinforcement and foundations not included":
         "όλος ο φορέας — χωρίς τον οπλισμό των πλακών και τις θεμελιώσεις",
+    "Shear walls": "Τοιχώματα",
+    "Grid point": "Θέση καννάβου",
+    "Direction": "Διεύθυνση",
+    "A wall replaces the column at that grid point (e.g. B1). Beams framing along the wall get rigid end zones of half its length.":
+        "Το τοίχωμα αντικαθιστά το υποστύλωμα σε εκείνη τη θέση (π.χ. B1). Οι δοκοί κατά τη "
+        "διεύθυνση του τοιχώματος αποκτούν άκαμπτα τμήματα ίσα με το μισό του μήκος του.",
+    "P-Δ effects (geometric stiffness)": "Φαινόμενα P-Δ (γεωμετρική δυσκαμψία)",
+    "Include the destabilising effect of the gravity loads G + ψ2Q in the stiffness (all analyses).":
+        "Λαμβάνεται υπόψη η αποσταθεροποιητική επίδραση των κατακόρυφων φορτίων G + ψ2Q στη "
+        "δυσκαμψία (σε όλες τις αναλύσεις).",
+    "Capacity design (EN 1998-1 DCM)": "Ικανοτικός σχεδιασμός (EN 1998-1 ΚΠΜ)",
+    "ΣM_Rc ≥ 1.3 ΣM_Rb at the joints (4.4.2.3) and shears from the flexural capacities (5.4.2.2, 5.4.2.3).":
+        "ΣM_Rc ≥ 1.3 ΣM_Rb στους κόμβους (4.4.2.3) και τέμνουσες από τις καμπτικές αντοχές "
+        "(5.4.2.2, 5.4.2.3).",
+    "Global stability": "Καθολική ευστάθεια",
+    "eigenvalue of (K + α K_G) φ = 0 for G + {p:g}Q": "ιδιοτιμή του (K + α K_G) φ = 0 για G + {p:g}Q",
+    "Elastic critical load factor": "Συντελεστής ελαστικού κρίσιμου φορτίου",
+    "α_cr ≥ 10 (first-order analysis sufficient)": "α_cr ≥ 10 (επαρκεί ανάλυση 1ης τάξης)",
+    "Switch on P-Δ effects, or stiffen the structure.":
+        "Ενεργοποιήστε τα φαινόμενα P-Δ ή δυσκαμψύνετε τον φορέα.",
+    "P-Δ: the geometric stiffness of the axial forces from G + {p:g}Q is included in every analysis below.":
+        "P-Δ: η γεωμετρική δυσκαμψία των αξονικών δυνάμεων από G + {p:g}Q περιλαμβάνεται σε "
+        "όλες τις παρακάτω αναλύσεις.",
+    "Capacity design": "Ικανοτικός σχεδιασμός",
+    "Strong columns – weak beams at every joint below the roof (EN 1998-1 4.4.2.3(4)); beam and column links from the capacity-design shears (5.4.2.2, 5.4.2.3, γ_Rd = 1.0 / 1.1).":
+        "Ισχυρά υποστυλώματα – ασθενείς δοκοί σε κάθε κόμβο κάτω από το δώμα (EN 1998-1 "
+        "4.4.2.3(4))· συνδετήρες δοκών και υποστυλωμάτων από τις ικανοτικές τέμνουσες "
+        "(5.4.2.2, 5.4.2.3, γ_Rd = 1.0 / 1.1).",
+    "Joint": "Κόμβος",
+    "ΣM_Rc [kNm]": "ΣM_Rc [kNm]",
+    "ΣM_Rb [kNm]": "ΣM_Rb [kNm]",
+    "ΣM_Rc/ΣM_Rb": "ΣM_Rc/ΣM_Rb",
+    "↑ = column bars increased to satisfy the rule":
+        "↑ = αυξήθηκε ο οπλισμός των υποστυλωμάτων για να ικανοποιηθεί ο κανόνας",
+    "Storey {k}: ΣM_Rc ≥ 1.3 ΣM_Rb (joint {j})": "Όροφος {k}: ΣM_Rc ≥ 1.3 ΣM_Rb (κόμβος {j})",
+    "Increase the column size or reduce the beam reinforcement.":
+        "Αυξήστε τη διατομή των υποστυλωμάτων ή μειώστε τον οπλισμό των δοκών.",
+    "Walls (critical region at the base)": "Τοιχώματα (κρίσιμη περιοχή στη βάση)",
+    "Increase the wall length or thickness.": "Αυξήστε το μήκος ή το πάχος του τοιχώματος.",
+    "Critical wall {m} — full calculation": "Κρίσιμο τοίχωμα {m} — πλήρης υπολογισμός",
+    "No boundary reinforcement passes — increase the wall length or thickness":
+        "Κανένας οπλισμός άκρων δεν επαρκεί — αυξήστε το μήκος ή το πάχος του τοιχώματος",
+    "Capacity-design shear exceeds the resistance — increase the column size":
+        "Η ικανοτική τέμνουσα υπερβαίνει την αντοχή — αυξήστε τη διατομή του υποστυλώματος",
+    "Capacity-design shear exceeds the resistance with Ø8 links — increase the beam width/depth":
+        "Η ικανοτική τέμνουσα υπερβαίνει την αντοχή με συνδετήρες Ø8 — αυξήστε το πλάτος/ύψος "
+        "της δοκού",
+    "links from the capacity-design shear V = {v:.0f} kN (5.4.2.2)":
+        "συνδετήρες από την ικανοτική τέμνουσα V = {v:.0f} kN (5.4.2.2)",
+    "links from the capacity-design shear V = {v:.0f} kN (5.4.2.3)":
+        "συνδετήρες από την ικανοτική τέμνουσα V = {v:.0f} kN (5.4.2.3)",
+    "Bars increased by capacity design (ΣM_Rc ≥ 1.3 ΣM_Rb)":
+        "Αύξηση οπλισμού λόγω ικανοτικού σχεδιασμού (ΣM_Rc ≥ 1.3 ΣM_Rb)",
+    "Wall at {g}: there is no such grid point (use e.g. A1)":
+        "Τοίχωμα στο {g}: δεν υπάρχει τέτοια θέση καννάβου (π.χ. A1)",
+    "Two walls at grid point {g}": "Δύο τοιχώματα στη θέση {g}",
+    "Wall at {g}: direction must be X or Y": "Τοίχωμα στο {g}: η διεύθυνση πρέπει να είναι X ή Y",
+    "Wall at {g}: give its length and thickness": "Τοίχωμα στο {g}: δώστε μήκος και πάχος",
+    "Wall at {g} is too long for the adjacent span — the beam would have no flexible length":
+        "Το τοίχωμα στο {g} είναι πολύ μακρύ για το γειτονικό άνοιγμα — η δοκός δεν θα είχε "
+        "εύκαμπτο μήκος",
+    "With P-Δ the structure buckles under the gravity loads (first at {d}) — increase the column sizes":
+        "Με P-Δ ο φορέας λυγίζει υπό τα κατακόρυφα φορτία (πρώτα στο {d}) — αυξήστε τις "
+        "διατομές των υποστυλωμάτων",
+    "Member {m}: the rigid end zones are longer than the member":
+        "Μέλος {m}: τα άκαμπτα τμήματα είναι μακρύτερα από το μέλος",
 }
