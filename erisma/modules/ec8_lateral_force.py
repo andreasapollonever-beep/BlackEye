@@ -6,21 +6,12 @@ import numpy as np
 
 from ..core import Calculation, DesignModule, Field, InputError, register
 from ..design.annex import get_annex
+from ..design.ec8 import design_spectrum  # noqa: F401 (re-exported)
 from ..report.scene3d import PALETTE, Scene3D
 from ..report.svg import spectrum_plot
 
 CT = {"Steel moment frames": 0.085, "RC moment frames / eccentric braced steel": 0.075,
       "All other structures (walls, masonry…)": 0.050}
-
-
-def design_spectrum(T, ag, S, TB, TC, TD, q, beta):
-    """EN 1998-1 Eq. 3.13–3.16 (Sd in g when ag in g)."""
-    T = np.asarray(T, dtype=float)
-    s1 = ag * S * (2 / 3 + T / TB * (2.5 / q - 2 / 3))
-    s2 = ag * S * 2.5 / q * np.ones_like(T)
-    s3 = np.maximum(ag * S * 2.5 / q * TC / np.maximum(T, 1e-9), beta * ag)
-    s4 = np.maximum(ag * S * 2.5 / q * TC * TD / np.maximum(T, 1e-9) ** 2, beta * ag)
-    return np.where(T <= TB, s1, np.where(T <= TC, s2, np.where(T <= TD, s3, s4)))
 
 
 @register

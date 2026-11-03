@@ -24,6 +24,10 @@ Tekla Tedds, but doing more). Target users: practising engineers, first market G
 - Internal units: N and mm (see `core/units.py`); convert only at inputs and output.
 - A module = subclass of `DesignModule` registered with `@register` in `erisma/modules/`,
   imported from `erisma/modules/__init__.py`.
+- Whole-building 3D analysis lives in its own package `erisma/structure/` (model, solver,
+  modal/spectrum); it reuses units, materials, sections, annex data and i18n, and raises
+  `StructureError` with a bilingual message and a `ref` to the node/member to fix.
+  Hand-calculation tests in `tests/structure/`; every static result has `equilibrium_ok()`.
 - 3D: modules may attach a generic scene (`erisma/report/scene3d.py`) as `calc.model3d`;
   `web/static/viewer3d.js` renders any scene (layers, prisms, boxes, meshes, arrows, labels).
 - Partial factors / NDPs: never hard-code — read them from `erisma/design/annex.py`

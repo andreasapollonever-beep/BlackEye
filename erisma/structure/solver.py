@@ -1,0 +1,438 @@
+"""Linear static analysis of 3D frames by the direct stiffness method.
+
+Element: two-node 3D beam with 6 DOF per node (ux, uy, uz, rx, ry, rz),
+Timoshenko shear deformation when the section has shear areas (exact
+stiffness for prismatic members — Przemieniecki, *Theory of Matrix Structural
+Analysis*, §5.6), optional moment hinges at either end (static condensation).
+
+Rigid diaphragms are imposed exactly by a master–slave transformation:
+``ux = Ux − (y − yc)·Rz``, ``uy = Uy + (x − xc)·Rz``, ``rz = Rz``.
+
+Reported internal forces (engineering convention, along local x):
+
+* ``N``  axial force, tension positive;
+* ``Vy``, ``Vz`` shear forces with dM/dx = V (left support of a simply
+  supported beam has V > 0);
+* ``T``  torsion;
+* ``My`` bending in the local x–z plane, positive = tension on the −z face
+  (sagging of a beam is positive);
+* ``Mz`` bending in the local x–y plane, positive = tension on the −y face.
+
+Every result carries an equilibrium check (Σ loads + Σ reactions = 0).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+import numpy as np
+
+from .model import DOF_NAMES, Member, Model, StructureError
+
+_HINGE_I = (4, 5)
+_HINGE_J = (10, 11)
+
+
+# --------------------------------------------------------------------- element
+
+
+def local_stiffness(m: Member, L: float) -> np.ndarray:
+    """12×12 local stiffness of a prismatic 3D Timoshenko beam."""
+    s, mat = m.section, m.material
+    E, G = mat.E, mat.G
+    phy = 12 * E * s.Iz / (G * s.Avy * L**2) if s.Avy else 0.0  # bending in x–y (uses Iz)
+    phz = 12 * E * s.Iy / (G * s.Avz * L**2) if s.Avz else 0.0  # bending in x–z (uses Iy)
+    k = np.zeros((12, 12))
+    ea, gj = E * s.A / L, G * s.J / L
+    k[0, 0] = k[6, 6] = ea
+    k[0, 6] = k[6, 0] = -ea
+    k[3, 3] = k[9, 9] = gj
+    k[3, 9] = k[9, 3] = -gj
+    # x–y plane: dofs v1=1, θz1=5, v2=7, θz2=11 (θz = dv/dx)
+    c = E * s.Iz / ((1 + phy) * L**3)
+    kb = c * np.array([[12, 6 * L, -12, 6 * L],
+                       [6 * L, (4 + phy) * L**2, -6 * L, (2 - phy) * L**2],
+                       [-12, -6 * L, 12, -6 * L],
+                       [6 * L, (2 - phy) * L**2, -6 * L, (4 + phy) * L**2]])
+    idx = [1, 5, 7, 11]
+    k[np.ix_(idx, idx)] = kb
+    # x–z plane: dofs w1=2, θy1=4, w2=8, θy2=10 (θy = −dw/dx)
+    c = E * s.Iy / ((1 + phz) * L**3)
+    kb = c * np.array([[12, -6 * L, -12, -6 * L],
+                       [-6 * L, (4 + phz) * L**2, 6 * L, (2 - phz) * L**2],
+                       [-12, 6 * L, 12, 6 * L],
+                       [-6 * L, (2 - phz) * L**2, 6 * L, (4 + phz) * L**2]])
+    idx = [2, 4, 8, 10]
+    k[np.ix_(idx, idx)] = kb
+    return k
+
+
+def fixed_end_forces(w: np.ndarray, L: float) -> np.ndarray:
+    """End forces on a fixed–fixed member under a uniform local load ``w`` (wx, wy, wz).
+
+    Uniform load: the fixed-end moments wL²/12 are not affected by shear
+    deformation, so these hold for the Timoshenko element too.
+    """
+    wx, wy, wz = w
+    f = np.zeros(12)
+    f[0] = f[6] = -wx * L / 2
+    f[1] = f[7] = -wy * L / 2
+    f[5], f[11] = -wy * L**2 / 12, wy * L**2 / 12
+    f[2] = f[8] = -wz * L / 2
+    f[4], f[10] = wz * L**2 / 12, -wz * L**2 / 12
+    return f
+
+
+@dataclass
+class _Element:
+    member: Member
+    L: float
+    R: np.ndarray        # 3×3 rows = local axes
+    T: np.ndarray        # 12×12
+    k: np.ndarray        # local stiffness (hinges condensed)
+    released: list[int]
+    kept: list[int]
+    kr: np.ndarray | None  # k_cr k_rr⁻¹ for load condensation
+
+    def condense_f(self, f: np.ndarray) -> np.ndarray:
+        if not self.released:
+            return f
+        out = f.copy()
+        out[self.kept] -= self.kr @ f[self.released]
+        out[self.released] = 0.0
+        return out
+
+    @property
+    def kg(self) -> np.ndarray:
+        return self.T.T @ self.k @ self.T
+
+
+def _make_element(model: Model, m: Member) -> _Element:
+    L = model.length(m)
+    R = model.rotation(m)
+    T = np.kron(np.eye(4), R)
+    k = local_stiffness(m, L)
+    rel = ([*_HINGE_I] if m.hinge_i else []) + ([*_HINGE_J] if m.hinge_j else [])
+    kept = [d for d in range(12) if d not in rel]
+    kr = None
+    if rel:
+        krr = k[np.ix_(rel, rel)]
+        kr = k[np.ix_(kept, rel)] @ np.linalg.inv(krr)
+        kc = k[np.ix_(kept, kept)] - kr @ k[np.ix_(rel, kept)]
+        k = np.zeros((12, 12))
+        k[np.ix_(kept, kept)] = kc
+    return _Element(m, L, R, T, k, rel, kept, kr)
+
+
+# --------------------------------------------------------------------- DOF map
+
+
+class DofMap:
+    """Maps the 6 DOF of every node onto the reduced (independent) unknowns."""
+
+    def __init__(self, model: Model) -> None:
+        used = {m.i for m in model.members.values()} | {m.j for m in model.members.values()}
+        self.node_ids = [n for n in model.nodes if n in used]
+        self.index = {n: k for k, n in enumerate(self.node_ids)}
+        self.labels: list[str] = []
+        self.kind: list[int] = []  # 0..5 = ux..rz, for influence vectors
+        self.masters: dict[str, tuple[np.ndarray, list[int]]] = {}
+        member_of: dict[str, str] = {}
+        for d in model.diaphragms:
+            xyz = np.array([model.nodes[n].xyz for n in d.nodes])
+            centre = xyz.mean(axis=0)
+            ids = [self._new(f"diaphragm {d.name} {name}", k)
+                   for name, k in (("ux", 0), ("uy", 1), ("rz", 5))]
+            self.masters[d.name] = (centre, ids)
+            for n in d.nodes:
+                member_of[n] = d.name
+        self.rows: list[tuple[np.ndarray, np.ndarray]] = []
+        empty = (np.zeros(0, dtype=int), np.zeros(0))
+        for nid in self.node_ids:
+            node = model.nodes[nid]
+            sup = model.supports.get(nid)
+            dia = member_of.get(nid)
+            for k in range(6):
+                if dia is not None and k in (0, 1, 5):
+                    (c, (iu, iv, ir)) = self.masters[dia]
+                    dx, dy = node.x - c[0], node.y - c[1]
+                    if k == 0:
+                        self.rows.append((np.array([iu, ir]), np.array([1.0, -dy])))
+                    elif k == 1:
+                        self.rows.append((np.array([iv, ir]), np.array([1.0, dx])))
+                    else:
+                        self.rows.append((np.array([ir]), np.array([1.0])))
+                elif sup is not None and sup.restraints[k]:
+                    self.rows.append(empty)
+                else:
+                    i = self._new(f"node {nid} {DOF_NAMES[k]}", k)
+                    self.rows.append((np.array([i]), np.array([1.0])))
+        self.n = len(self.labels)
+
+    def _new(self, label: str, kind: int) -> int:
+        self.labels.append(label)
+        self.kind.append(kind)
+        return len(self.labels) - 1
+
+    def full_dofs(self, nid: str) -> range:
+        b = 6 * self.index[nid]
+        return range(b, b + 6)
+
+    def gather(self, full: list[int]) -> tuple[np.ndarray, np.ndarray]:
+        """(reduced ids, T) with u_full[full] = T @ u_red[ids]."""
+        ids = sorted({int(i) for f in full for i in self.rows[f][0]})
+        pos = {i: c for c, i in enumerate(ids)}
+        T = np.zeros((len(full), len(ids)))
+        for r, f in enumerate(full):
+            for i, c in zip(*self.rows[f]):
+                T[r, pos[int(i)]] += c
+        return np.array(ids, dtype=int), T
+
+    def expand(self, u_red: np.ndarray) -> np.ndarray:
+        out = np.zeros(6 * len(self.node_ids))
+        for f, (ids, cs) in enumerate(self.rows):
+            if len(ids):
+                out[f] = cs @ u_red[ids]
+        return out
+
+
+# --------------------------------------------------------------------- results
+
+
+@dataclass
+class StaticResult:
+    """Displacements, member end forces and reactions for one load case/combination."""
+
+    name: str
+    analysis: "Analysis"
+    u: np.ndarray            # (n_nodes, 6) global displacements, mm and rad
+    end_forces: np.ndarray   # (n_members, 12) local end forces on the member
+    w_local: np.ndarray      # (n_members, 3) uniform local member load, N/mm
+    reactions: dict[str, np.ndarray]
+    applied: np.ndarray      # resultant of applied loads (Fx, Fy, Fz, Mx, My, Mz) about origin
+    notes: list[str] = field(default_factory=list)
+
+    # ---- queries
+    def displacement(self, node) -> np.ndarray:
+        return self.u[self.analysis.dofmap.index[str(node)]]
+
+    def reaction(self, node) -> np.ndarray:
+        return self.reactions[str(node)]
+
+    def forces(self, member, n: int = 11) -> dict[str, np.ndarray]:
+        """Internal force diagrams at ``n`` equally spaced stations along the member."""
+        k = self.analysis.member_index[str(member)]
+        L = self.analysis.elements[k].L
+        f1 = self.end_forces[k]
+        wx, wy, wz = self.w_local[k]
+        x = np.linspace(0.0, L, n)
+        return {
+            "x": x,
+            "N": -f1[0] - wx * x,
+            "Vy": f1[1] + wy * x,
+            "Vz": f1[2] + wz * x,
+            "T": -f1[3] * np.ones_like(x),
+            "My": f1[4] + x * f1[2] + wz * x**2 / 2,
+            "Mz": -f1[5] + x * f1[1] + wy * x**2 / 2,
+        }
+
+    def max_abs(self, member, key: str, n: int = 41) -> float:
+        return float(np.max(np.abs(self.forces(member, n)[key])))
+
+    def equilibrium(self) -> np.ndarray:
+        """Σ applied + Σ reactions (forces and moments about the origin) — should be ≈ 0."""
+        tot = self.applied.copy()
+        model = self.analysis.model
+        for nid, r in self.reactions.items():
+            p = model.nodes[nid].xyz
+            tot[:3] += r[:3]
+            tot[3:] += r[3:] + np.cross(p, r[:3])
+        return tot
+
+    def equilibrium_ok(self, rel: float = 1e-6) -> bool:
+        scale_f = max(np.abs(self.applied[:3]).max(), 1.0)
+        scale_m = max(np.abs(self.applied[3:]).max(), scale_f * 1000.0)
+        e = self.equilibrium()
+        return bool(np.abs(e[:3]).max() <= rel * scale_f and np.abs(e[3:]).max() <= rel * scale_m)
+
+    # ---- superposition
+    def scaled(self, factor: float, name: str | None = None) -> "StaticResult":
+        return StaticResult(name or f"{factor:g}·{self.name}", self.analysis, factor * self.u,
+                            factor * self.end_forces, factor * self.w_local,
+                            {k: factor * v for k, v in self.reactions.items()},
+                            factor * self.applied, list(self.notes))
+
+    def __add__(self, other: "StaticResult") -> "StaticResult":
+        return StaticResult(f"{self.name} + {other.name}", self.analysis, self.u + other.u,
+                            self.end_forces + other.end_forces, self.w_local + other.w_local,
+                            {k: self.reactions[k] + other.reactions[k] for k in self.reactions},
+                            self.applied + other.applied, list(self.notes))
+
+
+# --------------------------------------------------------------------- analysis
+
+
+class Analysis:
+    """Assembled model: call :meth:`static` per load case, :meth:`combine` for combinations."""
+
+    def __init__(self, model: Model) -> None:
+        self.model = model
+        self.warnings = model.validate()
+        self.dofmap = dm = DofMap(model)
+        self.elements = [_make_element(model, m) for m in model.members.values()]
+        self.member_index = {m: k for k, m in enumerate(model.members)}
+        self._gath = [dm.gather([*dm.full_dofs(e.member.i), *dm.full_dofs(e.member.j)])
+                      for e in self.elements]
+        K = np.zeros((dm.n, dm.n))
+        for e, (ids, T) in zip(self.elements, self._gath):
+            K[np.ix_(ids, ids)] += T.T @ e.kg @ T
+        for nid, sup in model.supports.items():
+            if nid not in dm.index:
+                continue
+            for k, ks in enumerate(sup.springs):
+                if ks and not sup.restraints[k]:
+                    ids, T = dm.gather([6 * dm.index[nid] + k])
+                    K[np.ix_(ids, ids)] += ks * np.outer(T[0], T[0])
+        self.K = K
+        diag = np.diag(K)
+        scale = max(np.abs(diag).max(), 1.0) if dm.n else 1.0
+        # DOFs with no stiffness at all (e.g. rotation of a node where every member is
+        # hinged) carry nothing: drop them, but never a translation.
+        dead = np.where(np.abs(diag) <= 1e-20 * scale)[0]  # released DOFs are exactly 0
+        for i in dead:
+            if dm.kind[i] < 3:
+                raise StructureError("The structure is unstable: {d} is not restrained by any "
+                                     "member or support — add a support or a member there",
+                                     ref=dm.labels[i].rsplit(" ", 1)[0], d=dm.labels[i])
+        self.notes = [f"{dm.labels[i]} has no rotational stiffness (all members hinged) — "
+                      "taken as free and unloaded" for i in dead]
+        self.active = np.array([i for i in range(dm.n) if i not in set(dead.tolist())], dtype=int)
+        Ka = K[np.ix_(self.active, self.active)]
+        d = 1 / np.sqrt(np.diag(Ka))
+        if not len(d):  # every DOF restrained: nothing to solve
+            self._Ks, self._d, self._Kinv = Ka, d, Ka
+            return
+        Ks = Ka * d[:, None] * d[None, :]
+        try:
+            Lc = np.linalg.cholesky(Ks)
+            ok = np.min(np.diag(Lc)) ** 2 > 1e-11
+        except np.linalg.LinAlgError:
+            ok = False
+        if not ok:
+            w, v = np.linalg.eigh(Ks)
+            i = int(np.argmax(np.abs(v[:, 0])))
+            lab = dm.labels[self.active[i]]
+            raise StructureError("The structure is unstable (a mechanism): it can move freely at "
+                                 "{d} — check supports, hinges and missing members around it",
+                                 ref=lab.rsplit(" ", 1)[0], d=lab)
+        self._Ks, self._d = Ks, d
+        self._Kinv: np.ndarray | None = None
+
+    # ---- solve K u = F on the active DOFs
+    def solve(self, F: np.ndarray) -> np.ndarray:
+        """Solve on the reduced DOFs; ``F`` may be (n,) or (n, k)."""
+        a, d = self.active, self._d
+        if self._Kinv is None:  # factorised once, reused for every load case
+            self._Kinv = np.linalg.inv(self._Ks)
+        rhs = F[a] * (d if F.ndim == 1 else d[:, None])
+        z = self._Kinv @ rhs
+        u = np.zeros_like(F, dtype=float)
+        u[a] = z * (d if F.ndim == 1 else d[:, None])
+        return u
+
+    def _member_w_local(self, case) -> np.ndarray:
+        w = np.zeros((len(self.elements), 3))
+        for ml in case.member:
+            k = self.member_index[ml.member]
+            v = np.asarray(ml.w, dtype=float)
+            w[k] += v if ml.axes == "local" else self.elements[k].R @ v
+        if case.self_weight:
+            for k, e in enumerate(self.elements):
+                g = -case.self_weight * e.member.material.weight * e.member.section.A
+                w[k] += e.R @ np.array([0.0, 0.0, g])
+        return w
+
+    def static(self, case_name: str) -> StaticResult:
+        if case_name not in self.model.cases:
+            raise StructureError("There is no load case called {c}", c=case_name)
+        case = self.model.cases[case_name]
+        dm, model = self.dofmap, self.model
+        nn = len(dm.node_ids)
+        P = np.zeros(6 * nn)
+        applied = np.zeros(6)
+        for nl in case.nodal:
+            if nl.node not in dm.index:
+                continue
+            v = np.asarray(nl.values, dtype=float)
+            P[list(dm.full_dofs(nl.node))] += v
+            applied[:3] += v[:3]
+            applied[3:] += v[3:] + np.cross(model.nodes[nl.node].xyz, v[:3])
+        w = self._member_w_local(case)
+        fe = np.zeros((len(self.elements), 12))
+        Feq = P.copy()
+        for k, e in enumerate(self.elements):
+            if not w[k].any():
+                continue
+            fe[k] = e.condense_f(fixed_end_forces(w[k], e.L))
+            full = [*dm.full_dofs(e.member.i), *dm.full_dofs(e.member.j)]
+            Feq[full] -= e.T.T @ fe[k]
+            wg = e.R.T @ w[k] * e.L
+            mid = (model.nodes[e.member.i].xyz + model.nodes[e.member.j].xyz) / 2
+            applied[:3] += wg
+            applied[3:] += np.cross(mid, wg)
+        F = np.zeros(dm.n)
+        for f, (ids, cs) in enumerate(dm.rows):
+            if len(ids) and Feq[f]:
+                F[ids] += cs * Feq[f]
+        u = self.solve(F)
+        return self._result(case_name, u, fe, w, P, applied)
+
+    def _result(self, name, u_red, fe, w, P, applied) -> StaticResult:
+        dm, model = self.dofmap, self.model
+        u_full = dm.expand(u_red)
+        ends = np.zeros((len(self.elements), 12))
+        node_force = np.zeros_like(u_full)
+        for k, e in enumerate(self.elements):
+            full = [*dm.full_dofs(e.member.i), *dm.full_dofs(e.member.j)]
+            ends[k] = e.k @ (e.T @ u_full[full]) + fe[k]
+            node_force[full] += e.T.T @ ends[k]
+        reactions = {}
+        for nid, sup in model.supports.items():
+            if nid not in dm.index:
+                continue
+            idx = list(dm.full_dofs(nid))
+            r = node_force[idx] - P[idx]
+            keep = np.array([sup.restraints[k] or bool(sup.springs[k]) for k in range(6)])
+            reactions[nid] = np.where(keep, r, 0.0)
+        return StaticResult(name, self, u_full.reshape(-1, 6), ends, w, reactions, applied,
+                            list(self.notes))
+
+    def static_from_displacements(self, name: str, u_red: np.ndarray) -> StaticResult:
+        """Forces caused by a reduced displacement vector alone (no member loads)."""
+        z = np.zeros((len(self.elements), 12))
+        return self._result(name, u_red, z, np.zeros((len(self.elements), 3)),
+                            np.zeros(6 * len(self.dofmap.node_ids)), np.zeros(6))
+
+    def run_all(self) -> dict[str, StaticResult]:
+        return {c: self.static(c) for c in self.model.cases}
+
+    @staticmethod
+    def combine(results: dict[str, StaticResult], factors: dict[str, float],
+                name: str = "") -> StaticResult:
+        """Linear combination Σ γ_i·E_i (e.g. ``{"G": 1.35, "Q": 1.5}``)."""
+        out = None
+        for case, g in factors.items():
+            if case not in results:
+                raise StructureError("Combination refers to load case {c}, which was not analysed",
+                                     c=case)
+            part = results[case].scaled(g)
+            out = part if out is None else out + part
+        if out is None:
+            raise StructureError("The combination is empty")
+        out.name = name or " + ".join(f"{g:g}·{c}" for c, g in factors.items())
+        return out
+
+
+def analyse(model: Model) -> Analysis:
+    """Validate and assemble the model (raises :class:`StructureError` with a clear message)."""
+    return Analysis(model)

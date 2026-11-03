@@ -2065,4 +2065,47 @@ EL: dict[str, str] = {
     'The licence key is damaged — copy it again': 'Το κλειδί άδειας είναι κατεστραμμένο — αντιγράψτε το ξανά',
     'The licence key is not valid': 'Το κλειδί άδειας δεν είναι έγκυρο',
     'The licence expired on {d}': 'Η άδεια έληξε στις {d}',
+    # ------------------------------------------------------------ 3D structure (erisma.structure)
+    "The mass source refers to load case {c}, which does not exist":
+        "Η πηγή μάζας αναφέρεται στη φόρτιση {c}, η οποία δεν υπάρχει",
+    "Negative mass at node {n}: the mass-source loads act upwards there":
+        "Αρνητική μάζα στον κόμβο {n}: τα φορτία της πηγής μάζας ενεργούν προς τα πάνω εκεί",
+    "The model has no mass — define the mass source (e.g. G + 0.3·Q)":
+        "Το μοντέλο δεν έχει μάζα — ορίστε την πηγή μάζας (π.χ. G + 0.3·Q)",
+    "A mode with zero stiffness was found — the structure is a mechanism":
+        "Βρέθηκε ιδιομορφή με μηδενική δυσκαμψία — ο φορέας είναι μηχανισμός",
+    "Direction {d} has no mass in the modal analysis":
+        "Η διεύθυνση {d} δεν έχει μάζα στην ιδιομορφική ανάλυση",
+    "Unknown support type '{k}' (use fixed, pinned or free)":
+        "Άγνωστος τύπος στήριξης «{k}» (χρησιμοποιήστε πάκτωση, άρθρωση ή ελεύθερο)",
+    "The model has no members — add beams or columns":
+        "Το μοντέλο δεν έχει μέλη — προσθέστε δοκούς ή υποστυλώματα",
+    "Member {m} refers to node {n}, which does not exist":
+        "Το μέλος {m} αναφέρεται στον κόμβο {n}, ο οποίος δεν υπάρχει",
+    "Member {m} has zero length — its two ends coincide":
+        "Το μέλος {m} έχει μηδενικό μήκος — τα δύο άκρα του συμπίπτουν",
+    "Member {m}: {p} must be greater than zero": "Μέλος {m}: το {p} πρέπει να είναι μεγαλύτερο του μηδενός",
+    "The model has no supports — fix or pin the base nodes":
+        "Το μοντέλο δεν έχει στηρίξεις — πακτώστε ή αρθρώστε τους κόμβους βάσης",
+    "Support at node {n}, which does not exist": "Στήριξη στον κόμβο {n}, ο οποίος δεν υπάρχει",
+    "Diaphragm {d} needs at least two nodes": "Το διάφραγμα {d} χρειάζεται τουλάχιστον δύο κόμβους",
+    "Diaphragm {d} refers to node {n}, which does not exist":
+        "Το διάφραγμα {d} αναφέρεται στον κόμβο {n}, ο οποίος δεν υπάρχει",
+    "Node {n} belongs to two diaphragms ({a}, {b})": "Ο κόμβος {n} ανήκει σε δύο διαφράγματα ({a}, {b})",
+    "Node {n} is supported horizontally and also belongs to diaphragm {d} — remove one of the two":
+        "Ο κόμβος {n} στηρίζεται οριζόντια και ανήκει και στο διάφραγμα {d} — αφαιρέστε το ένα από τα δύο",
+    "Load case {c}: load on node {n}, which does not exist":
+        "Φόρτιση {c}: φορτίο στον κόμβο {n}, ο οποίος δεν υπάρχει",
+    "Load case {c}: load on member {m}, which does not exist":
+        "Φόρτιση {c}: φορτίο στο μέλος {m}, το οποίο δεν υπάρχει",
+    "The structure is unstable: {d} is not restrained by any member or support — add a support or a member there":
+        "Η κατασκευή είναι ασταθής: το {d} δεν δεσμεύεται από κανένα μέλος ή στήριξη — "
+        "προσθέστε στήριξη ή μέλος εκεί",
+    "The structure is unstable (a mechanism): it can move freely at {d} — check supports, hinges and missing members around it":
+        "Η κατασκευή είναι ασταθής (μηχανισμός): μπορεί να κινηθεί ελεύθερα στο {d} — ελέγξτε "
+        "στηρίξεις, αρθρώσεις και μέλη που λείπουν γύρω από αυτό",
+    "There is no load case called {c}": "Δεν υπάρχει φόρτιση με όνομα {c}",
+    "Combination refers to load case {c}, which was not analysed":
+        "Ο συνδυασμός αναφέρεται στη φόρτιση {c}, η οποία δεν επιλύθηκε",
+    "The combination is empty": "Ο συνδυασμός είναι κενός",
 }
