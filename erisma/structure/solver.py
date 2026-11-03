@@ -68,16 +68,69 @@ def local_stiffness(m: Member, L: float) -> np.ndarray:
     return k
 
 
+def geometric_stiffness(N: float, L: float) -> np.ndarray:
+    """12×12 local geometric stiffness for axial force ``N`` (tension +), cubic shapes."""
+    kg = np.zeros((12, 12))
+    c = N / L
+    kb = c * np.array([[6 / 5, L / 10, -6 / 5, L / 10],
+                       [L / 10, 2 * L**2 / 15, -L / 10, -L**2 / 30],
+                       [-6 / 5, -L / 10, 6 / 5, -L / 10],
+                       [L / 10, -L**2 / 30, -L / 10, 2 * L**2 / 15]])
+    kg[np.ix_([1, 5, 7, 11], [1, 5, 7, 11])] = kb
+    kb = c * np.array([[6 / 5, -L / 10, -6 / 5, -L / 10],
+                       [-L / 10, 2 * L**2 / 15, L / 10, -L**2 / 30],
+                       [-6 / 5, L / 10, 6 / 5, L / 10],
+                       [-L / 10, -L**2 / 30, L / 10, 2 * L**2 / 15]])
+    kg[np.ix_([2, 4, 8, 10], [2, 4, 8, 10])] = kb
+    return kg
+
+
 @dataclass
 class _Element:
     member: Member
-    L: float
+    L: float             # node-to-node length
     R: np.ndarray        # 3×3 rows = local axes
     T: np.ndarray        # 12×12
-    k: np.ndarray        # local stiffness (hinges condensed)
-    released: list[int]
-    kept: list[int]
-    kr: np.ndarray | None  # k_cr k_rr⁻¹ for load condensation
+    oi: float = 0.0      # rigid end zones
+    oj: float = 0.0
+    N: float = 0.0       # axial force used for the geometric stiffness (P-Δ)
+    k: np.ndarray = field(default=None)       # node-level local stiffness
+    H: np.ndarray = field(default=None)       # flexible-end DOFs = H @ node DOFs
+    released: list[int] = field(default_factory=list)
+    kept: list[int] = field(default_factory=list)
+    kr: np.ndarray | None = None              # k_cr k_rr⁻¹ for load condensation
+
+    def __post_init__(self) -> None:
+        m = self.member
+        self.oi, self.oj = m.offset_i, m.offset_j
+        H = np.eye(12)
+        H[1, 5], H[2, 4] = self.oi, -self.oi
+        H[7, 11], H[8, 10] = -self.oj, self.oj
+        self.H = H
+        self.released = ([*_HINGE_I] if m.hinge_i else []) + ([*_HINGE_J] if m.hinge_j else [])
+        self.kept = [d for d in range(12) if d not in self.released]
+        self.set_axial(self.N)
+
+    @property
+    def Lf(self) -> float:
+        """Flexible length between the rigid end zones."""
+        return self.L - self.oi - self.oj
+
+    def set_axial(self, N: float) -> None:
+        """(Re)build the stiffness, including the geometric stiffness of ``N``."""
+        self.N = N
+        k = local_stiffness(self.member, self.Lf)
+        if N:
+            k = k + geometric_stiffness(N, self.Lf)
+        rel, kept = self.released, self.kept
+        self.kr = None
+        if rel:
+            krr = k[np.ix_(rel, rel)]
+            self.kr = k[np.ix_(kept, rel)] @ np.linalg.inv(krr)
+            kc = k[np.ix_(kept, kept)] - self.kr @ k[np.ix_(rel, kept)]
+            k = np.zeros((12, 12))
+            k[np.ix_(kept, kept)] = kc
+        self.k = self.H.T @ k @ self.H
 
     @property
     def rigidities(self) -> tuple[float, float, float, float | None, float | None]:
@@ -93,6 +146,29 @@ class _Element:
         out[self.released] = 0.0
         return out
 
+    def fixed_end(self, segs: list[Segment]) -> np.ndarray:
+        """Node-level fixed-end forces: flexible part exactly, rigid zones by statics."""
+        L, oi, oj = self.L, self.oi, self.oj
+        if not oi and not oj:
+            return self.condense_f(fixed_end_forces(segs, L, *self.rigidities))
+        flex, zone_i, zone_j = [], [], []
+        for x1, x2, w1, w2 in segs:
+            for lo, hi, bucket in ((0.0, oi, zone_i), (oi, L - oj, flex), (L - oj, L, zone_j)):
+                a, b = max(x1, lo), min(x2, hi)
+                if b - a <= 1e-9:
+                    continue
+                wa = w1 + (w2 - w1) * (a - x1) / (x2 - x1)
+                wb = w1 + (w2 - w1) * (b - x1) / (x2 - x1)
+                bucket.append(segment(a, b, wa, wb))
+        flex = [(a - oi, b - oi, wa, wb) for a, b, wa, wb in flex]
+        f = self.H.T @ self.condense_f(fixed_end_forces(flex, self.Lf, *self.rigidities))
+        for zone, base, sl in ((zone_i, 0.0, slice(0, 6)), (zone_j, L, slice(6, 12))):
+            if zone:
+                Rz, Sz = totals(zone)
+                S = Sz - base * Rz  # first moment about the node
+                f[sl] -= np.concatenate([Rz, [0.0, -S[2], S[1]]])
+        return f
+
     @property
     def kg(self) -> np.ndarray:
         return self.T.T @ self.k @ self.T
@@ -101,18 +177,7 @@ class _Element:
 def _make_element(model: Model, m: Member) -> _Element:
     L = model.length(m)
     R = model.rotation(m)
-    T = np.kron(np.eye(4), R)
-    k = local_stiffness(m, L)
-    rel = ([*_HINGE_I] if m.hinge_i else []) + ([*_HINGE_J] if m.hinge_j else [])
-    kept = [d for d in range(12) if d not in rel]
-    kr = None
-    if rel:
-        krr = k[np.ix_(rel, rel)]
-        kr = k[np.ix_(kept, rel)] @ np.linalg.inv(krr)
-        kc = k[np.ix_(kept, kept)] - kr @ k[np.ix_(rel, kept)]
-        k = np.zeros((12, 12))
-        k[np.ix_(kept, kept)] = kc
-    return _Element(m, L, R, T, k, rel, kept, kr)
+    return _Element(m, L, R, np.kron(np.eye(4), R))
 
 
 # --------------------------------------------------------------------- DOF map
@@ -215,10 +280,12 @@ class StaticResult:
         k = self.analysis.member_index[str(member)]
         L = self.analysis.elements[k].L
         f1 = self.end_forces[k]
+        e = self.analysis.elements[k]
         x = np.linspace(0.0, L, n)
         segs = self.loads[k]
-        if segs:  # include the load break points so peaks are not missed
-            x = np.unique(np.concatenate([x, [s[i] for s in segs for i in (0, 1)]]))
+        extra = [s[i] for s in segs for i in (0, 1)] + [e.oi, L - e.oj]
+        # load break points and faces of the rigid zones, so peaks/face values are exact
+        x = np.unique(np.concatenate([x, np.clip(extra, 0.0, L)]))
         Q, Ml = integrals(segs, x)
         return {
             "x": x,
@@ -271,11 +338,17 @@ class StaticResult:
 class Analysis:
     """Assembled model: call :meth:`static` per load case, :meth:`combine` for combinations."""
 
-    def __init__(self, model: Model) -> None:
+    def __init__(self, model: Model, axial: dict[str, float] | None = None) -> None:
+        """``axial`` = member axial forces (N, tension +) for the geometric stiffness (P-Δ)."""
         self.model = model
         self.warnings = model.validate()
         self.dofmap = dm = DofMap(model)
         self.elements = [_make_element(model, m) for m in model.members.values()]
+        self.pdelta = bool(axial)
+        if axial:
+            for e in self.elements:
+                if e.member.id in axial:
+                    e.set_axial(float(axial[e.member.id]))
         self.member_index = {m: k for k, m in enumerate(model.members)}
         self._gath = [dm.gather([*dm.full_dofs(e.member.i), *dm.full_dofs(e.member.j)])
                       for e in self.elements]
@@ -318,6 +391,10 @@ class Analysis:
             w, v = np.linalg.eigh(Ks)
             i = int(np.argmax(np.abs(v[:, 0])))
             lab = dm.labels[self.active[i]]
+            if self.pdelta:
+                raise StructureError("With P-Δ the structure buckles under the gravity loads "
+                                     "(first at {d}) — increase the column sizes",
+                                     ref=lab.rsplit(" ", 1)[0], d=lab)
             raise StructureError("The structure is unstable (a mechanism): it can move freely at "
                                  "{d} — check supports, hinges and missing members around it",
                                  ref=lab.rsplit(" ", 1)[0], d=lab)
@@ -379,7 +456,7 @@ class Analysis:
         for k, e in enumerate(self.elements):
             if not w[k]:
                 continue
-            fe[k] = e.condense_f(fixed_end_forces(w[k], e.L, *e.rigidities))
+            fe[k] = e.fixed_end(w[k])
             full = [*dm.full_dofs(e.member.i), *dm.full_dofs(e.member.j)]
             Feq[full] -= e.T.T @ fe[k]
             Rl, Sl = totals(w[k])
@@ -444,3 +521,48 @@ class Analysis:
 def analyse(model: Model) -> Analysis:
     """Validate and assemble the model (raises :class:`StructureError` with a clear message)."""
     return Analysis(model)
+
+
+def axial_forces(result: StaticResult) -> dict[str, float]:
+    """Mean axial force of every member (tension +) — input for P-Δ."""
+    return {m: float(-(result.end_forces[k][0] - result.end_forces[k][6]) / 2)
+            for m, k in result.analysis.member_index.items()}
+
+
+def analyse_pdelta(model: Model, gravity: dict[str, float]) -> Analysis:
+    """P-Δ analysis: geometric stiffness from the axial forces of the ``gravity``
+    combination (e.g. ``{"G": 1.0, "Q": 0.3}``), as used for seismic analysis.
+
+    Every load case solved with the returned analysis includes the P-Δ effect.
+    """
+    lin = Analysis(model)
+    res = {c: lin.static(c) for c in gravity}
+    N = axial_forces(lin.combine(res, gravity))
+    return Analysis(model, N)
+
+
+def critical_load_factor(analysis: Analysis, gravity: dict[str, float]) -> float:
+    """Elastic critical load factor α_cr of the ``gravity`` combination (EN 1993-1-1 5.2.1):
+    smallest λ with (K + λ K_G) φ = 0."""
+    res = {c: analysis.static(c) for c in gravity}
+    N = axial_forces(analysis.combine(res, gravity))
+    dm, a = analysis.dofmap, analysis.active
+    KG = np.zeros((dm.n, dm.n))
+    for e, (ids, T) in zip(analysis.elements, analysis._gath):
+        n = N[e.member.id]
+        if not n:
+            continue
+        g = geometric_stiffness(n, e.Lf)
+        if e.released:  # hinged ends: consistent with the condensed element
+            g = np.where(np.isin(np.arange(12), e.released)[:, None]
+                         | np.isin(np.arange(12), e.released)[None, :], 0.0, g)
+        g = e.T.T @ e.H.T @ g @ e.H @ e.T
+        KG[np.ix_(ids, ids)] += T.T @ g @ T
+    K = analysis.K[np.ix_(a, a)]
+    G = KG[np.ix_(a, a)]
+    lam = np.linalg.eigvals(np.linalg.solve(K, -G))
+    lam = np.real(lam[np.abs(np.imag(lam)) < 1e-9 * np.abs(lam).max()])
+    pos = lam[lam > 1e-12]
+    if not len(pos):
+        return float("inf")
+    return float(1.0 / pos.max())

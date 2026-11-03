@@ -161,6 +161,8 @@ class Member:
     beta: float = 0.0
     hinge_i: bool = False  # moment release (My, Mz) at end i
     hinge_j: bool = False
+    offset_i: float = 0.0  # rigid end zone at end i, mm along the member (e.g. half a wall)
+    offset_j: float = 0.0
 
 
 @dataclass
@@ -321,6 +323,10 @@ class Model:
                                          ref=f"member {m.id}", m=m.id, n=end)
             if m.i == m.j or self.length(m) < 1.0:
                 raise StructureError("Member {m} has zero length — its two ends coincide",
+                                     ref=f"member {m.id}", m=m.id)
+            if m.offset_i < 0 or m.offset_j < 0 or \
+                    m.offset_i + m.offset_j > 0.9 * self.length(m):
+                raise StructureError("Member {m}: the rigid end zones are longer than the member",
                                      ref=f"member {m.id}", m=m.id)
             s, mat = m.section, m.material
             for name, v in (("A", s.A), ("Iy", s.Iy), ("Iz", s.Iz), ("J", s.J), ("E", mat.E)):
