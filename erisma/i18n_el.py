@@ -553,4 +553,38 @@ EL: dict[str, str] = {
     "Use thicker lagging boards or reduce the pile spacing.": "Χρησιμοποιήστε παχύτερες σανίδες ή μειώστε την απόσταση των πασσάλων.",
     "Use anchors with a higher design resistance (longer grout body / larger tendon) or reduce the pile spacing.":
         "Χρησιμοποιήστε αγκύρια μεγαλύτερης αντοχής (μακρύτερη ρίζα / ισχυρότερο τένοντα) ή μειώστε την απόσταση των πασσάλων.",
+    # ------------------------------------------------------ step & shear key
+    "Stem step": "Κλιμάκωση κορμού (step)", "Stepped stem (thicker lower part)": "Κλιμακωτός κορμός (παχύτερο κάτω τμήμα)",
+    "Thicken the lower part of the stem where the moments are largest.": "Πάχυνση του κάτω τμήματος του κορμού, εκεί όπου οι ροπές είναι μέγιστες.",
+    "Height of the step above the base": "Ύψος της κλιμάκωσης πάνω από τη βάση",
+    "Stem thickness below the step": "Πάχος κορμού κάτω από την κλιμάκωση",
+    "Above the step the stem tapers from 'thickness at base' to 'thickness at top'.":
+        "Πάνω από την κλιμάκωση ο κορμός μεταβάλλεται από το «πάχος στη βάση» έως το «πάχος στην κορυφή».",
+    "Shear key": "Δόντι (shear key)", "Shear key under the base": "Δόντι κάτω από τη βάση",
+    "A downstand under the base that mobilises passive resistance against sliding.":
+        "Προεξοχή κάτω από τη βάση που ενεργοποιεί παθητική αντίσταση έναντι ολίσθησης.",
+    "Key position (front face, from the toe)": "Θέση δοντιού (εμπρός παρειά, από το πόδι)",
+    "Usually under the stem or just behind it.": "Συνήθως κάτω από τον κορμό ή λίγο πίσω από αυτόν.",
+    "Key width": "Πλάτος δοντιού", "Key depth below the base": "Βάθος δοντιού κάτω από τη βάση",
+    "Shear key bars Ø": "Ράβδοι δοντιού Ø", "Shear key bar spacing": "Απόσταση ράβδων δοντιού",
+    "The stem below the step must be thicker than the stem above it (thickness at base)":
+        "Ο κορμός κάτω από την κλιμάκωση πρέπει να είναι παχύτερος από τον κορμό πάνω από αυτήν (πάχος στη βάση)",
+    "The step must be lower than the top of the stem": "Η κλιμάκωση πρέπει να είναι χαμηλότερα από την κορυφή του κορμού",
+    "The shear key must lie under the base": "Το δόντι πρέπει να βρίσκεται κάτω από τη βάση",
+    "Shear key position from the toe": "Θέση δοντιού από το πόδι", "Shear key width": "Πλάτος δοντιού",
+    "Shear key depth below the base": "Βάθος δοντιού κάτω από τη βάση", "Base friction": "Τριβή βάσης",
+    "Passive coefficient in front of the shear key": "Συντελεστής παθητικών ωθήσεων μπροστά από το δόντι",
+    "Passive resistance on the key face (D₁ = {d1:.2f} m, D₂ = {d2:.2f} m, soil over the toe ignored)":
+        "Παθητική αντίσταση στην παρειά του δοντιού (D₁ = {d1:.2f} m, D₂ = {d2:.2f} m, το έδαφος πάνω από το πόδι αγνοείται)",
+    "Sliding resistance with shear key": "Αντίσταση σε ολίσθηση με δόντι",
+    "Make the shear key deeper, increase the base width (heel) or improve drainage to remove water pressure.":
+        "Βαθύνετε το δόντι, αυξήστε το πλάτος της βάσης (πτέρνα) ή βελτιώστε την αποστράγγιση ώστε να μηδενιστεί η πίεση του νερού.",
+    "Stem at the step (z = {z:.2f} m above the base)": "Κορμός στη στάθμη της κλιμάκωσης (z = {z:.2f} m πάνω από τη βάση)",
+    "The stem bars must be anchored past the step (lap / anchorage length to EN 1992-1-1 8.4 and 8.7).":
+        "Οι ράβδοι του κορμού πρέπει να αγκυρώνονται πέρα από την κλιμάκωση (μήκος αγκύρωσης / υπερκάλυψης κατά EN 1992-1-1 8.4 και 8.7).",
+    "Shear key: the design force is the passive resistance that has to be mobilised for sliding equilibrium in the governing combination (F = H_d − R_h,base ≤ P_p,key).":
+        "Δόντι: δύναμη σχεδιασμού είναι η παθητική αντίσταση που πρέπει να ενεργοποιηθεί για την ισορροπία έναντι ολίσθησης στον κρίσιμο συνδυασμό (F = H_d − R_h,base ≤ P_p,key).",
+    "Shear key (at the underside of the base)": "Δόντι (στην κάτω παρειά της βάσης)",
+    "Shear key passive resistance": "Παθητική αντίσταση δοντιού",
+    "shear key: P_p = {p:.0f} kN/m (char.)": "δόντι: P_p = {p:.0f} kN/m (χαρακτ.)",
 }

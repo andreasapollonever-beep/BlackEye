@@ -87,3 +87,39 @@ def test_doubly_reinforced_beam():
     MRd, x = section_capacity(300, d, 4 * math.pi * 25**2 / 4, fcd, fyd, d2,
                               3 * math.pi * 16**2 / 4)
     assert v["M_Rd"] == pytest.approx(MRd)
+
+
+# ------------------------------------------------------------ stem step & shear key
+from erisma.modules.ec7_retaining_wall import CantileverGeometry  # noqa: E402
+
+
+def test_stepped_stem_geometry_and_checks():
+    inp = WALL.parse_inputs({"step": True, "h_step": 1.5, "t_low": 0.55})
+    g = CantileverGeometry(inp)
+    a, _, _ = poly_props(g.stem_poly)
+    assert a / 1e6 == pytest.approx(0.55 * 1.5 + (0.40 + 0.25) / 2 * 2.5)
+    a, _, _ = poly_props(g.back_soil)  # soil on the ledge of the step is included
+    assert a / 1e6 == pytest.approx(2.2 * 4 + 0.15 * 2.5 + 0.15 * 2.5 / 2)
+    assert g.B == pytest.approx(1000 + 550 + 2200)
+    c = WALL.calculate({"step": True})
+    titles = [i.data["text"] for i in c.items if i.kind == "heading"]
+    assert any("step" in t for t in titles)
+
+
+def test_shear_key_adds_rankine_passive_to_sliding():
+    c0 = WALL.calculate({"seismic": False, "approach": "DA2"})
+    c1 = WALL.calculate({"seismic": False, "approach": "DA2", "key": True, "key_h": 0.5})
+    phi = math.radians(32)
+    Kp = math.tan(math.pi / 4 + phi / 2) ** 2
+    D1, D2 = 500.0, 1000.0
+    Pp = 0.5 * Kp * 19e-6 * (D2**2 - D1**2) / 1.4  # γ_R,e = 1.4 in DA2
+    assert c1.values["K_p"] == pytest.approx(Kp)
+    assert c1.values["P_p,key"] == pytest.approx(Pp)
+    assert c1.values["R_h,d"] > c0.values["R_h,d"]
+    assert any(o["layer"] == "key" for o in c1.model3d["objects"])
+
+
+def test_shear_key_outside_base_rejected():
+    with pytest.raises(InputError) as e:
+        WALL.calculate({"key": True, "key_x": 9})
+    assert e.value.field == "key_x"

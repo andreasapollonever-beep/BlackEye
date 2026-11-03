@@ -18,8 +18,8 @@ from ..core import Calculation, DesignModule, Field, InputError
 from ..core.units import from_base
 from ..report.scene3d import PALETTE, Scene3D
 from ..report.svg import wall_section
-from .geotech import (bearing_factors, clip_z, k_mononobe_okabe, ka_coulomb,
-                      linear_resultant, poly_props)
+from .geotech import (bearing_factors, clip_z, k_mononobe_okabe, ka_coulomb, kp_rankine,
+                      kp_seismic, linear_resultant, poly_props)
 
 GAMMA_W = 9.81e-6  # N/mm³
 
@@ -37,6 +37,8 @@ HINT_SLIDING = ("Increase the base width (longer heel adds stabilising soil weig
                 "shear key below the base, or improve drainage to remove water pressure.")
 HINT_BEARING = ("Increase the base width or the toe length to spread the load and bring the "
                 "resultant closer to the centre of the base.")
+HINT_SLIDING_KEY = ("Make the shear key deeper, increase the base width (heel) or improve "
+                    "drainage to remove water pressure.")
 HINT_ECC = ("Lengthen the toe (or heel) so that the resultant falls inside the middle part of "
             "the base.")
 HINT_OVT = "Increase the toe length or the heel length (more soil weight behind the wall)."
@@ -114,6 +116,8 @@ class WallGeometry:
         self.gb, self.gsat, self.gf = inp["gamma_b"], inp["gamma_sat"], inp["gamma_f"]
         self.hw, self.L = inp["h_w"], inp["length"]
 
+    key: dict | None = None  # shear key {"x": front face, "b": width, "h": depth} (mm)
+
     def finish(self) -> None:
         self.hv = self.top + (self.B - self.x0) * math.tan(self.beta)
         self.far = self.B + max(2000.0, 0.6 * self.hv)
@@ -123,9 +127,14 @@ class WallGeometry:
         return self.top + max(x - self.x0, 0) * math.tan(self.beta)
 
     @property
+    def back_face(self) -> list:
+        """Back face of the wall from the top down to the base (x, z)."""
+        return [(self.x0, self.top), (self.xbb, self.tb)]
+
+    @property
     def back_soil(self) -> list:
-        pts = [(self.xbb, self.tb), (self.B, self.tb), (self.B, self.zs(self.B)),
-               (self.x0, self.top)]
+        pts = [(self.xbb, self.tb), (self.B, self.tb), (self.B, self.zs(self.B))] + \
+            self.back_face[:-1]
         out = []
         for p in pts:
             if not out or abs(p[0] - out[-1][0]) + abs(p[1] - out[-1][1]) > 1e-9:
@@ -223,7 +232,7 @@ class WallModule(DesignModule):
 
     @classmethod
     def structural(cls, calc: Calculation, g: WallGeometry, inp: dict,
-                   weights: list[Comp], seis: dict | None) -> None:
+                   weights: list[Comp], seis: dict | None, gov: dict | None = None) -> None:
         pass
 
     # ---------------------------------------------------------------- run
@@ -268,7 +277,7 @@ class WallModule(DesignModule):
         if inp["seismic"] and inp["ag"] > 0:
             seis = cls._seismic(calc, g, inp, weights, gov)
 
-        cls.structural(calc, g, inp, weights, seis)
+        cls.structural(calc, g, inp, weights, seis, gov)
 
         pressures = cls._pressure_profiles(g, inp, seis)
         calc.model3d = cls._scene(calc, g, inp, weights, pressures, gov)
@@ -373,9 +382,25 @@ class WallModule(DesignModule):
         calc.table(["Action", "γ_H", "H_d [kN/m]", "z [m]", "γ_V", "V_d [kN/m]", "x [m]"],
                    rows, caption=caption)
 
+    @staticmethod
+    def _key_passive(g: WallGeometry, phi_d: float, theta: float = 0.0) -> tuple:
+        """Passive resistance on the front face of the shear key (per mm run).
+
+        Soil over the toe is ignored (allowance for unplanned excavation,
+        EN 1997-1 9.3.2.2), so the passive wedge starts at the base underside.
+        """
+        D1 = g.tb
+        D2 = D1 + g.key["h"]
+        Kp = kp_seismic(phi_d, theta) if theta else kp_rankine(phi_d)
+        P = 0.5 * Kp * g.gf * (D2**2 - D1**2)
+        p1, p2 = Kp * g.gf * D1, Kp * g.gf * D2
+        lever = g.key["h"] * (p1 + 2 * p2) / (3 * (p1 + p2))  # below the base underside
+        return {"Kp": Kp, "P": P, "D1": D1, "D2": D2, "p1": p1, "p2": p2,
+                "lever": lever}, p1, p2
+
     @classmethod
     def _stability(cls, calc, g, inp, name, comps, gu, gf, gq, gphi, gc, gRv, gRh,
-                   gov) -> None:
+                   gov, theta: float = 0.0) -> None:
         t = factored(comps, gu, gf, gq)
         cls._table(calc, t, calc.tr("{name} — design actions (vertical actions favourable)",
                                     name=name))
@@ -386,10 +411,29 @@ class WallModule(DesignModule):
         tan_db = calc.formula("tan δ_d", "k tan φ'_f,d", inp["k_base"] * math.tan(phi_fd), "",
                               ref="EN 1997-1 6.5.3(10)", dp=4)
         Hd = calc.formula("H_d", "Σ H_d", t.H, "kN/m", "Design horizontal action")
-        Rh = calc.formula("R_h,d", "V'_d tan δ_d / γ_R,h", max(t.V, 0) * tan_db / gRh, "kN/m",
-                          "Sliding resistance", ref="Eq. 6.3a")
+        R_base = max(t.V, 0) * tan_db / gRh
+        if g.key:
+            Rb = calc.formula("R_h,base", "V'_d tan δ_d / γ_R,h", R_base, "kN/m",
+                              "Base friction", ref="Eq. 6.3a")
+            Pp, _, _ = cls._key_passive(g, phi_fd, theta)
+            gRe = 1.4 if name == "DA2" else 1.0
+            calc.formula("K_p", "tan²(45° + φ'_f,d/2)" if not theta else
+                              "EN 1998-5 Eq. E.4", Pp["Kp"], "", "Passive coefficient in "
+                              "front of the shear key", ref="EN 1997-1 Annex C", dp=3)
+            Pd = calc.formula("P_p,key", "½ K_p γ (D₂² − D₁²) / γ_R,e", Pp["P"] / gRe, "kN/m",
+                              calc.tr("Passive resistance on the key face (D₁ = {d1:.2f} m, "
+                                      "D₂ = {d2:.2f} m, soil over the toe ignored)",
+                                      d1=from_base(Pp["D1"], "m"), d2=from_base(Pp["D2"], "m")),
+                              ref="EN 1997-1 9.5")
+            Rh = calc.formula("R_h,d", "R_h,base + P_p,key", Rb + Pd, "kN/m",
+                              "Sliding resistance with shear key")
+            gov["key_force"] = max(gov.get("key_force", 0.0), min(Pd, max(Hd - Rb, 0.0)))
+            gov["key_lever"] = Pp["lever"]
+        else:
+            Rh = calc.formula("R_h,d", "V'_d tan δ_d / γ_R,h", R_base, "kN/m",
+                              "Sliding resistance", ref="Eq. 6.3a")
         calc.check(calc.tr("{name} sliding: H_d ≤ R_h,d", name=name), Hd, Rh, "kN/m",
-                   "EN 1997-1 6.5.3", hint=HINT_SLIDING)
+                   "EN 1997-1 6.5.3", hint=HINT_SLIDING_KEY if g.key else HINT_SLIDING)
         Nq, Nc, Ng = bearing_factors(phi_fd)
         best = None
         for label, mv in (("max V", True), ("min V", False)):
@@ -511,7 +555,7 @@ class WallModule(DesignModule):
                      "Dynamic increment, applied at mid-height of the virtual back",
                      ref="E.9(3)")
         cls._stability(calc, g, inp, calc.tr("Seismic"), result["comps"], 1, 1, 1, gphi, 1.25,
-                       1.0, 1.0, gov)
+                       1.0, 1.0, gov, theta=result["theta"])
         t = result["t"]
         calc.check("Seismic overturning: M_dst ≤ M_stb", t.M_dst, t.M_stb, "kNm/m",
                    "EN 1998-5 7.3.1", hint=HINT_OVT)
@@ -545,8 +589,8 @@ class WallModule(DesignModule):
     def _outline(g: WallGeometry) -> dict:
         m = lambda P: [(from_base(x, "m"), from_base(z, "m")) for x, z in P]  # noqa: E731
         far = g.far
-        back = [(g.xbb, g.tb), (g.B, g.tb), (g.B, 0), (far, 0), (far, g.zs(far)),
-                (g.x0, g.top)]
+        back = [(g.xbb, g.tb), (g.B, g.tb), (g.B, 0), (far, 0), (far, g.zs(far))] + \
+            g.back_face[:-1]
         front = None
         if g.df > 0:
             front = [(-1500, 0), (0, 0), (0, g.tb), (g.x_front, g.tb),
@@ -638,6 +682,23 @@ class WallModule(DesignModule):
                                        b=from_base(gov["B_eff"], "m")),
                      (rx, -1.05, 0), "result")
 
+        if g.key:
+            sc.layer("key", "Shear key passive resistance")
+            Pp, p1, p2 = cls._key_passive(g, math.radians(inp["phi_f"]))
+            xk, hk = from_base(g.key["x"], "m"), from_base(g.key["h"], "m")
+            p1k, p2k = from_base(p1, "kN/m²"), from_base(p2, "kN/m²")
+            sk = max(0.6, 0.6 * hk * 2) / max(p2k, 1e-6)
+            poly = [(xk, 0), (xk - p1k * sk, 0), (xk - p2k * sk, -hk), (xk, -hk)]
+            sc.prism("key", poly, L * 0.98, PALETTE["bearing"], opacity=0.25)
+            for j in range(5):
+                zz = -L / 2 + L * (j + 0.5) / 5
+                for i in range(3):
+                    y = -hk * (i + 0.5) / 3
+                    ln = (p1k + (p2k - p1k) * (-y) / hk) * sk
+                    sc.arrow("key", (xk - ln, y, zz), (1, 0, 0), ln, PALETTE["bearing"], 0.08)
+            sc.label("key", calc.tr("shear key: P_p = {p:.0f} kN/m (char.)",
+                                    p=from_base(Pp["P"], "kN/m")), (xk - p2k * sk, -hk, L / 2),
+                     "bearing")
         chars, _ = cls._thrust(calc, g, inp, 1.0, record=False)
         allf = weights + chars
         fmax = max([math.hypot(from_base(c.H, "kN/m"), from_base(c.V, "kN/m"))

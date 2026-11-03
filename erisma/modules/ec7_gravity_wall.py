@@ -94,7 +94,7 @@ class GravityWallEC7(WallModule):
                      "Height of virtual back (through rear edge of base)")
 
     @classmethod
-    def structural(cls, calc, g: GravityGeometry, inp, weights, seis) -> None:
+    def structural(cls, calc, g: GravityGeometry, inp, weights, seis, gov=None) -> None:
         fck = float(inp["concrete"].split("/")[0][1:])
         fcd = calc.formula("f_cd,pl", "α_cc,pl f_ck / γ_c", 0.8 * fck / 1.5, "N/mm²",
                            "Design compressive strength, plain concrete", ref="EN 1992-1-1 12.3.1")

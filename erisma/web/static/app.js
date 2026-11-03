@@ -174,15 +174,27 @@ function renderForm() {
       if (f.kind === "table") { fs.append(tableEditor(f)); continue; }
       if (!(f.name in state.inputs)) state.inputs[f.name] = f.default;
       const id = `f-${f.name}`;
-      const input = scalarInput(f, state.inputs[f.name], (v) => { state.inputs[f.name] = v; clearInvalid(); schedule(); });
+      const input = scalarInput(f, state.inputs[f.name], (v) => {
+        state.inputs[f.name] = v; clearInvalid(); if (f.kind === "bool") updateVisibility(); schedule();
+      });
       input.id = id;
-      const row = el("div", { class: "field", "data-name": f.name }, el("label", { for: id }, f.label),
+      const row = el("div", { class: "field", "data-name": f.name, "data-show-if": f.show_if || null }, el("label", { for: id }, f.label),
         el("div", { class: "inp" }, input, el("span", {}, f.unit || "")));
       if (f.help) row.append(el("div", { class: "help" }, f.help));
       fs.append(row);
     }
     form.append(fs);
   }
+  updateVisibility();
+}
+
+// Fields with show_if appear only when their switch is on (keeps the form short).
+function updateVisibility() {
+  document.querySelectorAll("#inputs [data-show-if]").forEach((row) => {
+    const on = !!state.inputs[row.dataset.showIf];
+    row.hidden = !on;
+    row.classList.toggle("sub", on);
+  });
 }
 
 function clearInvalid() {

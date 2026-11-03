@@ -9,7 +9,7 @@ import numpy as np
 from ..core import Calculation, Field, InputError, register
 from ..core.units import from_base
 from ..design.ec2 import bar_area, design_flexure, section_capacity, shear_no_links
-from ..design.geotech import ka_coulomb, poly_props
+from ..design.geotech import clip_z, ka_coulomb, poly_props
 from ..design.walls import (GAMMA_W, Totals, WallGeometry, WallModule, factored,
                             soil_fields)
 
@@ -24,19 +24,38 @@ class CantileverGeometry(WallGeometry):
         self.Hs, self.t_top, self.t_bot = inp["H_stem"], inp["t_top"], inp["t_bot"]
         self.tb, self.toe, self.heel = inp["t_base"], inp["toe"], inp["heel"]
         self.df = inp["d_front"]
-        self.B = self.toe + self.t_bot + self.heel
+        self.step = bool(inp.get("step"))
+        self.h_step = inp["h_step"] if self.step else 0.0
+        self.t_low = inp["t_low"] if self.step else self.t_bot
+        self.B = self.toe + self.t_low + self.heel
         self.top = self.tb + self.Hs
         self.x0 = self.toe + self.t_top
-        self.xb = self.xbb = self.toe + self.t_bot
+        self.xb = self.xbb = self.toe + self.t_low
         self.x_front = self.toe
         self.gc = inp["gamma_c"]
         self.concrete = [("Stem", self.stem_poly), ("Base", self.base_poly)]
+        if inp.get("key"):
+            self.key = {"x": inp["key_x"], "b": inp["key_b"], "h": inp["key_h"]}
+            k = self.key
+            self.concrete.append(("Shear key", [(k["x"], 0), (k["x"] + k["b"], 0),
+                                                (k["x"] + k["b"], -k["h"]), (k["x"], -k["h"])]))
         self.finish()
 
     @property
+    def z_step(self) -> float:
+        return self.tb + self.h_step
+
+    @property
+    def back_face(self):
+        if not self.step:
+            return [(self.x0, self.top), (self.xb, self.tb)]
+        xs = self.toe + self.t_bot
+        return [(self.x0, self.top), (xs, self.z_step), (self.xb, self.z_step),
+                (self.xb, self.tb)]
+
+    @property
     def stem_poly(self):
-        return [(self.toe, self.tb), (self.xb, self.tb), (self.x0, self.tb + self.Hs),
-                (self.toe, self.tb + self.Hs)]
+        return [(self.toe, self.tb)] + self.back_face[::-1] + [(self.toe, self.top)]
 
     @property
     def base_poly(self):
@@ -94,6 +113,23 @@ class RetainingWallEC7(WallModule):
         Field("d_front", "Soil depth over toe", "m", 0.50, min=0, group="Geometry",
               help="Depth of soil in front of the wall above the top of the base."),
         Field("length", "Wall length (3D view)", "m", 8.0, min=1, group="Geometry"),
+        Field("step", "Stepped stem (thicker lower part)", kind="bool", default=False,
+              group="Stem step",
+              help="Thicken the lower part of the stem where the moments are largest."),
+        Field("h_step", "Height of the step above the base", "m", 1.5, min=0.2,
+              group="Stem step", show_if="step"),
+        Field("t_low", "Stem thickness below the step", "m", 0.55, min=0.2, group="Stem step",
+              show_if="step", help="Above the step the stem tapers from 'thickness at base' "
+                                   "to 'thickness at top'."),
+        Field("key", "Shear key under the base", kind="bool", default=False, group="Shear key",
+              help="A downstand under the base that mobilises passive resistance against "
+                   "sliding."),
+        Field("key_x", "Key position (front face, from the toe)", "m", 1.0, min=0,
+              group="Shear key", show_if="key",
+              help="Usually under the stem or just behind it."),
+        Field("key_b", "Key width", "m", 0.40, min=0.2, group="Shear key", show_if="key"),
+        Field("key_h", "Key depth below the base", "m", 0.50, min=0.2, max=2.0,
+              group="Shear key", show_if="key"),
     ] + soil_fields() + [
         Field("concrete", "Concrete class", kind="choice", choices=CONCRETE, default="C30/37",
               group="Concrete"),
@@ -110,13 +146,26 @@ class RetainingWallEC7(WallModule):
         Field("toe_dia", "Toe bottom bars Ø", kind="choice", choices=BARS, default="12",
               group="Reinforcement"),
         Field("toe_s", "Toe bar spacing", "mm", 150.0, min=75, max=400, group="Reinforcement"),
+        Field("key_dia", "Shear key bars Ø", kind="choice", choices=BARS, default="12",
+              group="Reinforcement", show_if="key"),
+        Field("key_s", "Shear key bar spacing", "mm", 200.0, min=75, max=400,
+              group="Reinforcement", show_if="key"),
     ]
 
     @classmethod
     def make_geometry(cls, inp: dict) -> CantileverGeometry:
         if inp["t_bot"] < inp["t_top"]:
             raise InputError("Stem thickness at base must be ≥ thickness at top", "t_bot")
-        return CantileverGeometry(inp)
+        if inp["step"]:
+            if inp["t_low"] <= inp["t_bot"]:
+                raise InputError("The stem below the step must be thicker than the stem above "
+                                 "it (thickness at base)", "t_low")
+            if inp["h_step"] >= inp["H_stem"]:
+                raise InputError("The step must be lower than the top of the stem", "h_step")
+        g = CantileverGeometry(inp)
+        if g.key and g.key["x"] + g.key["b"] > g.B + 1e-6:
+            raise InputError("The shear key must lie under the base", "key_x")
+        return g
 
     @classmethod
     def record_geometry(cls, calc: Calculation, g: CantileverGeometry, inp: dict) -> None:
@@ -127,13 +176,22 @@ class RetainingWallEC7(WallModule):
         calc.input("t_b", g.tb, "m", "Base thickness")
         calc.input("b_toe", g.toe, "m", "Toe length")
         calc.input("b_heel", g.heel, "m", "Heel length")
-        calc.formula("B", "b_toe + t_bot + b_heel", g.B, "m", "Base width")
+        if g.step:
+            calc.input("h_step", g.h_step, "m", "Height of the step above the base")
+            calc.input("t_low", g.t_low, "m", "Stem thickness below the step")
+            calc.formula("B", "b_toe + t_low + b_heel", g.B, "m", "Base width")
+        else:
+            calc.formula("B", "b_toe + t_bot + b_heel", g.B, "m", "Base width")
+        if g.key:
+            calc.input("x_key", g.key["x"], "m", "Shear key position from the toe")
+            calc.input("b_key", g.key["b"], "m", "Shear key width")
+            calc.input("h_key", g.key["h"], "m", "Shear key depth below the base")
         calc.input("β", inp["beta"], "°", "Backfill slope")
         calc.formula("h_v", "t_b + H_stem + (B − b_toe − t_top) tan β", g.hv, "m",
                      "Height of virtual back (through heel)")
 
     @classmethod
-    def structural(cls, calc, g, inp, weights, seis) -> None:
+    def structural(cls, calc, g, inp, weights, seis, gov=None) -> None:
         fck = float(inp["concrete"].split("/")[0][1:])
         fcd = fck / 1.5
         fyk = inp["fyk"]
@@ -150,12 +208,12 @@ class RetainingWallEC7(WallModule):
         calc.formula("K_a,h", "K_a(φ'_k, β) cos β", Ka_s, "", "Horizontal active coefficient "
                      "on stem", dp=4)
 
-        # ---- stem forces at the top of the base
-        def stem_forces(Kh, fG, fQ, q, extra=None):
-            zs = np.linspace(g.tb, g.tb + g.Hs, 401)
-            depth = g.tb + g.Hs - zs
-            if g.hw > g.tb:
-                dw = max(g.tb + g.Hs - g.hw, 0)
+        # ---- stem forces at a horizontal section z0 (pressure on the stem above z0)
+        def stem_forces(z0, Kh, fG, fQ, q, extra=None):
+            zs = np.linspace(z0, g.top, 401)
+            depth = g.top - zs
+            if g.hw > z0:
+                dw = max(g.top - g.hw, 0)
                 sv = np.where(zs >= g.hw, g.gb * depth,
                               g.gb * dw + (g.gsat - GAMMA_W) * (depth - dw))
                 pw = np.where(zs < g.hw, GAMMA_W * (g.hw - zs), 0.0)
@@ -163,7 +221,7 @@ class RetainingWallEC7(WallModule):
                 sv = g.gb * depth
                 pw = np.zeros_like(zs)
             p = fG * (Kh * sv + pw) + fQ * Kh * q
-            lever = zs - g.tb
+            lever = zs - z0
             V = np.trapezoid(p, zs)
             M = np.trapezoid(p * lever, zs)
             if extra:
@@ -171,23 +229,35 @@ class RetainingWallEC7(WallModule):
                 M += extra[1]
             return M, V
 
-        M_p, V_p = stem_forces(Ka_s, 1.35, 1.5, inp["q"])
-        M_s = V_s = 0.0
-        if seis:
-            kvs, Kae, kh = seis["kvs"], seis["Kae"], seis["kh"]
-            Ka_d = seis["Ka"]
-            dE = max(0.5 * g.gb * (1 + kvs) * Kae * g.Hs**2 - 0.5 * g.gb * Ka_d * g.Hs**2, 0)
-            Ws, _, zc = poly_props(g.stem_poly)
-            Ws *= g.gc
-            dE *= math.cos(beta)
-            extra = (dE + kh * Ws + Kae * inp["psi2"] * inp["q"] * g.Hs,
-                     dE * g.Hs / 2 + kh * Ws * (zc - g.tb)
-                     + Kae * inp["psi2"] * inp["q"] * g.Hs**2 / 2)
-            M_s, V_s = stem_forces(Ka_d * math.cos(beta), 1.0, 0.0, 0.0, extra)
+        def stem_section(z0):
+            M_p, V_p = stem_forces(z0, Ka_s, 1.35, 1.5, inp["q"])
+            M_s = V_s = 0.0
+            if seis:
+                kvs, Kae, kh = seis["kvs"], seis["Kae"], seis["kh"]
+                Ka_d = seis["Ka"]
+                h = g.top - z0
+                dE = max(0.5 * g.gb * (1 + kvs) * Kae * h**2 - 0.5 * g.gb * Ka_d * h**2, 0)
+                Ws, _, zc = poly_props(clip_z(g.stem_poly, z0, keep_below=False))
+                Ws *= g.gc
+                dE *= math.cos(beta)
+                extra = (dE + kh * Ws + Kae * inp["psi2"] * inp["q"] * h,
+                         dE * h / 2 + kh * Ws * (zc - z0)
+                         + Kae * inp["psi2"] * inp["q"] * h**2 / 2)
+                M_s, V_s = stem_forces(z0, Ka_d * math.cos(beta), 1.0, 0.0, 0.0, extra)
+            return M_p, V_p, M_s, V_s
 
-        cls._member(calc, "Stem (at top of base, earth face in tension)", g.t_bot,
+        M_p, V_p, M_s, V_s = stem_section(g.tb)
+        cls._member(calc, "Stem (at top of base, earth face in tension)", g.t_low,
                     inp["cover_stem"], float(inp["stem_dia"]), inp["stem_s"],
                     max(M_p, M_s), max(V_p, V_s), M_p, M_s, fck, fcd, fyk, fyd)
+        if g.step:
+            M_p, V_p, M_s, V_s = stem_section(g.z_step)
+            cls._member(calc, calc.tr("Stem at the step (z = {z:.2f} m above the base)",
+                                      z=from_base(g.h_step, "m")), g.t_bot,
+                        inp["cover_stem"], float(inp["stem_dia"]), inp["stem_s"],
+                        max(M_p, M_s), max(V_p, V_s), M_p, M_s, fck, fcd, fyk, fyd)
+            calc.note("The stem bars must be anchored past the step (lap / anchorage length "
+                      "to EN 1992-1-1 8.4 and 8.7).")
 
         # ---- heel and toe from linear base pressure
         thrust, _ = cls._thrust(None, g, inp, 1.0, record=False)
@@ -206,6 +276,15 @@ class RetainingWallEC7(WallModule):
                     inp["cover_base"], float(inp["toe_dia"]), inp["toe_s"],
                     max(toe_p, toe_s), max(abs(vtoe_p), abs(vtoe_s)), toe_p, toe_s,
                     fck, fcd, fyk, fyd)
+        if g.key:
+            F = (gov or {}).get("key_force", 0.0)
+            calc.text("Shear key: the design force is the passive resistance that has to be "
+                      "mobilised for sliding equilibrium in the governing combination "
+                      "(F = H_d − R_h,base ≤ P_p,key).")
+            M_k = F * (gov or {}).get("key_lever", g.key["h"] / 2)
+            cls._member(calc, "Shear key (at the underside of the base)", g.key["b"],
+                        inp["cover_base"], float(inp["key_dia"]), inp["key_s"], M_k, F, M_k, 0.0,
+                        fck, fcd, fyk, fyd)
 
     @staticmethod
     def _member(calc, title, h, cover, dia, s, M, V, M_p, M_s, fck, fcd, fyk, fyd) -> None:

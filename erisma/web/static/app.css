@@ -138,3 +138,5 @@ padding:14px;display:flex;flex-direction:column;gap:8px;transition:box-shadow .1
 .badge3d{font-size:11px;font-weight:700;color:#fff;background:var(--accent2);border-radius:4px;padding:1px 6px}
 .card.last{border-color:var(--accent2)}
 .empty{color:var(--muted);padding:20px 0}
+.field[hidden]{display:none}
+.field.sub{border-left:3px solid #cfe0f1;padding-left:8px;margin-left:2px}
