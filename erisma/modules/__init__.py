@@ -8,6 +8,7 @@ from . import (  # noqa: F401
     ec3_steel_column,
     ec1_wind_snow,
     ec8_lateral_force,
+    ec8_3_assessment,
     en1990_combinations,
     ec7_berlin_wall,
     ec7_embedded_wall,

@@ -97,6 +97,10 @@ class Annex:
                                                7: 1.12, 10: 1.08})
     # 7.6.2.3(8) "alternative method": minimum model factor on γ_b, γ_s (None = not set)
     pile_model_min: float | None = None
+    # EN 1998-3 2.1(3)P: return periods [years] of the limit states NC, SD, DL
+    ec83_return: dict = field(default_factory=lambda: {"NC": 2475, "SD": 475, "DL": 225})
+    # EN 1998-3 2.2.1(7)P: brittle primary elements use the partial factors of EN 1998-1
+    ec83_brittle_partial: bool = True
     # EN 1992-3 9.11.1(102): minimum wall thickness t1 (class 0), t2 (classes 1, 2) [mm]
     tank_tmin: tuple = (120.0, 150.0)
     # EN 1997-1 Table A.15 — UPL: (γ_G,dst, γ_G,stb, γ_Q,dst)
@@ -149,6 +153,9 @@ CY = Annex(
     # NA to CYS EN 1997-1 NA 2.35 Tables A.6–A.8(CYS): R2 γb = γs = γt = 1.1, γs,t = 1.15;
     # NA 2.36 Tables A.9–A.11(CYS) = EN ξ values; NA 2.19: model factor ≥ 1.25.
     pile_model_min=1.25,
+    # NA to CYS EN 1998-3: NA 2.2 return periods 2475/475/225 years, NA 2.3 partial factors
+    # of CYS EN 1998-1 for brittle primary elements, NA 2.4 Table 3.1(CYS) CF 1.35/1.20/1.00,
+    # NA 3.1 Annex A may be used.
     # NA to CYS EN 1997-1 NA 2.40 Table A.15(CYS) UPL 1.0/0.9/1.5 (= EN). NA to CYS
     # EN 1996-1-1 NA 2.1 Table 1(CYS) γ_M, NA 2.5 f_vk ≤ 0.065 f_b, NA 2.7 K_E = 1000,
     # NA 2.11 λ_c = 15 (= EN recommended). No CYS annex to EN 1995-1-1 or EN 1991-4 was

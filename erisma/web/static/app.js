@@ -264,7 +264,7 @@ function renderForm() {
       if (!(f.name in state.inputs)) state.inputs[f.name] = f.default;
       const id = `f-${f.name}`;
       const input = scalarInput(f, state.inputs[f.name], (v) => {
-        state.inputs[f.name] = v; clearInvalid(); if (f.kind === "bool") updateVisibility(); schedule();
+        state.inputs[f.name] = v; clearInvalid(); updateVisibility(); schedule();
       });
       input.id = id;
       const row = el("div", { class: "field", "data-name": f.name, "data-show-if": f.show_if || null }, el("label", { for: id }, f.label),
@@ -281,7 +281,9 @@ function renderForm() {
 // Fields with show_if appear only when their switch is on (keeps the form short).
 function updateVisibility() {
   document.querySelectorAll("#inputs [data-show-if]").forEach((row) => {
-    const on = !!state.inputs[row.dataset.showIf];
+    const cond = row.dataset.showIf;  // "switch" or "field=value"
+    const [k, v] = cond.split("=");
+    const on = v === undefined ? !!state.inputs[k] : String(state.inputs[k]) === v;
     row.hidden = !on;
     row.classList.toggle("sub", on);
   });
@@ -347,6 +349,7 @@ const PICS = {
   ec5_timber_beam: '<rect x="6" y="16" width="84" height="14" fill="#c8955a"/><path d="M6 21h84M6 25h84" stroke="#8a5a2b" stroke-width="1"/><path d="M10 30l-5 8h10zM86 30l-5 8h10z" fill="#9aa0a8" stroke="none"/>',
   ec6_masonry_wall: '<rect x="20" y="6" width="56" height="36" fill="#b5653e"/><path d="M20 15h56M20 24h56M20 33h56M34 6v9M58 6v9M46 15v9M70 15v9M34 24v9M58 24v9M46 33v9" stroke="#e6e0d6" stroke-width="1.2"/>',
   ec2_tank: '<path d="M14 8v34h68V8" stroke="#8a8f96" stroke-width="5" fill="none"/><rect x="17" y="16" width="62" height="24" fill="#2f8fd8" fill-opacity="0.45" stroke="none"/><path d="M17 16q8-3 16 0t16 0 16 0 14 0" stroke="#2f8fd8"/>',
+  ec8_3_assessment: '<rect x="38" y="4" width="20" height="40" fill="#b4b8bf"/><path d="M42 12l6 6-4 4 6 6" stroke="#e03b3b" stroke-width="2" fill="none"/><rect x="33" y="4" width="30" height="40" fill="none" stroke="#2e9b5f" stroke-width="2" stroke-dasharray="4 2"/>',
 };
 const pic = (id) => `<svg viewBox="0 0 96 48" fill="none" stroke="#334" stroke-width="2" stroke-linejoin="round">${PICS[id] || '<rect x="30" y="8" width="36" height="32" rx="4"/>'}</svg>`;
 
