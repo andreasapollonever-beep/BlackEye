@@ -274,8 +274,13 @@ def build(spec: BuildingSpec) -> tuple[Model, dict]:
         level = [node_id(i, j, k) for i in range(nx) for j in range(ny)
                  if node_id(i, j, k) in used]
         m.diaphragm(f"L{k}", level)
-    fbeams = _foundation(m, spec, xs, ys, wall_at, conc) if spec.foundation else {}
-    used = {mm.i for mm in m.members.values()} | {mm.j for mm in m.members.values()}
+    fbeams, raft = {}, None
+    if spec.foundation and spec.foundation.get("type") == "raft":
+        raft = _raft(m, spec, xs, ys, wall_at, conc)
+    elif spec.foundation:
+        fbeams = _foundation(m, spec, xs, ys, wall_at, conc)
+    used = {mm.i for mm in m.members.values()} | {mm.j for mm in m.members.values()} | \
+        {n for p in m.plates.values() for n in p.nodes}
     for nid in [n for n in m.nodes if n not in used]:
         del m.nodes[nid]
     area = sum((xs[i + 1] - xs[i]) * (ys[j + 1] - ys[j]) for i in range(nx - 1)
@@ -283,7 +288,8 @@ def build(spec: BuildingSpec) -> tuple[Model, dict]:
     info = {"xs": xs, "ys": ys, "zs": zs, "columns": columns, "walls": walls,
             "wall_spec": wall_at, "beams_x": beams_x,
             "beams_y": beams_y, "concrete": conc, "col": col, "beam": beam,
-            "plan_area": area, "sizes": sizes, "openings": openings, "fbeams": fbeams}
+            "plan_area": area, "sizes": sizes, "openings": openings, "fbeams": fbeams,
+            "raft": raft}
     return m, info
 
 
@@ -352,3 +358,75 @@ def _foundation(m: Model, spec: BuildingSpec, xs, ys, wall_at, conc) -> dict[str
         s = m.support(nid, "free", springs=(0.0, 0.0, ks * B * length, 0.0, 0.0, 0.0))
         s.restraints = (True, True, False, False, False, False)
     return out
+
+
+def _raft(m: Model, spec: BuildingSpec, xs, ys, wall_at, conc) -> dict:
+    """Raft foundation: MITC4 plate mesh under the whole plan (plus an overhang) on Winkler
+    springs k = k_s·(tributary area); horizontal translations restrained, rotations free.
+    Walls are tied to the raft over their length by rigid links (they bear on a strip, not a
+    point)."""
+    import math
+
+    f = spec.foundation
+    t, over, ks, target = f["t"], f.get("over", 500.0), f["ks"], f.get("mesh", 1000.0)
+
+    def lines(grid, extra):
+        pts = sorted(set([grid[0] - over, grid[-1] + over] + list(grid) + extra))
+        out = [pts[0]]
+        for a, b in zip(pts[:-1], pts[1:]):
+            if b - a < 1.0:
+                continue
+            n = max(1, math.ceil((b - a) / target))
+            out += [a + (b - a) * k / n for k in range(1, n + 1)]
+        return out
+
+    extra_x, extra_y = [], []
+    gpos = {grid_label(i, j): (xs[i], ys[j]) for i in range(len(xs)) for j in range(len(ys))}
+    for g, w in wall_at.items():
+        x0, y0 = gpos[g]
+        if w["dir"] == "X":
+            extra_x += [x0 - w["L"] / 2, x0 + w["L"] / 2]
+        else:
+            extra_y += [y0 - w["L"] / 2, y0 + w["L"] / 2]
+    X, Y = lines(xs, extra_x), lines(ys, extra_y)
+    gid = {}
+    for i, x in enumerate(xs):
+        for j, y in enumerate(ys):
+            gid[(round(x, 3), round(y, 3))] = node_id(i, j, 0)
+    ids = {}
+    for a, x in enumerate(X):
+        for b, y in enumerate(Y):
+            nid = gid.get((round(x, 3), round(y, 3))) or f"R{a}_{b}"
+            if nid not in m.nodes:
+                m.node(nid, x, y, 0.0)
+            ids[(a, b)] = nid
+    plates, trib = [], {}
+    w_self = CONCRETE_WEIGHT * t
+    for a in range(len(X) - 1):
+        for b in range(len(Y) - 1):
+            pid = f"RF{a}_{b}"
+            corners = [ids[(a, b)], ids[(a + 1, b)], ids[(a + 1, b + 1)], ids[(a, b + 1)]]
+            m.plate(pid, corners, t, conc)
+            m.load_plate("G", pid, w_self)
+            A = (X[a + 1] - X[a]) * (Y[b + 1] - Y[b])
+            for n in corners:
+                trib[n] = trib.get(n, 0.0) + A / 4
+            plates.append({"id": pid, "x0": X[a], "x1": X[a + 1], "y0": Y[b], "y1": Y[b + 1]})
+    for nid, A in trib.items():
+        s = m.support(nid, "free", springs=(0.0, 0.0, ks * A, 0.0, 0.0, 0.0))
+        s.restraints = (True, True, False, False, False, False)
+    rigid = Section("rigid link", 1e8, 1e14, 1e14, 1e14)
+    for g, w in wall_at.items():
+        base = node_id(*next((i, j) for i in range(len(xs)) for j in range(len(ys))
+                             if grid_label(i, j) == g), 0)
+        x0, y0 = gpos[g]
+        k = 0
+        for (a, b), nid in ids.items():
+            x, y = X[a], Y[b]
+            along = (w["dir"] == "X" and abs(y - y0) < 1 and 0 < abs(x - x0) <= w["L"] / 2 + 1) or \
+                (w["dir"] == "Y" and abs(x - x0) < 1 and 0 < abs(y - y0) <= w["L"] / 2 + 1)
+            if along:
+                k += 1
+                m.member(f"RL.{g}.{k}", base, nid, rigid, conc)
+    return {"X": X, "Y": Y, "plates": plates, "trib": trib, "t": t, "ks": ks,
+            "bounds": (X[0], X[-1], Y[0], Y[-1])}

@@ -64,7 +64,9 @@ def test_module_default_passes_every_check_and_designs_everything():
     c = get_module("building_frame").calculate({})
     assert c.passed, [k.description for k in c.checks if not k.passed]
     kinds = {v["kind"] for v in c.structure["members"].values()}
-    assert {"column", "beam", "wall", "slab", "fbeam"} <= kinds
+    assert {"column", "beam", "wall", "slab", "raft", "punching"} <= kinds
+    fb = get_module("building_frame").calculate({"found_type": "Foundation beams (Winkler)"})
+    assert fb.passed and any(v["kind"] == "fbeam" for v in fb.structure["members"].values())
 
 
 def test_autosize_makes_an_undersized_building_pass():
@@ -79,3 +81,35 @@ def test_autosize_makes_an_undersized_building_pass():
     assert r["passed"] and r["rounds"] >= 1
     assert mod.calculate(r["inputs"]).passed
     assert any("→" in line for rnd in r["log"] for line in rnd)
+
+
+def test_raft_punching_perimeter_and_bearing_shape_factors():
+    from erisma.structure.raft import _perimeter, bearing_rect
+
+    d, c = 700.0, 400.0
+    full = 4 * c + 2 * math.pi * 2 * d
+    # internal column far from the edges: the whole basic control perimeter (EN 1992-1-1 6.4.2)
+    assert _perimeter(5000, 5000, c, c, 2 * d, (0, 10000, 0, 10000)) == pytest.approx(full, rel=2e-3)
+    # corner column at the raft corner: a quarter of the round part plus two straight sides
+    u_corner = _perimeter(0, 0, c, c, 2 * d, (-200, 10000, -200, 10000))
+    assert 0.2 * full < u_corner < 0.6 * full
+    # B = L (square): s_q = 1 + sin φ, s_γ = 0.7
+    B, D, phi, cc, g = 10000.0, 1500.0, 30.0, 0.0, 19e-6
+    Nq = math.exp(math.pi * math.tan(math.radians(phi))) * math.tan(math.radians(60)) ** 2
+    Ng = 2 * (Nq - 1) * math.tan(math.radians(phi))
+    exact = g * D * Nq * 1.5 + 0.5 * g * B * Ng * 0.7
+    assert bearing_rect(B, B, D, phi, cc, g) == pytest.approx(exact)
+
+
+def test_raft_default_building_passes_and_reports_everything():
+    c = get_module("building_frame").calculate({})
+    assert c.passed, [k.description for k in c.checks if not k.passed]
+    descr = " ".join(k.description for k in c.checks)
+    for word in ("Raft bottom face x", "punching", "Soil bearing under the raft", "Relative rotation",
+                 "Total settlement"):
+        assert word in descr
+    raft = c.structure["raft"]
+    assert raft["elements"] and raft["punching"]
+    r = c.raft
+    # vertical equilibrium of the soil: Σ spring reactions = Σ loads for G
+    assert r["soil"][0]["p"] > 0

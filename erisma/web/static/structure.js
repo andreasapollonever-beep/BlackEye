@@ -97,12 +97,15 @@ Object.assign(UI.el, {
   "Round": "Γύρος", "Apply": "Εφαρμογή", "Design slabs": "Πλάκες", "Design foundation": "Θεμελίωση",
   "Flange B": "Πέλμα B", "Web b_w": "Κορμός b_w", "Depth h": "Ύψος h", "k_s": "k_s", "D": "D",
   "φ'": "φ'", "c'": "c'", "γ": "γ", "Foundation beams": "Πεδιλοδοκοί",
+  "Raft": "Κοιτόστρωση", "Thickness t": "Πάχος t", "Overhang": "Πρόβολος", "Mesh": "Πλέγμα",
+  "Raft: demand / basic mesh": "Κοιτόστρωση: απαίτηση / βασικός οπλισμός",
+  "additional bars": "πρόσθετος οπλισμός", "Punching": "Διάτρηση",
 });
 const SHORT = { col_b: "Column b_x", col_h: "Column h_y", beam_b: "Beam b", beam_h: "Beam h", slab_t: "Slab t",
   g_finish: "Finishes g", q: "Imposed q", q_roof: "Roof q", g_wall: "Facade walls", category: "Category",
   ag: "a_gR [g]", ground: "Ground", importance: "Importance", q_factor: "q", cracked: "EI cracked",
   drift: "Non-structural", n_modes: "Modes", phi_E: "φ (ψ_E)", concrete: "Concrete", fyk: "f_yk", cover: "Cover",
-  found_type: "Type", fb_B: "Flange B", fb_bw: "Web b_w", fb_h: "Depth h", ks: "k_s", D_found: "D",
+  found_type: "Type", raft_t: "Thickness t", raft_over: "Overhang", raft_mesh: "Mesh", fb_B: "Flange B", fb_bw: "Web b_w", fb_h: "Depth h", ks: "k_s", D_found: "D",
   phi_soil: "φ'", c_soil: "c'", gamma_soil: "γ" };
 
 const Structure = (() => {
@@ -366,7 +369,8 @@ const Structure = (() => {
       ]],
       ["found", t("Foundation"), [
         group(t("Foundation"), col(tog("foundations", t("Design foundation")), ctl("found_type", { width: 170 }))),
-        group(t("Foundation beams"), col(ctl("fb_B"), ctl("fb_bw")), col(ctl("fb_h"), ctl("ks"))),
+        group(t("Raft"), col(ctl("raft_t"), ctl("raft_over")), col(ctl("raft_mesh"), ctl("ks"))),
+        group(t("Foundation beams"), col(ctl("fb_B"), ctl("fb_bw")), col(ctl("fb_h"))),
         group(t("Soil"), col(ctl("D_found"), ctl("phi_soil")), col(ctl("c_soil"), ctl("gamma_soil"))),
         group(t("View"), btn("found", t("Foundation"), "", () => { S.opt.storey = "found"; saveView(); setView("plan"); }, { big: true, on: S.opt.storey === "found" })),
       ]],
@@ -770,6 +774,23 @@ const Structure = (() => {
     } else {
       const m = S.res?.structure?.members || {};
       const isBeams = String(S.inp.found_type || "").startsWith("Foundation beams");
+      const raft = S.res?.structure?.raft;
+      if (raft && String(S.inp.found_type || "").startsWith("Raft")) {
+        for (const e of raft.elements) {
+          const r = sv("rect", { x: X(e.x0), y: Y(e.y1), width: e.x1 - e.x0, height: e.y1 - e.y0, class: "st-raft" }, gPan);
+          r.style.fill = e.util > 1 ? "#e8752a" : heat(0.7 * e.util);
+          sv("title", {}, r).textContent = `${e.id}: ${t("Raft: demand / basic mesh")} = ${e.util.toFixed(2)}` + (e.util > 1 ? ` (${t("additional bars")})` : "");
+        }
+        for (const p of raft.punching) {
+          const [i0, j0] = idx(p.grid);
+          const c = sv("circle", { cx: X(xs[i0] * 1000), cy: Y(ys[j0] * 1000), r: unit * 3.2, class: "st-punch" }, gBeam);
+          c.style.stroke = p.util > 1 ? "#e03b3b" : heat(0.85 * p.util ** 2);
+          sv("title", {}, c).textContent = `${t("Punching")} ${p.grid}: η = ${p.util.toFixed(2)}`;
+          if (S.opt.labels) sv("text", { x: X(xs[i0] * 1000) + unit * 3.6, y: Y(ys[j0] * 1000) + unit * 3.6, "font-size": unit * 1.2, class: "st-rlbl" }, gTxt).textContent = `η ${p.util.toFixed(2)}`;
+        }
+        const rr = m["R.raft"];
+        if (rr) $("#st-hint").textContent = `${t("Raft")}: ${rr.reinforcement}`;
+      }
       for (const [k, v] of Object.entries(m)) {
         if (v.kind === "fbeam" && isBeams) {
           const [a, b] = k.slice(3).split("-").map(idx);

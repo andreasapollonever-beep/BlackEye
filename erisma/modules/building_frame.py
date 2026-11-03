@@ -123,10 +123,18 @@ class BuildingFrame(DesignModule):
               help="A pad footing under every column and wall, sized for bearing, sliding and "
                    "eccentricity; seismic actions with capacity design (EN 1998-1 4.4.2.6)."),
         Field("found_type", "Foundation type", kind="choice", group="Foundations",
-              choices=["Foundation beams (Winkler)", "Isolated pad footings"],
-              default="Foundation beams (Winkler)",
-              help="Foundation beams along the grid lines on elastic soil springs (part of the "
-                   "3D model, as usual for seismic buildings), or pad footings under a fixed base."),
+              choices=["Raft (Winkler)", "Foundation beams (Winkler)", "Isolated pad footings"],
+              default="Raft (Winkler)",
+              help="Raft: a plate under the whole building on elastic soil springs, analysed with "
+                   "finite elements together with the frame. Foundation beams along the grid "
+                   "lines on springs, or pad footings under a fixed base."),
+        Field("raft_t", "Raft thickness", "mm", 800.0, min=300, max=2000, group="Foundations",
+              show_if="found_type=Raft (Winkler)"),
+        Field("raft_over", "Raft overhang beyond the outer grid lines", "m", 1.0, min=0.0,
+              max=3.0, group="Foundations", show_if="found_type=Raft (Winkler)"),
+        Field("raft_mesh", "Raft mesh size", "m", 1.0, min=0.3, max=2.0, group="Foundations",
+              show_if="found_type=Raft (Winkler)",
+              help="Finite-element size; smaller is more accurate but slower."),
         Field("fb_B", "Foundation beam flange width B", "m", 1.2, min=0.4, max=4.0,
               group="Foundations", show_if="found_type=Foundation beams (Winkler)"),
         Field("fb_bw", "Foundation beam web width b_w", "mm", 500.0, min=250, max=1000,
@@ -134,7 +142,7 @@ class BuildingFrame(DesignModule):
         Field("fb_h", "Foundation beam depth h", "mm", 1200.0, min=500, max=2500,
               group="Foundations", show_if="found_type=Foundation beams (Winkler)"),
         Field("ks", "Modulus of subgrade reaction k_s", "MN/m³", 40.0, min=5, max=300,
-              group="Foundations", show_if="found_type=Foundation beams (Winkler)",
+              group="Foundations",
               help="Typical: loose sand 10–25, medium sand 25–60, dense sand 60–120, stiff "
                    "clay 25–50 MN/m³ (or from a plate-load test / the geotechnical report)."),
         Field("D_found", "Founding depth D", "m", 1.2, min=0.5, max=5.0, group="Foundations",
@@ -168,7 +176,9 @@ class BuildingFrame(DesignModule):
             [{"at": r["at"], "dir": r["dir"], "L": r["L"], "t": r["t"]} for r in inp["walls"]],
             inp["layout"],
             {"B": inp["fb_B"], "bw": inp["fb_bw"], "h": inp["fb_h"], "ks": inp["ks"], "n": 6}
-            if inp["found_type"].startswith("Foundation beams") else None)
+            if inp["found_type"].startswith("Foundation beams") else
+            {"type": "raft", "t": inp["raft_t"], "over": inp["raft_over"], "ks": inp["ks"],
+             "mesh": inp["raft_mesh"]} if inp["found_type"].startswith("Raft") else None)
         if inp["beam_h"] <= inp["slab_t"]:
             raise InputError("The beam depth must be greater than the slab thickness", "beam_h")
         calc.issues = []   # machine-readable failures, used by the automatic sizing
@@ -367,7 +377,9 @@ class BuildingFrame(DesignModule):
             cls._capacity(calc, inp, spec, info, dc, db, quasi, seis, project)
         ds = cls._slabs(inp, spec, info, project) if inp["slabs"] else []
         df = []
-        if inp["foundations"] and info["fbeams"]:
+        if inp["foundations"] and info.get("raft"):
+            df = cls._raft(calc, inp, spec, info, res, seis, uls, quasi, dc + dw, psi2)
+        elif inp["foundations"] and info["fbeams"]:
             df = cls._fbeams(calc, inp, spec, info, res, seis, uls, quasi, dc + dw, project)
         elif inp["foundations"]:
             df = cls._footings(calc, inp, spec, info, res, seis, quasi, dc + dw, project)
@@ -380,7 +392,7 @@ class BuildingFrame(DesignModule):
                 ("Footings", [d for d in df if d.kind == "footing"],
                  "Increase the founding depth or use a strip footing / raft."),
                 ("Foundation beams", [d for d in df if d.kind == "fbeam"],
-                 "Increase the foundation beam depth or width.")):
+                 "Increase the foundation beam depth or width.")):  # raft: own section
             if not items:
                 continue
             calc.heading(title, 2)
@@ -448,6 +460,120 @@ class BuildingFrame(DesignModule):
         qs = {k: (spec.q_roof if k == ns else spec.q) for k in range(1, ns + 1)}
         return design_slabs(panels, spec.slab_t, inp["concrete"], spec.g_finish, qs, project,
                             inp["fyk"])
+
+    @staticmethod
+    def _raft(calc, inp, spec, info, res, seis, uls, quasi, vertical, psi2):
+        """Raft on Winkler springs: Wood–Armer bending, shear, punching, soil, settlement."""
+        from ..structure.design import _omega
+        from ..structure.raft import design_raft
+        na = get_annex(calc.project.annex)
+        fck = float(inp["concrete"].split("/")[0][1:])
+        fcd, fyd = na.alpha_cc * fck / na.gamma_c, inp["fyk"] / na.gamma_s
+        an = res["G"].analysis
+        ef = 1.0
+        vd = {d.member: d for d in vertical}
+        if seis is not None:
+            ef = max(_omega(vd.get(mid), seis, quasi, fcd, fyd)
+                     for mid in info["columns"] + info["walls"] if mid[1:3] == "1.")
+        cols = {c.split(".", 1)[1]: (f"{c.split('.', 1)[1]}@0", c, *info["sizes"][c])
+                for c in info["columns"] if c.startswith("C1.")}
+        walls = {}
+        for w in info["walls"]:
+            if w.startswith("W1."):
+                g = w.split(".", 1)[1]
+                ws = info["wall_spec"][g]
+                walls[g] = (f"{g}@0", ws["L"], ws["t"], ws["dir"])
+        soil = {"phi": inp["phi_soil"], "c": inp["c_soil"], "gamma": inp["gamma_soil"]}
+        r = design_raft(info["raft"], an, res, uls, quasi, seis, ef, cols, walls,
+                        inp["concrete"], inp["fyk"], na, soil, inp["D_found"], psi2)
+        calc.raft = r
+        x0, x1, y0, y1 = info["raft"]["bounds"]
+        calc.heading("Raft foundation", 2)
+        calc.text("Raft {a:.2f} × {b:.2f} m, t = {t:g} mm, MITC4 plate finite elements "
+                  "({n} elements) on Winkler springs k_s = {k:g} MN/m³, analysed together with "
+                  "the frame. Design moments by Wood–Armer.", a=(x1 - x0) / 1000,
+                  b=(y1 - y0) / 1000, t=inp["raft_t"], n=len(r["elements"]), k=inp["ks"] * 1e3)
+        if seis is not None:
+            calc.formula("γ_Rd Ω", "γ_Rd · min(M_Rd/M_Ed of the columns, q)", ef, "",
+                         "Overstrength of the seismic action on the foundation",
+                         ref="EN 1998-1 4.4.2.6", dp=2)
+        names = {"bottom": calc.tr("bottom face"), "top": calc.tr("top face")}
+        rows, ok = [], True
+        for (face, dirn), m in r["mesh"].items():
+            add = f"+ Ø{m['add'][0]}/{m['add'][1]:g}" if m["add"] else "—"
+            rows.append([f"{names[face]} {dirn}", f"Ø{m['base'][0]}/{m['base'][1]:g}", add,
+                         f"{m['d']:.0f}", f"{m['As_min'] * 1000:.0f}", f"{m['peak'] * 1000:.0f}",
+                         f"{m['cap'] * 1000:.0f}"])
+        calc.table(["Face / direction", "Basic mesh", "Additional bars", "d [mm]",
+                    "A_s,min [mm²/m]", "A_s,req,max [mm²/m]", "A_s,prov [mm²/m]"], rows,
+                   caption="EN 1992-1-1 6.1, 9.2.1.1, 9.3.1.1 — additional bars where the "
+                           "Wood–Armer demand exceeds the basic mesh")
+        for (face, dirn), m in r["mesh"].items():
+            calc.check_min(calc.tr("Raft {f} {d}: A_s,prov ≥ A_s,req", f=names[face], d=dirn),
+                           m["cap"] * 1000, m["peak"] * 1000, "mm²/m", "EN 1992-1-1 6.1",
+                           hint="Increase the raft thickness.")
+        sh = r["shear"]
+        calc.check("Raft shear away from the columns: V_Ed ≤ V_Rd,c", sh["V"], sh["VRd"], "kN/m",
+                   "EN 1992-1-1 6.2.2", hint="Increase the raft thickness.")
+        pr = [p for p in r["punching"]]
+        calc.table(["Column", "Combination", "V_Ed [kN]", "ΔV_Ed [kN]", "u₁ [mm]", "β",
+                    "v_Ed [MPa]", "v_Rd,c [MPa]", "η"],
+                   [[p["grid"], p["combo"], f"{p['V'] / 1e3:.0f}", f"{p['dV'] / 1e3:.0f}",
+                     f"{p['u1']:.0f}", f"{p['beta']:g}", f"{p['vEd']:.3f}", f"{p['vRd']:.3f}",
+                     f"{p['util']:.2f}"] for p in pr],
+                   caption="Punching at 2d, EN 1992-1-1 6.4.4 (V_Ed,red = V_Ed − ΔV_Ed, soil "
+                           "reaction inside u₁) and at the column face 6.4.5(3)")
+        if pr:
+            w = max(pr, key=lambda p: p["util"])
+            calc.check(calc.tr("Raft punching at column {g}", g=w["grid"]), w["util"], 1.0, "",
+                       "EN 1992-1-1 6.4", hint="Increase the raft thickness under the columns.")
+        calc.table(["Combination", "p_avg [kPa]", "p_peak [kPa]", "q_Rd [kPa]"],
+                   [[s_["combo"], f"{s_['p'] * 1e3:.0f}", f"{s_['peak'] * 1e3:.0f}",
+                     f"{s_['qRd'] * 1e3:.0f}"] for s_ in r["soil"]],
+                   caption="EN 1997-1 6.5.2 / Annex D, B × L raft with shape factors")
+        soil_ok = True
+        for s_ in r["soil"]:
+            calc.check(calc.tr("Soil bearing under the raft ({c})", c=s_["combo"]), s_["p"],
+                       s_["qRd"], "kN/m²", "EN 1997-1 6.5.2",
+                       hint="Enlarge the raft overhang or found deeper.")
+            soil_ok &= s_["p"] <= s_["qRd"]
+        if r["uplift"]:
+            calc.warn("Uplift under the raft at {n} in the seismic situation (p_min = {p:.0f} kPa)"
+                      ": the linear springs carry tension there — check it or enlarge the raft.",
+                      n=r["uplift"]["node"], p=r["uplift"]["p"] * 1e3)
+        st = r["settlement"]
+        calc.check(calc.tr("Relative rotation between columns {a}–{b} ≤ 1/500", a=st["pair"][0],
+                           b=st["pair"][1]) if st["pair"][0] else
+                   calc.tr("Relative rotation between columns ≤ 1/500"),
+                   st["rot"], 1 / 500, "", "EN 1997-1 Annex H",
+                   hint="Increase the raft thickness or improve the soil.")
+        calc.check("Total settlement (G + ψ₂Q) ≤ 50 mm", st["w_max"], 50.0, "mm",
+                   "EN 1997-1 Annex H", hint="Improve the soil or enlarge the raft.")
+        # records for the workspace and the automatic sizing
+        bend_ok = not r["fail"]
+        sh_ok = sh["V"] <= sh["VRd"]
+        punch_ok = all(p["util"] <= 1 for p in pr)
+        set_ok = st["rot"] <= 1 / 500 and st["w_max"] <= 50
+        if not (bend_ok and sh_ok and punch_ok and set_ok):
+            calc.issues.append({"type": "raft"})
+        if not soil_ok:
+            calc.issues.append({"type": "raft_soil"})
+        mesh_txt = "; ".join(f"{names[f]} {d}: Ø{m['base'][0]}/{m['base'][1]:g}" +
+                             (f" + Ø{m['add'][0]}/{m['add'][1]:g}" if m["add"] else "")
+                             for (f, d), m in r["mesh"].items())
+        util = max([max(p["util"] for p in pr) if pr else 0.0, sh["V"] / sh["VRd"],
+                    max(m["peak"] / m["cap"] for m in r["mesh"].values()),
+                    st["rot"] * 500])
+        out = [MemberDesign("R.raft", "raft", 0, mesh_txt, util,
+                            bend_ok and sh_ok and punch_ok and set_ok and soil_ok,
+                            "ULS / G+ψ2Q+ΩE", {}, "", [], 0.0)]
+        out[0]._mesh = r["mesh"]
+        spec.D_found = inp["D_found"]
+        for p in pr:
+            out.append(MemberDesign(f"PU.{p['grid']}", "punching", 0,
+                                    f"v_Ed = {p['vEd']:.3f} MPa, β = {p['beta']:g}", p["util"],
+                                    p["util"] <= 1.0, p["combo"], {}, "", [], 0.0))
+        return out
 
     @staticmethod
     def _fbeams(calc, inp, spec, info, res, seis, uls, quasi, vertical, project):
@@ -607,6 +733,14 @@ class BuildingFrame(DesignModule):
                 "inputs": d.inputs,
                 "notes": [n.message(calc.lang) if hasattr(n, "message") else calc.tr(n)
                           for n in d.notes]}
+        r = getattr(calc, "raft", None)
+        if r:
+            out["raft"] = {"elements": [{k: (round(float(v), 3) if not isinstance(v, (str, bool))
+                                             else v) for k, v in e.items()
+                                         if k in ("id", "x0", "x1", "y0", "y1", "util")}
+                                        for e in r["elements"]],
+                           "punching": [{"grid": p["grid"], "util": float(p["util"])}
+                                        for p in r["punching"]]}
         if seis is not None:
             out["periods"] = [float(t) for t in seis.modes.periods[:6]]
             out["base_shear"] = {d: v / 1e3 for d, v in seis.base_shear.items()}
@@ -619,6 +753,7 @@ class BuildingFrame(DesignModule):
     @staticmethod
     def _quantities(spec, info, an, designs) -> dict:
         inp_D = lambda i: i["D"] * 1000  # noqa: E731  (founding depth, m → mm)
+        spec_D = lambda sp: getattr(sp, "D_found", 1200.0)  # noqa: E731
         """Concrete, formwork and (if designed) reinforcement of the whole frame."""
         model = an.model
         rho_s = 7850e-9  # kg/mm³
@@ -626,6 +761,8 @@ class BuildingFrame(DesignModule):
         des = {d.member: d for d in designs}
         fb = (spec.foundation or {})
         for mem in model.members.values():
+            if mem.id.startswith("RL."):      # rigid links wall → raft (no material)
+                continue
             L = model.length(mem)
             vertical = abs(model.nodes[mem.i].z - model.nodes[mem.j].z) > 1
             if mem.id.startswith("FB."):      # foundation beam (inverted T)
@@ -695,6 +832,21 @@ class BuildingFrame(DesignModule):
                 a = np.pi * float(i["dia_x"]) ** 2 / 4
                 steel += a * (By / i["s_x"]) * Bx + a * (Bx / i["s_y"]) * By
                 exc += (Bx + 600) * (By + 600) * inp_D(i)
+        rf = info.get("raft")
+        if rf:
+            x0, x1, y0, y1 = rf["bounds"]
+            A = (x1 - x0) * (y1 - y0)
+            conc += A * rf["t"]
+            form += 2 * ((x1 - x0) + (y1 - y0)) * rf["t"]
+            exc += A * spec_D(spec)
+            rd = next((d for d in designs if d.kind == "raft"), None)
+            mesh = getattr(rd, "_mesh", None)
+            if mesh:
+                for m in mesh.values():
+                    a = np.pi * float(m["base"][0]) ** 2 / 4 / m["base"][1]
+                    steel += a * A
+                    if m["add"]:
+                        steel += np.pi * float(m["add"][0]) ** 2 / 4 / m["add"][1] * A * 0.15
         out = {"concrete": conc * 1e-9, "formwork": form * 1e-6}
         if exc:
             out["excavation"] = exc * 1e-9
@@ -731,6 +883,8 @@ class BuildingFrame(DesignModule):
         model = an.model
         fb = spec.foundation or {}
         for mem in model.members.values():
+            if mem.id.startswith("RL."):
+                continue
             a, b = model.nodes[mem.i], model.nodes[mem.j]
             c = ((a.x + b.x) / 2, (a.z + b.z) / 2, (a.y + b.y) / 2)
             vertical = abs(a.z - b.z) > 1
@@ -769,6 +923,14 @@ class BuildingFrame(DesignModule):
                 col = heat_color(0.85 * min(max(t, 0.0), 1.0))
             sc.box("frame", tuple(m(v) for v in c), tuple(m(v) for v in size), col)
         xs, ys, zs = info["xs"], info["ys"], info["zs"]
+        rf = info.get("raft")
+        if rf:
+            sc.layer("found", "Raft")
+            x0, x1, y0, y1 = rf["bounds"]
+            rd = next((d for d in designs if d.kind == "raft"), None)
+            col = "#e03b3b" if rd is not None and not rd.ok else PALETTE["concrete"]
+            sc.box("found", (m((x0 + x1) / 2), -rf["t"] / 2000, m((y0 + y1) / 2)),
+                   (m(x1 - x0), rf["t"] / 1000, m(y1 - y0)), col, opacity=0.85)
         pads = [d for d in designs if d.kind == "footing"]
         if pads:
             sc.layer("found", "Footings")

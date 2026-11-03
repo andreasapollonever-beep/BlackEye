@@ -10,7 +10,8 @@ slab and foundation) and applies simple, conservative engineering rules to what 
 * storey drift or θ too large → all columns 50 mm larger in that direction;
 * strong-column/weak-beam failure at a joint → the columns of that grid line 50 mm larger;
 * Σ effective mass < 90 % → more modes; α_cr < 10 → P-Δ analysis switched on;
-* soil bearing under foundation beams → wider flange.
+* soil bearing under foundation beams → wider flange;
+* raft bending / shear / punching / settlement → 100 mm thicker; raft soil → larger overhang.
 
 Inputs are in the module's display units (m, mm, kN/m²…), as edited by the engineer.
 """
@@ -93,6 +94,11 @@ def _adjust(inp: dict, calc, lang: str) -> list[str]:
             elif inp["fb_bw"] + 100 <= CAP_FB_BW:
                 say("Foundation beams: web {a:g} → {b:g} mm", a=inp["fb_bw"], b=inp["fb_bw"] + 100)
                 inp["fb_bw"] += 100
+        elif kind in ("raft", "punching") and "raft" not in done:
+            done.add("raft")
+            if inp.get("raft_t", 800) + 100 <= 2000:
+                say("Raft: thickness {a:g} → {b:g} mm", a=inp["raft_t"], b=inp["raft_t"] + 100)
+                inp["raft_t"] += 100
         elif kind == "footing" and "found" not in done:
             done.add("found")
             inp["found_type"] = "Foundation beams (Winkler)"
@@ -120,6 +126,16 @@ def _adjust(inp: dict, calc, lang: str) -> list[str]:
         elif t == "acr" and not inp.get("pdelta"):
             inp["pdelta"] = True
             say("α_cr < 10: P-Δ analysis switched on")
+        elif t == "raft" and "raft" not in done:
+            done.add("raft")
+            if inp.get("raft_t", 800) + 100 <= 2000:
+                say("Raft: thickness {a:g} → {b:g} mm", a=inp["raft_t"], b=inp["raft_t"] + 100)
+                inp["raft_t"] += 100
+        elif t == "raft_soil" and "raft_soil" not in done:
+            done.add("raft_soil")
+            if inp.get("raft_over", 1.0) + 0.5 <= 3.0:
+                say("Raft: overhang {a:g} → {b:g} m", a=inp["raft_over"], b=inp["raft_over"] + 0.5)
+                inp["raft_over"] = round(inp["raft_over"] + 0.5, 2)
         elif t == "soil" and "soil" not in done:
             done.add("soil")
             if inp["fb_B"] + 0.2 <= CAP_FB_B:

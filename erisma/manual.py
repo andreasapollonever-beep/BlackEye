@@ -323,9 +323,11 @@ calculation, delete). The status bar shows the cursor coordinates and how many m
 <p><b>What is checked.</b> Columns (EC2 bending, biaxial, slenderness, shear; EC8 DCM
 detailing), beams (EC2 bending, shear, <b>deflection by span/depth 7.4.2</b>; EC8 detailing),
 walls (EC8 ductile walls), <b>slabs</b> (every panel as a two-way slab, continuous over
-neighbouring panels), the <b>foundation</b> — foundation beams on Winkler springs in the 3D
-model (EC2 design with the overstrength γ_Rd·Ω of EN 1998-1 4.4.2.6 and the EC7 bearing check of
-the soil under them) or isolated pad footings —, storey drifts, θ, α_cr, effective modal mass
+neighbouring panels), the <b>foundation</b> — a <b>raft</b> (default): MITC4 plate finite
+elements on Winkler springs analysed together with the frame, Wood–Armer bending with a basic
+mesh and additional bars, shear, punching at every column (EN 1992-1-1 6.4, soil reaction
+deducted), EC7 bearing and Annex H settlement; or foundation beams on springs; or isolated pad
+footings; seismic actions with the overstrength γ_Rd·Ω of EN 1998-1 4.4.2.6 —, storey drifts, θ, α_cr, effective modal mass
 and capacity design (ΣM_Rc ≥ 1.3 ΣM_Rb, capacity shears).</p>
 <p><b>Auto-size</b> (Home or Design tab) repeats the complete calculation and enlarges what
 fails — columns, beams, walls, slab thickness, foundation beams, the number of modes, P-Δ —
@@ -371,9 +373,12 @@ the browser; <b>Save</b> writes a project file that <b>Open</b> brings back.</p>
 <p><b>Τι ελέγχεται.</b> Υποστυλώματα (EC2 κάμψη, διαξονική, λυγηρότητα, διάτμηση· EC8
 κατασκευαστικές διατάξεις ΚΠΜ), δοκοί (EC2 κάμψη, διάτμηση, <b>βέλος με λόγο ανοίγματος/ύψους
 7.4.2</b>· EC8 διατάξεις), τοιχώματα (EC8 πλάστιμα τοιχώματα), <b>πλάκες</b> (κάθε φάτνωμα ως
-διέρειστη πλάκα, συνεχής πάνω από γειτονικά φατνώματα), η <b>θεμελίωση</b> — πεδιλοδοκοί σε
-ελατήρια Winkler μέσα στο 3D προσομοίωμα (EC2 με την υπεραντοχή γ_Rd·Ω του EN 1998-1 4.4.2.6 και
-έλεγχο φέρουσας ικανότητας εδάφους EC7) ή μεμονωμένα πέδιλα —, σχετικές μετακινήσεις, θ, α_cr,
+διέρειστη πλάκα, συνεχής πάνω από γειτονικά φατνώματα), η <b>θεμελίωση</b> — <b>κοιτόστρωση</b>
+(προεπιλογή): πεπερασμένα στοιχεία πλάκας MITC4 σε ελατήρια Winkler, επιλυμένα μαζί με τον
+φορέα, κάμψη κατά Wood–Armer με βασικό και πρόσθετο οπλισμό, διάτμηση, διάτρηση σε κάθε
+υποστύλωμα (EN 1992-1-1 6.4, με αφαίρεση της αντίδρασης εδάφους), φέρουσα ικανότητα EC7 και
+καθιζήσεις Παραρτήματος H· ή πεδιλοδοκοί σε ελατήρια· ή μεμονωμένα πέδιλα· σεισμικές δράσεις με
+την υπεραντοχή γ_Rd·Ω του EN 1998-1 4.4.2.6 —, σχετικές μετακινήσεις, θ, α_cr,
 δρώσα ιδιομορφική μάζα και ικανοτικός σχεδιασμός (ΣM_Rc ≥ 1.3 ΣM_Rb, ικανοτικές τέμνουσες).</p>
 <p>Η <b>Αυτόματη διαστασιολόγηση</b> (καρτέλα Αρχική ή Σχεδιασμός) επαναλαμβάνει τον πλήρη
 υπολογισμό και μεγαλώνει ό,τι ανεπαρκεί — υποστυλώματα, δοκούς, τοιχώματα, πάχος πλάκας,
