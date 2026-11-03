@@ -7,4 +7,4 @@ build/
 dist/
 .pytest_cache/
 *.html
-!blackeye/web/static/*.html
+!erisma/web/static/*.html

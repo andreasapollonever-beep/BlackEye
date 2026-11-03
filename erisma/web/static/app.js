@@ -1,5 +1,5 @@
 "use strict";
-// BlackEye web client: schema-driven input forms with live calculation preview.
+// Erisma web client: schema-driven input forms with live calculation preview.
 // Usability rules: never lose work (autosave), point at the wrong field, always explain
 // failures with a hint, keyboard shortcuts for the common actions, Greek & English UI.
 
@@ -16,16 +16,16 @@ const UI = {
     "All checks pass": "Όλοι οι έλεγχοι επαρκούν", "Design fails": "Ο σχεδιασμός ανεπαρκεί",
     "max utilisation": "μέγιστη αξιοποίηση", "Analysis complete": "Η ανάλυση ολοκληρώθηκε",
     "Calculating…": "Υπολογισμός…", "failing check(s) — what to change": "έλεγχοι ανεπαρκούν — τι να αλλάξετε",
-    "+ Add row": "+ Προσθήκη γραμμής", "Remove row": "Διαγραφή γραμμής", "Not a BlackEye project file": "Δεν είναι αρχείο έργου BlackEye",
+    "+ Add row": "+ Προσθήκη γραμμής", "Remove row": "Διαγραφή γραμμής", "Not an Erisma project file": "Δεν είναι αρχείο έργου Erisma",
     "Layers": "Επίπεδα", "Labels": "Ετικέτες", "Front": "Όψη", "Top": "Κάτοψη", "Save image": "Αποθήκευση εικόνας",
     "Drag to rotate · right-drag to pan · scroll to zoom": "Σύρετε για περιστροφή · δεξί κλικ για μετακίνηση · ροδέλα για zoom",
     "Shortcuts: Ctrl+S save · Ctrl+O open · Ctrl+P print · Ctrl+3 3D view": "Συντομεύσεις: Ctrl+S αποθήκευση · Ctrl+O άνοιγμα · Ctrl+P εκτύπωση · Ctrl+3 3D",
     "No calculations match": "Δεν βρέθηκαν υπολογισμοί",
   },
 };
-let LANG = (() => { try { return localStorage.getItem("blackeye.lang") || "el"; } catch { return "el"; } })();
+let LANG = (() => { try { return localStorage.getItem("erisma.lang") || "el"; } catch { return "el"; } })();
 const t = (k) => (LANG !== "en" && UI[LANG]?.[k]) || k;
-window.BlackEyeI18n = t;
+window.ErismaI18n = t;
 
 const PROJECT_FIELDS = [
   ["company", "Company"], ["project", "Project"], ["job_no", "Job no."],
@@ -47,11 +47,17 @@ const el = (tag, attrs = {}, ...kids) => {
 
 // ------------------------------------------------------------------ storage
 const store = {
-  get(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } },
+  get(key, fallback) {
+    try {
+      // fall back to data saved under the program's former name
+      const v = localStorage.getItem(key) ?? localStorage.getItem(key.replace(/^erisma\./, "blackeye."));
+      return JSON.parse(v) ?? fallback;
+    } catch { return fallback; }
+  },
   set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private mode */ } },
   del(key) { try { localStorage.removeItem(key); } catch { /* ignore */ } },
 };
-const inputsKey = (id) => `blackeye.inputs.${id}`;
+const inputsKey = (id) => `erisma.inputs.${id}`;
 
 async function api(path, body) {
   const sep = path.includes("?") ? "&" : "?";
@@ -103,7 +109,7 @@ function renderProject() {
   for (const [key, label] of PROJECT_FIELDS) {
     const id = `p-${key}`;
     const input = el("input", { id, value: state.project[key] || "", type: key === "date" ? "date" : "text",
-      on: { input: (e) => { state.project[key] = e.target.value; store.set("blackeye.project", state.project); schedule(); } } });
+      on: { input: (e) => { state.project[key] = e.target.value; store.set("erisma.project", state.project); schedule(); } } });
     box.append(el("div", {}, el("label", { for: id }, t(label)), input));
   }
 }
@@ -191,7 +197,7 @@ async function selectModule(id, inputs) {
   $("#mod-desc").textContent = `${state.schema.standard} — ${state.schema.description}`;
   $("#restored").hidden = !(saved && !inputs);
   history.replaceState(null, "", `#${id}`);
-  store.set("blackeye.last", id);
+  store.set("erisma.last", id);
   renderForm();
   run();
 }
@@ -203,7 +209,7 @@ function showTab(name) {
   currentTab = name;
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
   document.querySelectorAll(".pane").forEach((p) => p.classList.toggle("on", p.dataset.pane === name));
-  if (name === "model") window.dispatchEvent(new Event("blackeye:show3d"));
+  if (name === "model") window.dispatchEvent(new Event("erisma:show3d"));
 }
 document.querySelectorAll(".tabs button").forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
 
@@ -234,8 +240,8 @@ async function run() {
     $("#tab-model").hidden = !has3d;
     if (!has3d && currentTab === "model") showTab("report");
     if (has3d) {
-      window.__blackeyeModel = { model: res.model3d, summary: res.summary };
-      window.dispatchEvent(new CustomEvent("blackeye:model3d", { detail: window.__blackeyeModel }));
+      window.__erismaModel = { model: res.model3d, summary: res.summary };
+      window.dispatchEvent(new CustomEvent("erisma:model3d", { detail: window.__erismaModel }));
     }
     renderStatus(res.summary);
   } catch (err) {
@@ -282,8 +288,8 @@ const fileBase = () => (state.project.job_no || "calc").replace(/[^\w.-]+/g, "_"
 const actions = {
   print: () => $("#report").contentWindow.print(),
   html: () => download(`${fileBase()}.html`, state.lastHtml, "text/html"),
-  save: () => download(`${fileBase()}.bkeye`, JSON.stringify({
-    format: "blackeye", version: 1, module: state.schema.id, project: state.project, inputs: state.inputs,
+  save: () => download(`${fileBase()}.erisma`, JSON.stringify({
+    format: "erisma", version: 1, module: state.schema.id, project: state.project, inputs: state.inputs,
   }, null, 2), "application/json"),
   open: () => $("#file-open").click(),
   reset: () => { store.del(inputsKey(state.schema.id)); selectModule(state.schema.id, {}); },
@@ -298,9 +304,9 @@ $("#file-open").onchange = async (e) => {
   if (!file) return;
   try {
     const doc = JSON.parse(await file.text());
-    if (doc.format !== "blackeye") throw new Error(t("Not a BlackEye project file"));
+    if (doc.format !== "erisma" && doc.format !== "blackeye") throw new Error(t("Not an Erisma project file"));
     state.project = doc.project || {};
-    store.set("blackeye.project", state.project);
+    store.set("erisma.project", state.project);
     renderProject();
     await selectModule(doc.module, doc.inputs);
   } catch (err) { alert(err.message); }
@@ -315,7 +321,7 @@ document.addEventListener("keydown", (e) => {
 $("#search").addEventListener("input", renderNav);
 document.querySelectorAll(".lang button").forEach((b) => (b.onclick = async () => {
   LANG = b.dataset.lang;
-  try { localStorage.setItem("blackeye.lang", LANG); } catch { /* ignore */ }
+  try { localStorage.setItem("erisma.lang", LANG); } catch { /* ignore */ }
   translateChrome();
   renderProject();
   state.modules = await api("/api/modules");
@@ -324,11 +330,11 @@ document.querySelectorAll(".lang button").forEach((b) => (b.onclick = async () =
 }));
 
 (async function init() {
-  state.project = store.get("blackeye.project", {});
+  state.project = store.get("erisma.project", {});
   translateChrome();
   renderProject();
   state.modules = await api("/api/modules");
   renderNav();
-  const wanted = location.hash.slice(1) || store.get("blackeye.last", "");
+  const wanted = location.hash.slice(1) || store.get("erisma.last", "");
   selectModule(state.modules.some((m) => m.id === wanted) ? wanted : state.modules[0].id);
 })();

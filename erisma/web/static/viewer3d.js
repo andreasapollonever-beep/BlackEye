@@ -1,9 +1,9 @@
-// BlackEye 3D viewer — renders the generic scene produced by blackeye/report/scene3d.py.
+// Erisma 3D viewer — renders the generic scene produced by erisma/report/scene3d.py.
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/OrbitControls.js";
 import { CSS2DObject, CSS2DRenderer } from "three/addons/CSS2DRenderer.js";
 
-const T = (k) => (window.BlackEyeI18n ? window.BlackEyeI18n(k) : k);
+const T = (k) => (window.ErismaI18n ? window.ErismaI18n(k) : k);
 
 class Viewer {
   constructor(host) {
@@ -69,7 +69,7 @@ class Viewer {
     this.render();
     const a = document.createElement("a");
     a.href = this.renderer.domElement.toDataURL("image/png");
-    a.download = `blackeye-3d-${this.kind || "model"}.png`;
+    a.download = `erisma-3d-${this.kind || "model"}.png`;
     a.click();
   }
 
@@ -267,6 +267,6 @@ function show(detail) {
   viewer.load(detail.model, detail.summary);
   viewer.resize();
 }
-window.addEventListener("blackeye:model3d", (e) => show(e.detail));
-window.addEventListener("blackeye:show3d", () => viewer?.resize());
-if (window.__blackeyeModel) show(window.__blackeyeModel);
+window.addEventListener("erisma:model3d", (e) => show(e.detail));
+window.addEventListener("erisma:show3d", () => viewer?.resize());
+if (window.__erismaModel) show(window.__erismaModel);

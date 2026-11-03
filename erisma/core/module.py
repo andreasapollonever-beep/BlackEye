@@ -4,7 +4,7 @@ Every design calculation (an EC3 steel beam, an EC2 RC section, ...) is a
 :class:`DesignModule`.  A module declares its inputs as :class:`Field` objects -
 this declaration drives the web forms, the CLI, validation and the saved
 project files - and implements :meth:`DesignModule.run` which writes a
-:class:`~blackeye.core.calc.Calculation`.
+:class:`~erisma.core.calc.Calculation`.
 """
 
 from __future__ import annotations
@@ -167,7 +167,7 @@ def register(cls: type[DesignModule]) -> type[DesignModule]:
 
 
 def get_module(module_id: str) -> type[DesignModule]:
-    import blackeye.modules  # noqa: F401  (ensure modules are registered)
+    import erisma.modules  # noqa: F401  (ensure modules are registered)
 
     try:
         return _REGISTRY[module_id]
@@ -176,7 +176,7 @@ def get_module(module_id: str) -> type[DesignModule]:
 
 
 def all_modules() -> list[type[DesignModule]]:
-    import blackeye.modules  # noqa: F401
+    import erisma.modules  # noqa: F401
 
     return sorted(_REGISTRY.values(), key=lambda m: (m.category, m.title))
 

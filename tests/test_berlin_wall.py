@@ -3,9 +3,9 @@ import math
 import numpy as np
 import pytest
 
-from blackeye.core import InputError, get_module
-from blackeye.design.geotech import ka_coulomb, kp_coulomb
-from blackeye.modules.ec7_berlin_wall import BerlinWallEC7 as BW
+from erisma.core import InputError, get_module
+from erisma.design.geotech import ka_coulomb, kp_coulomb
+from erisma.modules.ec7_berlin_wall import BerlinWallEC7 as BW
 
 CB = {"name": "char", "gG": 1.0, "gQ": 1.0, "gphi": 1.0, "gc": 1.0, "gRe": 1.0, "seis": None}
 

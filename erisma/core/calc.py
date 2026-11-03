@@ -1,10 +1,10 @@
 """The calculation record.
 
-A :class:`Calculation` is the heart of BlackEye.  Design modules do not just
+A :class:`Calculation` is the heart of Erisma.  Design modules do not just
 return numbers: they *write* a calculation, step by step, exactly as an
 engineer would on a calc sheet - headings, inputs, formulas with substituted
 values, code references and pass/fail checks.  The record is renderer-agnostic
-and is turned into HTML/PDF reports or JSON by :mod:`blackeye.report`.
+and is turned into HTML/PDF reports or JSON by :mod:`erisma.report`.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ class ProjectInfo:
     calc_by: str = ""
     checked_by: str = ""
     date: str = field(default_factory=lambda: date.today().isoformat())
-    company: str = "BlackEye Engineering"
+    company: str = ""
 
     @classmethod
     def from_dict(cls, data: dict[str, Any] | None) -> "ProjectInfo":
@@ -71,7 +71,7 @@ class Calculation:
 
     All user-facing strings pass through :meth:`tr`, so a module written in
     English is reported in the requested language (``lang``) when a
-    translation exists in :mod:`blackeye.i18n`.
+    translation exists in :mod:`erisma.i18n`.
     """
 
     def __init__(self, title: str, module_id: str = "", standard: str = "",

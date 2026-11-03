@@ -7,7 +7,7 @@ display:flex;flex-direction:column}
 .top{display:flex;justify-content:space-between;align-items:center;padding:8px 16px;
 background:var(--accent);color:#fff;gap:12px;flex-wrap:wrap}
 .logo{font-weight:700;font-size:18px}.logo small{font-weight:400;opacity:.7;font-size:12px;margin-left:6px}
-.eye{color:#7fc4ff}
+.logo{display:flex;align-items:center;gap:8px}.logo .mark{width:28px;height:28px}
 .actions{display:flex;gap:6px;flex-wrap:wrap}
 button{font:inherit;border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;
 padding:5px 12px;border-radius:4px;cursor:pointer}

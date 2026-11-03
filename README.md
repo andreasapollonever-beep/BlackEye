@@ -1,10 +1,10 @@
-# BlackEye — Structural Engineering Calculations
+# Erisma — Structural Engineering Calculations
 
-**BlackEye** is a professional structural calculation suite in the spirit of Tekla Tedds:
+**Erisma** is a professional structural calculation suite in the spirit of Tekla Tedds:
 every design is written out step by step — inputs, formulas with substituted values, code
 clause references and PASS/FAIL checks — and produced as a print-ready calculation sheet.
 
-> **Ελληνικά:** Το BlackEye είναι λογισμικό στατικών υπολογισμών (τύπου Tedds) με
+> **Ελληνικά:** Το Erisma είναι λογισμικό στατικών υπολογισμών (τύπου Tedds) με
 > Ευρωκώδικες. Κάθε υπολογισμός καταγράφεται αναλυτικά (δεδομένα → τύπος → τιμή →
 > παραπομπή κανονισμού → έλεγχος) και εξάγεται ως επαγγελματικό τεύχος υπολογισμών (HTML/PDF).
 
@@ -23,11 +23,11 @@ clause references and PASS/FAIL checks — and produced as a print-ready calcula
 
 Platform:
 
-* **Calculation engine** (`blackeye.core`) — auditable `Calculation` record, units, input schema.
-* **Analysis engine** (`blackeye.analysis`) — FE beam solver, verified against closed-form results.
-* **Section library** (`blackeye.sections`) — IPE / HEA / HEB, properties derived from dimensions.
-* **Reports** (`blackeye.report`) — branded A4 calc sheets with title block, SVG diagrams, summary.
-* **Web app** (`blackeye.web`) — schema-driven forms, live preview, save/open projects (`.bkeye`), print to PDF.
+* **Calculation engine** (`erisma.core`) — auditable `Calculation` record, units, input schema.
+* **Analysis engine** (`erisma.analysis`) — FE beam solver, verified against closed-form results.
+* **Section library** (`erisma.sections`) — IPE / HEA / HEB, properties derived from dimensions.
+* **Reports** (`erisma.report`) — branded A4 calc sheets with title block, SVG diagrams, summary.
+* **Web app** (`erisma.web`) — schema-driven forms, live preview, save/open projects (`.erisma`), print to PDF.
 * **3D viewer** — Three.js (vendored, works offline): wall, soil, groundwater, cumulative pressure
   prisms with arrows (earth / surcharge / water / seismic), base pressure, resultant forces,
   layer toggles, live utilisation panel, PNG export.
@@ -36,20 +36,29 @@ Platform:
 * **REST API** — every module is available over HTTP (`/docs` for the OpenAPI UI).
 * **CLI** — batch runs for automation.
 
-## Quick start
+## Εκκίνηση με διπλό κλικ / One-click start
+
+1. Εγκαταστήστε την [Python](https://www.python.org/downloads/) (τσεκάρετε «Add Python to PATH»).
+2. Κατεβάστε το πρόγραμμα (Code → Download ZIP) και αποσυμπιέστε το.
+3. **Windows:** διπλό κλικ στο `Erisma.bat` · **Mac:** δεξί κλικ στο `Erisma.command` → Άνοιγμα.
+
+Την πρώτη φορά γίνεται αυτόματα η εγκατάσταση (1–2 λεπτά). Το Erisma ανοίγει μόνο του στον
+browser. Για τερματισμό κλείστε το μαύρο παράθυρο.
+
+## Quick start (developers)
 
 ```bash
 pip install -e ".[dev]"
-blackeye serve            # open http://127.0.0.1:8000
-blackeye list
-blackeye run ec3_steel_beam -o beam.html
+erisma serve            # open http://127.0.0.1:8000
+erisma list
+erisma run ec3_steel_beam -o beam.html
 pytest
 ```
 
 ## Adding a module
 
 ```python
-from blackeye.core import DesignModule, Field, register
+from erisma.core import DesignModule, Field, register
 
 @register
 class MyCheck(DesignModule):
@@ -63,7 +72,7 @@ class MyCheck(DesignModule):
         calc.check("Tension: F_Ed ≤ F_Rd", F, R, "kN", "6.2.3(1)")
 ```
 
-Import it in `blackeye/modules/__init__.py`; it then appears automatically in the web app,
+Import it in `erisma/modules/__init__.py`; it then appears automatically in the web app,
 API and CLI. All internal values are in **N and mm**; `Field`/`calc.*` units convert at the boundary.
 
 ## Roadmap — beyond Tedds

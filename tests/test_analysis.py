@@ -1,6 +1,6 @@
 import pytest
 
-from blackeye.analysis import UDL, Beam, PointLoad, PointMoment, Support
+from erisma.analysis import UDL, Beam, PointLoad, PointMoment, Support
 
 E, I = 210000.0, 1e8
 

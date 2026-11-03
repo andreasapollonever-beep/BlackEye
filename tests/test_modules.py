@@ -3,11 +3,11 @@ import math
 import pytest
 from fastapi.testclient import TestClient
 
-from blackeye.cli import main
-from blackeye.core import InputError, all_modules, get_module
-from blackeye.report import render_html
-from blackeye.sections.steel import get_section
-from blackeye.web.app import app
+from erisma.cli import main
+from erisma.core import InputError, all_modules, get_module
+from erisma.report import render_html
+from erisma.sections.steel import get_section
+from erisma.web.app import app
 
 
 @pytest.mark.parametrize("name,A,Iy,Wpl,It", [

@@ -1,6 +1,6 @@
 """Unit handling.
 
-All engineering calculations inside BlackEye are carried out in a single
+All engineering calculations inside Erisma are carried out in a single
 consistent base system: **N, mm** (so stresses are N/mm² = MPa, moments are
 Nmm, line loads are N/mm).  Values are converted to/from friendly display
 units only at the boundaries (user input and report output).

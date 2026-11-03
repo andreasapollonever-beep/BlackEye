@@ -3,11 +3,11 @@ import math
 import pytest
 from fastapi.testclient import TestClient
 
-from blackeye.core import InputError, get_module
-from blackeye.design.ec2 import section_capacity
-from blackeye.design.geotech import (bearing_factors, k_mononobe_okabe, ka_coulomb,
+from erisma.core import InputError, get_module
+from erisma.design.ec2 import section_capacity
+from erisma.design.geotech import (bearing_factors, k_mononobe_okabe, ka_coulomb,
                                      poly_props)
-from blackeye.web.app import app
+from erisma.web.app import app
 
 WALL = get_module("ec7_retaining_wall")
 

@@ -18,7 +18,7 @@ from ..report import render_html
 
 STATIC = Path(__file__).parent / "static"
 
-app = FastAPI(title="BlackEye", version=__version__,
+app = FastAPI(title="Erisma", version=__version__,
               description="Structural engineering calculations API")
 
 
