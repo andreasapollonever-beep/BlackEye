@@ -140,6 +140,44 @@ def zone_at(code: str, lat: float | None = None, lon: float | None = None,
             "width": W, "height": H}
 
 
+@lru_cache(maxsize=2)
+def _wind(code: str) -> dict:
+    if code != "CY":
+        raise KeyError(code)
+    d = json.loads((DATA / "cy_wind.json").read_text())
+    rows = []
+    for r in d["rle"]:
+        row = []
+        for v, n in zip(r[0::2], r[1::2]):
+            row.extend([v] * n)
+        rows.append(row)
+    d["grid"] = rows
+    return d
+
+
+def wind_at(code: str, lat: float, lon: float, radius_km: float = 1.0) -> dict:
+    """Fundamental basic wind velocity v_b,0 [m/s] at a site (highest within radius_km)."""
+    d = _wind(code)
+    xs, ys = latlon_to_xy(code, lat, lon)
+    sx, sy, r, tx, ty = d["affine_to_seismic"]
+    u, v = (xs - tx) / sx, (ys - ty) / sy
+    c, s = math.cos(r), math.sin(r)
+    x, y = c * u + s * v, -s * u + c * v
+    W, H, grid = d["width"], d["height"], d["grid"]
+    rp = max(1, int(round(radius_km / (0.301 * sx))))
+    xi, yi = int(round(x)), int(round(y))
+    vals = set()
+    for yy in range(yi - rp, yi + rp + 1):
+        for xx in range(xi - rp, xi + rp + 1):
+            if 0 <= yy < H and 0 <= xx < W and (xx - xi) ** 2 + (yy - yi) ** 2 <= rp * rp:
+                if grid[yy][xx]:
+                    vals.add(grid[yy][xx])
+    special = d["special"] in vals
+    numeric = {v for v in vals if v != d["special"]}
+    return {"vb0": max(numeric) if numeric and not special else None, "special": special,
+            "near_boundary": len(vals) > 1, "on_map": bool(vals)}
+
+
 def places(code: str) -> list[dict]:
     if code != "CY":
         return []

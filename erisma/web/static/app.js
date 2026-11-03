@@ -217,6 +217,10 @@ function scalarInput(f, value, onChange) {
     s.value = value ?? f.default;
     return s;
   }
+  if (f.kind === "text") {
+    return el("input", { type: "text", value: value ?? f.default ?? "",
+      on: { input: (e) => onChange(e.target.value) } });
+  }
   if (f.kind === "bool") {
     const c = el("input", { type: "checkbox", class: "chk", on: { change: (e) => onChange(e.target.checked) } });
     c.checked = !!(value ?? f.default);

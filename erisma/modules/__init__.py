@@ -2,6 +2,9 @@
 
 from . import (  # noqa: F401
     beam_analysis,
+    ec1_wind_snow,
+    ec8_lateral_force,
+    en1990_combinations,
     ec7_berlin_wall,
     ec2_rc_beam,
     ec3_steel_beam,

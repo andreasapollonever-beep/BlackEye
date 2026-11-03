@@ -336,3 +336,31 @@ def vertical_diagrams(z: np.ndarray, H: float, t: float, series: list, z_anchor=
                '▽ H</text>')
     out.append("</svg>")
     return "\n".join(out)
+
+
+def spectrum_plot(T, Sd, T1: float, Sd1: float, title: str = "") -> str:
+    """Design spectrum with the fundamental period marked."""
+    W, Hh, L, B = 640.0, 280.0, 50.0, 30.0
+    tmax, smax = float(T[-1]), float(max(Sd)) * 1.15 or 1.0
+    X = lambda t: L + t / tmax * (W - L - 15)  # noqa: E731
+    Y = lambda s: Hh - B - s / smax * (Hh - B - 20)  # noqa: E731
+    pts = " ".join(f"{X(t):.1f},{Y(s):.1f}" for t, s in zip(T, Sd))
+    out = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W:.0f} {Hh:.0f}" '
+           'class="diagram" role="img"><style>.t{font:11px sans-serif;fill:#334}</style>',
+           f'<line x1="{L}" y1="{Y(0):.1f}" x2="{W - 10}" y2="{Y(0):.1f}" stroke="#99a"/>',
+           f'<line x1="{L}" y1="{Y(0):.1f}" x2="{L}" y2="15" stroke="#99a"/>']
+    for t in range(0, int(tmax) + 1):
+        out.append(f'<text x="{X(t):.1f}" y="{Y(0) + 14:.1f}" class="t" text-anchor="middle">{t}</text>')
+    for k in range(5):
+        s = smax * k / 4
+        out.append(f'<text x="{L - 6}" y="{Y(s) + 4:.1f}" class="t" text-anchor="end">{s:.2f}</text>')
+    out.append(f'<polyline points="{pts}" fill="none" stroke="#2a6f97" stroke-width="2"/>')
+    out.append(f'<line x1="{X(T1):.1f}" y1="{Y(0):.1f}" x2="{X(T1):.1f}" y2="{Y(Sd1):.1f}" '
+               'stroke="#c0392b" stroke-dasharray="4 3"/>'
+               f'<circle cx="{X(T1):.1f}" cy="{Y(Sd1):.1f}" r="4" fill="#c0392b"/>'
+               f'<text x="{X(T1) + 6:.1f}" y="{Y(Sd1) - 6:.1f}" class="t" fill="#c0392b">'
+               f'T1 = {T1:.2f} s, Sd = {Sd1:.3f} g</text>')
+    out.append(f'<text x="{L + 4}" y="14" class="t">{escape(title)}</text>'
+               f'<text x="{W - 12}" y="{Y(0) + 26:.1f}" class="t" text-anchor="end">T [s]</text>')
+    out.append("</svg>")
+    return "\n".join(out)

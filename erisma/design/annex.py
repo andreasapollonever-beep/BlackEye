@@ -52,6 +52,31 @@ class Annex:
     mandatory_approach: str | None = None
     # EN 1998-1 seismic zones: [(label, agR in g)]
     zones: tuple = ()
+    # EN 1998-1 Table 3.2 — Type 1 spectrum: ground type -> (S, TB, TC, TD)
+    spectrum: dict = field(default_factory=lambda: {
+        "A": (1.0, 0.15, 0.4, 2.0), "B": (1.2, 0.15, 0.5, 2.0), "C": (1.15, 0.20, 0.6, 2.0),
+        "D": (1.35, 0.20, 0.8, 2.0), "E": (1.4, 0.15, 0.5, 2.0)})
+    gamma_I: dict = field(default_factory=lambda: {"I": 0.8, "II": 1.0, "III": 1.2, "IV": 1.4})
+    spectrum_beta: float = 0.2
+    # EN 1990 Table A1.1 — ψ0, ψ1, ψ2
+    psi: dict = field(default_factory=lambda: {
+        "A": (0.7, 0.5, 0.3), "B": (0.7, 0.5, 0.3), "C": (0.7, 0.7, 0.6), "D": (0.7, 0.7, 0.6),
+        "E": (1.0, 0.9, 0.8), "F": (0.7, 0.7, 0.6), "G": (0.7, 0.5, 0.3), "H": (0.0, 0.0, 0.0),
+        "snow_high": (0.7, 0.5, 0.2), "snow_low": (0.5, 0.2, 0.0), "wind": (0.6, 0.2, 0.0),
+        "temperature": (0.6, 0.5, 0.0)})
+    # EN 1991-1-3: characteristic ground snow s_k(A) [kN/m²] or None (user input)
+    snow_formula: str | None = None
+    snow_max_altitude: float | None = None
+    wind_map: bool = False
+    air_density: float = 1.25
+    # EN 1993-1-1 / -1-8
+    gamma_M0: float = 1.0
+    gamma_M1: float = 1.0
+    gamma_M2: float = 1.25
+    # EN 1998-3 Table 3.1 confidence factors
+    CF: dict = field(default_factory=lambda: {"KL1": 1.35, "KL2": 1.20, "KL3": 1.00})
+    # EN 1992-3 7.3.1(111): w_k1 = 0.2 mm (h_D/h ≤ 5) … 0.05 mm (h_D/h ≥ 35)
+    wk1: tuple = (5.0, 0.2, 35.0, 0.05)
     notes: tuple = ()
 
     def approach(self, choice: str) -> str:
@@ -84,6 +109,12 @@ CY = Annex(
     "EN 1998-5:2004 (approved 11/06/2010)",
     default_approach="DA2", mandatory_approach="DA2",
     punch_vmax=0.5, anchor_sls_factor=1.35, slope_mode="DA2", slope_gRe=1.1,
+    # NA to CYS EN 1991-1-3 NA 2.5: Annex C, Mediterranean, Z = 1 everywhere → s_k =
+    # 0.289 [1 + (A/452)²]; special study above 1500 m. NA to CYS EN 1991-1-4 NA 2.4:
+    # v_b,0 from the isotach map (24/30/40 m/s), c_dir = c_season = 1.0, ρ = 1.25 kg/m³.
+    snow_formula="0.289*(1+(A/452)**2)", snow_max_altitude=1500.0, wind_map=True,
+    # NA to CYS EN 1990 Table A1.1, EN 1998-1 NA 2.7/2.9/2.12, EN 1993-1-1 NA 2.14,
+    # EN 1998-3 Table 3.1 (CYS), EN 1992-3 NA 2.1 — equal to the EN recommended values.
     zones=(("Zone 1", 0.15), ("Zone 2", 0.20), ("Zone 3", 0.25)),
     notes=("Design Approach 2 is mandatory for STR/GEO (NA 2.9).",
            "Seismic zones: Zone 1 0.15 g, Zone 2 0.20 g, Zone 3 0.25 g (NA zonation map, "
@@ -91,6 +122,13 @@ CY = Annex(
 )
 
 ANNEXES: dict[str, Annex] = {"EN": EN, "CY": CY}
+
+
+def ground_snow(na: Annex, A: float) -> float | None:
+    """Characteristic ground snow load s_k [kN/m²] at altitude A [m] (None = user input)."""
+    if not na.snow_formula:
+        return None
+    return float(eval(na.snow_formula, {"__builtins__": {}}, {"A": A}))  # noqa: S307
 
 
 def get_annex(code: str | None) -> Annex:

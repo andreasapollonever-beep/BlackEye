@@ -10,6 +10,9 @@ SCENARIOS = {
     "ec3_steel_beam": [{}, {"L": 12, "Lcr": 0}, {"section": "IPE 600", "grade": "S235"},
                        {"Gk_pt": 50, "Qk_pt": 30}, {"section": "HEA 300", "L": 3, "qk": 200}],
     "beam_analysis": [{}],
+    "ec1_wind_snow": [{}, {"use_site": False}, {"roof": 45, "Ce": "Sheltered", "A": 1200}],
+    "ec8_lateral_force": [{}, {"T1": 3.0}, {"ag": 0.05}, {"ag": 0.03}],
+    "en1990_combinations": [{}],
     "ec7_berlin_wall": [{}, {"support": "Cantilever"}, {"phi": 20, "support": "Cantilever"},
                         {"approach": "DA2", "seismic": False}, {"section": "HEB 100"}],
     "ec7_retaining_wall": [{}, {"h_w": 1.5, "beta": 10}, {"approach": "DA2", "key": True},
@@ -28,7 +31,8 @@ BAD = [("ec3_steel_beam", {"L": -1}), ("ec3_steel_beam", {"L": "abc"}),
        ("ec7_slope_stability", {"phi": 0, "c": 0}), ("ec7_berlin_wall", {"z_a": 6}),
        ("ec7_berlin_wall", {"a": 0.1}), ("ec7_retaining_wall", {"step": True, "t_low": 0.3}),
        ("ec7_retaining_wall", {"step": True, "h_step": 5}),
-       ("ec7_retaining_wall", {"key": True, "key_x": 9})]
+       ("ec7_retaining_wall", {"key": True, "key_x": 9}), ("en1990_combinations", {"actions": []}),
+       ("ec8_lateral_force", {"storeys": []})]
 
 
 def collect() -> set[str]:
@@ -43,9 +47,18 @@ def collect() -> set[str]:
         render_html(m.calculate({"approach": "DA1"} if any(f.name == "approach" for f in m.fields)
                                 else {}, {"annex": "CY", "site": "Λεμεσός", "lat": "34.6841",
                                           "lon": "33.0379"}, "el"))
-        render_html(m.calculate({}, {"annex": "CY", "lat": "34.0", "lon": "30.0"}, "el"))
-        render_html(m.calculate({}, {"annex": "CY", "lat": "35.1195", "lon": "33.0", "site": "x"},
-                                "el"))
+        for proj in ({"annex": "CY", "lat": "34.0", "lon": "30.0"},
+                     {"annex": "CY", "lat": "35.1195", "lon": "33.0", "site": "x"},
+                     {"annex": "CY", "lat": "34.92", "lon": "32.88"}):
+            try:
+                render_html(m.calculate({}, proj, "el"))
+            except InputError:
+                pass
+    try:
+        get_module("ec1_wind_snow").calculate({"A": 1600}, {"annex": "CY", "lat": "34.6841",
+                                                            "lon": "33.0379"}, "el")
+    except InputError:
+        pass
     for a in ANNEXES.values():
         for z, _ in a.zones:
             i18n.tr(z, "el")
