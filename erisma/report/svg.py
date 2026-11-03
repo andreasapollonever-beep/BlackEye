@@ -364,3 +364,47 @@ def spectrum_plot(T, Sd, T1: float, Sd1: float, title: str = "") -> str:
                f'<text x="{W - 12}" y="{Y(0) + 26:.1f}" class="t" text-anchor="end">T [s]</text>')
     out.append("</svg>")
     return "\n".join(out)
+
+
+def line_plot(series: list, xlabel: str, ylabel: str, hlines: list | None = None,
+              vlines: list | None = None) -> str:
+    """Simple x-y plot: series = [(label, xs, ys, colour)], hlines/vlines = [(value, label)]."""
+    W, H, L, B, T, R = 640.0, 300.0, 56.0, 40.0, 16.0, 16.0
+    xs_all = np.concatenate([np.asarray(s[1], float) for s in series])
+    ys_all = np.concatenate([np.asarray(s[2], float) for s in series] +
+                            [np.array([v for v, _ in (hlines or [])], float)])
+    x0, x1 = 0.0, float(xs_all.max()) or 1.0
+    y0, y1 = min(0.0, float(ys_all.min())), float(ys_all.max()) * 1.08 or 1.0
+    X = lambda x: L + (x - x0) / (x1 - x0) * (W - L - R)  # noqa: E731
+    Y = lambda y: H - B - (y - y0) / (y1 - y0) * (H - B - T)  # noqa: E731
+    out = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W:.0f} {H:.0f}" '
+           'class="diagram" role="img"><style>.t{font:11px sans-serif;fill:#223}'
+           '.ax{stroke:#99a}.g{stroke:#e3e6ea}</style>']
+    for k in range(6):
+        yv = y0 + (y1 - y0) * k / 5
+        xv = x0 + (x1 - x0) * k / 5
+        out.append(f'<line x1="{L}" y1="{Y(yv):.1f}" x2="{W - R}" y2="{Y(yv):.1f}" class="g"/>')
+        out.append(f'<text x="{L - 6}" y="{Y(yv) + 4:.1f}" class="t" text-anchor="end">{yv:.0f}</text>')
+        out.append(f'<text x="{X(xv):.1f}" y="{H - B + 15:.1f}" class="t" text-anchor="middle">'
+                   f'{xv:.0f}</text>')
+    out.append(f'<line x1="{L}" y1="{Y(y0):.1f}" x2="{W - R}" y2="{Y(y0):.1f}" class="ax"/>')
+    out.append(f'<line x1="{L}" y1="{T}" x2="{L}" y2="{H - B}" class="ax"/>')
+    out.append(f'<text x="{(W + L) / 2:.0f}" y="{H - 6}" class="t" text-anchor="middle">'
+               f'{escape(xlabel)}</text>')
+    out.append(f'<text x="12" y="{(H - B) / 2:.0f}" class="t" transform="rotate(-90 12 '
+               f'{(H - B) / 2:.0f})" text-anchor="middle">{escape(ylabel)}</text>')
+    for v, lab in hlines or []:
+        out.append(f'<line x1="{L}" y1="{Y(v):.1f}" x2="{W - R}" y2="{Y(v):.1f}" stroke="#e03b3b" '
+                   f'stroke-dasharray="5 4"/><text x="{W - R - 4}" y="{Y(v) - 4:.1f}" class="t" '
+                   f'text-anchor="end" fill="#e03b3b">{escape(lab)}</text>')
+    for v, lab in vlines or []:
+        out.append(f'<line x1="{X(v):.1f}" y1="{T}" x2="{X(v):.1f}" y2="{H - B}" stroke="#2a6f97" '
+                   f'stroke-dasharray="5 4"/><text x="{X(v) + 4:.1f}" y="{T + 12}" class="t" '
+                   f'fill="#2a6f97">{escape(lab)}</text>')
+    for i, (lab, xs, ys, col) in enumerate(series):
+        pts = " ".join(f"{X(x):.1f},{Y(y):.1f}" for x, y in zip(xs, ys))
+        out.append(f'<polyline points="{pts}" fill="none" stroke="{col}" stroke-width="2"/>')
+        out.append(f'<text x="{L + 10}" y="{T + 14 + 14 * i}" class="t" fill="{col}">'
+                   f'{escape(lab)}</text>')
+    out.append("</svg>")
+    return "\n".join(out)

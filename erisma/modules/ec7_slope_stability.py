@@ -33,6 +33,32 @@ class SlopeModel:
         self.y_min = -inp["depth_firm"]
         self.x_left = -max(3 * self.H, self.q_off + self.q_w + self.H)
         self.x_right = self.Ls + 2.5 * self.H
+        # nails / anchors: (x_head, y_head, dx, dy, L, T_d per m, bond per m per m)
+        self.nails = []
+        for r in inp.get("nails") or []:
+            zh = min(max(r["z"], 0.0), self.H)
+            a = math.radians(r["angle"])
+            self.nails.append((self.Ls * (1 - zh / self.H), zh, -math.cos(a), -math.sin(a),
+                               r["L"], r["Td"] / r["sh"], r["bond"] / r["sh"]))
+
+    def nail_force(self, xc, yc, R):
+        """Σ T·r / R of the nails crossing the circle (per metre of slope)."""
+        tot, used = 0.0, []
+        for xh, yh, dx, dy, L, Td, bond in self.nails:
+            fx, fy = xh - xc, yh - yc
+            b = 2 * (fx * dx + fy * dy)
+            cc = fx * fx + fy * fy - R * R
+            disc = b * b - 4 * cc
+            if disc <= 0 or cc >= 0:  # head must lie inside the circle (in the moving mass)
+                continue
+            s_int = (-b + math.sqrt(disc)) / 2
+            if s_int <= 0 or s_int >= L:
+                continue
+            T = min(Td, bond * (L - s_int))
+            lever = abs(fx * dy - fy * dx)
+            tot += T * lever / R
+            used.append(T)
+        return tot, used
 
     def ground(self, x):
         x = np.asarray(x, dtype=float)
@@ -72,17 +98,18 @@ class SlopeModel:
         if drive <= 0:
             return None
         num0 = c * b + np.maximum(Wv - u * b, 0) * tanphi
+        Tn, used = self.nail_force(xc, yc, R) if self.nails else (0.0, [])
         F = 1.5
         for _ in range(60):
             m = cosa * (1 + sina / cosa * tanphi / F)
             m = np.maximum(m, 0.2)  # guard against negative mα at steep exit
-            Fn = np.sum(num0 / m) / drive
+            Fn = (np.sum(num0 / m) + Tn) / drive
             if abs(Fn - F) < 1e-5:
                 F = Fn
                 break
             F = Fn
         return {"F": float(F), "xc": xc, "yc": yc, "R": R, "x1": x1, "x2": x2,
-                "edges": edges, "yb": yb, "W": float(W.sum())}
+                "edges": edges, "yb": yb, "W": float(W.sum()), "T": used}
 
     def search(self, tanphi, c, gq=1.0, kh=0.0, kv=0.0):
         H, Ls = self.H, self.Ls
@@ -146,6 +173,16 @@ class SlopeStabilityEC7(DesignModule):
         Field("q", "Crest surcharge (variable)", "kN/m²", 10.0, min=0, group="Loads"),
         Field("q_offset", "Distance of surcharge from crest", "m", 1.0, min=0, group="Loads"),
         Field("q_width", "Surcharge width", "m", 5.0, min=0, group="Loads"),
+        Field("nails", "Soil nails / anchors (optional)", kind="table", group="Reinforcement",
+              default=[], columns=[
+                  Field("z", "Head height above the toe", "m", 3.0, min=0),
+                  Field("angle", "Inclination below horizontal", "°", 15.0, min=0, max=60),
+                  Field("L", "Length", "m", 8.0, min=1),
+                  Field("sh", "Horizontal spacing", "m", 1.5, min=0.3),
+                  Field("Td", "Design tensile resistance T_d", "kN", 150.0, min=1),
+                  Field("bond", "Design pull-out resistance per metre", "kN/m", 40.0, min=1)],
+              help="Leave empty for an unreinforced slope. Each row adds T = min(T_d, bond × "
+                   "length behind the slip surface) with its lever arm about the circle centre."),
         Field("seismic", "Include seismic (pseudo-static)", kind="bool", default=True,
               group="Seismic"),
         Field("ag", "Design ground acceleration αgR·γI", "", 0.16, min=0, max=0.6,
@@ -236,6 +273,16 @@ class SlopeStabilityEC7(DesignModule):
                            "EN 1998-5 4.1.3.3", hint=HINT_SLOPE)
                 cases.append(("seismic", rs))
 
+        if sm.nails:
+            calc.heading("Soil nails / anchors")
+            calc.text("Each row crossing the slip circle adds the resisting moment T·r about the "
+                      "centre, T = min(T_d, R_pull,d × L_behind) per metre (s_h). Design values "
+                      "of T_d and pull-out resistance are given by the user (EN 1997-1 §8).")
+            calc.table(["Row", "z [m]", "α [°]", "L [m]", "s_h [m]", "T_d [kN]", "T in design case [kN/m]"],
+                       [[str(k + 1), f"{r['z'] / 1000:g}", f"{r['angle']:g}", f"{r['L'] / 1000:g}",
+                         f"{r['sh'] / 1000:g}", f"{r['Td'] / 1000:g}",
+                         f"{rd['T'][k] / 1:.1f}" if k < len(rd.get('T', [])) else "—"]
+                        for k, r in enumerate(inp["nails"])], caption="Reinforcement rows")
         calc.heading("Critical slip circles")
         calc.table(["Case", "F", "x_c [m]", "y_c [m]", "R [m]", "W [kN/m]"],
                    [[calc.tr({"char": "Characteristic", "design": "Persistent (design)",
@@ -295,6 +342,13 @@ class SlopeStabilityEC7(DesignModule):
                              0.15)
             sc.label("loads", f"q = {from_base(inp['q'], 'kN/m²'):.0f} kN/m²",
                      ((x1 + x2) / 2, H + 1.2, L * 0.45), "surcharge")
+        if sm.nails:
+            sc.layer("nails", "Soil nails / anchors")
+            for xh, yh, dx, dy, Ln, _, _ in sm.nails:
+                for zz in np.linspace(-L * 0.4, L * 0.4, 7):
+                    sc.cylinder("nails", (m(xh), m(yh), zz),
+                                (m(xh + dx * Ln), m(yh + dy * Ln), zz), 0.05, "#5a6b7d")
+                sc.box("nails", (m(xh), m(yh), 0), (0.08, 0.5, L * 0.85), "#9aa0a8")
         sc.label("dims", f"H = {H:.1f} m", (Ls + 0.4, H / 2, L / 2), "dim")
         sc.label("dims", f"β = {inp['slope']:.1f}°", (Ls * 0.6, H * 0.2, L / 2), "dim")
         return sc.to_dict()

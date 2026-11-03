@@ -230,6 +230,56 @@ def _ass(i, c):
     return {}, ""
 
 
+@quantity("ec2_rc_stair")
+def _stair(i, c):
+    a = math.atan(i["rise"] / i["L"])
+    vol = m3(i["L"] / math.cos(a), i["t"], i["w"]) + m3(i["L"], i["rise"] / i["n"] / 2, i["w"])
+    As = _bar(float(i["dia"])) * i["w"] / i["s"]
+    return {"concrete": vol, "rebar": _kg(As, i["L"] / math.cos(a)) * 1.3,
+            "formwork": i["L"] / math.cos(a) * i["w"] / 1e6}, "per flight"
+
+
+@quantity("ec2_pile_cap")
+def _cap(i, c):
+    from .modules.ec2_pile_cap import layout
+    pts = layout(int(i["n"]), i["s"])
+    xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+    W = max(xs) - min(xs) + i["D"] + 2 * i["edge"]
+    L = max(ys) - min(ys) + i["D"] + 2 * i["edge"]
+    nt = {2: 1, 3: 3, 4: 4}[int(i["n"])]
+    As = i["nbar"] * _bar(float(i["dia"]))
+    return {"concrete": m3(W, L, i["h"]), "rebar": nt * _kg(As, max(W, L)) * 1.4,
+            "formwork": 2 * (W + L) * i["h"] / 1e6, "excavation": m3(W + 600, L + 600, i["h"])},\
+        "per cap"
+
+
+@quantity("ec8_rc_wall")
+def _wallq(i, c):
+    lw, bw, H = i["lw"], i["bw"], i["Hw"]
+    Abe = 2 * i["nbe"] * _bar(float(i["dbe"]))
+    Av = 2 * _bar(float(i["dv"])) * (lw - 2 * i["lc"]) / i["sv"]
+    Ah = 2 * _bar(float(i["dhw"])) * lw * H / i["shw"]
+    return {"concrete": m3(lw, bw, H), "rebar": _kg(Abe + Av, H) * 1.1 + Ah * 1e-9 * RHO_S,
+            "formwork": 2 * lw * H / 1e6}, "per wall (full height)"
+
+
+@quantity("ec7_raft")
+def _raft(i, c):
+    Lx = (i["nx"] - 1) * i["ax"] + 2 * i["e"]
+    Ly = (i["ny"] - 1) * i["ay"] + 2 * i["e"]
+    Ab = _bar(float(i["db"])) * 1000 / i["sb"]
+    At = _bar(float(i["dt"])) * 1000 / i["st"]
+    area = Lx * Ly / 1e6
+    return {"concrete": m3(Lx, Ly, i["t"]), "rebar": 2 * (Ab + At) * 1e-6 * RHO_S * area,
+            "formwork": 2 * (Lx + Ly) * i["t"] / 1e6,
+            "excavation": m3(Lx + 1000, Ly + 1000, i["t"] + 300)}, "per raft"
+
+
+@quantity("ec3_weld")
+def _weld(i, c):
+    return {}, ""
+
+
 def estimate(calc, inputs: dict) -> dict | None:
     fn = _FN.get(calc.module_id)
     if not fn:

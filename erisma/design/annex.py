@@ -101,6 +101,8 @@ class Annex:
     ec83_return: dict = field(default_factory=lambda: {"NC": 2475, "SD": 475, "DL": 225})
     # EN 1998-3 2.2.1(7)P: brittle primary elements use the partial factors of EN 1998-1
     ec83_brittle_partial: bool = True
+    # EN 1998-5 4.1.4(11): safety factor against liquefaction λ
+    liq_lambda: float = 1.25
     # EN 1992-3 9.11.1(102): minimum wall thickness t1 (class 0), t2 (classes 1, 2) [mm]
     tank_tmin: tuple = (120.0, 150.0)
     # EN 1997-1 Table A.15 — UPL: (γ_G,dst, γ_G,stb, γ_Q,dst)

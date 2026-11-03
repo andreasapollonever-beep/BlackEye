@@ -356,9 +356,11 @@ NOTES: dict[str, dict[str, list[str]]] = {
                "Δσ = 0.2 σ'_v0· κοκκώδη με E_oed, άργιλοι με C_c/C_r/OCR."]},
     "ec7_slope_stability": {
         "en": ["Bishop simplified method with automatic search of the critical circle; "
-               "pseudo-static seismic action (EN 1998-5 4.1.3.3)."],
+               "pseudo-static seismic action (EN 1998-5 4.1.3.3); optional soil nails / anchors "
+               "adding T·r about the centre."],
         "el": ["Απλοποιημένη μέθοδος Bishop με αυτόματη αναζήτηση του κρίσιμου κύκλου· "
-               "ψευδοστατική σεισμική δράση (EN 1998-5 4.1.3.3)."]},
+               "ψευδοστατική σεισμική δράση (EN 1998-5 4.1.3.3)· προαιρετικά ήλοι / αγκύρια "
+               "με ροπή T·r ως προς το κέντρο."]},
     "ec7_berlin_wall": {
         "en": ["Blum (cantilever) or free earth support (one anchor row); spatial passive "
                "resistance below the excavation (f·b ≤ a)."],
@@ -388,6 +390,49 @@ NOTES: dict[str, dict[str, list[str]]] = {
                "variable action in turn as leading action."],
         "el": ["Όλοι οι συνδυασμοί ΟΚΑ (6.10), σεισμικοί (6.12b) και ΟΚΛ με τα ψ του "
                "προσαρτήματος· κάθε μεταβλητή δράση διαδοχικά ως κύρια."]},
+    "ec3_weld": {
+        "en": ["Elastic stresses on the throat area unfolded into the joint plane; σ⊥ = τ⊥ = σ_w/√2, "
+               "τ∥ from the shear on the vertical welds; Eq. 4.1 and the simplified method 4.5.3.3."],
+        "el": ["Ελαστικές τάσεις στο ξεδιπλωμένο εμβαδόν λαιμού· σ⊥ = τ⊥ = σ_w/√2, τ∥ από την "
+               "τέμνουσα στις κατακόρυφες ραφές· Εξ. 4.1 και απλοποιημένη μέθοδος 4.5.3.3."]},
+    "ec2_rc_stair": {
+        "en": ["Waist slab as a one-way slab on the horizontal span; self weight of waist and steps "
+               "on plan; comfort rule 2R + G."],
+        "el": ["Η πλάκα της σκάλας ως πλάκα μίας διεύθυνσης στο οριζόντιο άνοιγμα· ίδιο βάρος "
+               "πλάκας και βαθμίδων σε κάτοψη· κανόνας άνεσης 2R + G."]},
+    "ec2_pile_cap": {
+        "en": ["Rigid cap: pile loads from N and M; strut-and-tie with z = 0.9d, ties along the "
+               "pile lines; node stresses by Eq. 6.60/6.61."],
+        "el": ["Δύσκαμπτος κεφαλόδεσμος: φορτία πασσάλων από N και M· θλιπτήρες-ελκυστήρες με "
+               "z = 0.9d, ελκυστήρες στις γραμμές πασσάλων· τάσεις κόμβων κατά Εξ. 6.60/6.61."]},
+    "ec8_rc_wall": {
+        "en": ["DCM wall: ν_d ≤ 0.4, h_cr (Eq. 5.19), M_Rd by strain compatibility with web bars, "
+               "V_Ed = 1.5 V'_Ed, confinement of boundary elements by Eq. 5.20 with μ_φ = 2q_0 − 1."],
+        "el": ["Τοίχωμα ΚΠΜ: ν_d ≤ 0.4, h_cr (Εξ. 5.19), M_Rd με συμβιβαστό παραμορφώσεων και τον "
+               "οπλισμό κορμού, V_Ed = 1.5 V'_Ed, περίσφιγξη άκρων κατά Εξ. 5.20 με μ_φ = 2q_0 − 1."]},
+    "ec7_raft": {
+        "en": ["Strip method: each column line as a beam on Winkler springs carrying the full "
+               "column loads in both directions (conservative); E_c = 0.5 E_cm."],
+        "el": ["Μέθοδος λωρίδων: κάθε γραμμή υποστυλωμάτων ως δοκός σε ελατήρια Winkler με όλα τα "
+               "φορτία και στις δύο διευθύνσεις (συντηρητικά)· E_c = 0.5 E_cm."]},
+    "ec8_5_liquefaction": {
+        "en": ["τ_e = 0.65 α S σ_v0; (N1)60 with C_N and fines correction; CRR of Youd et al. "
+               "(2001) × C_M (Table B.1); FS ≥ λ of the National Annex."],
+        "el": ["τ_e = 0.65 α S σ_v0· (N1)60 με C_N και διόρθωση λεπτόκοκκων· CRR κατά Youd κ.ά. "
+               "(2001) × C_M (Πίνακας B.1)· FS ≥ λ του Εθνικού Προσαρτήματος."]},
+    "ec3_fire": {
+        "en": ["Critical temperature Eq. 4.22; heating to ISO 834 by Eq. 4.25 (unprotected, k_sh) "
+               "or Eq. 4.27 (protected, product data λ_p, d_p, c_p, ρ_p)."],
+        "el": ["Κρίσιμη θερμοκρασία Εξ. 4.22· θέρμανση κατά ISO 834 με Εξ. 4.25 (απροστάτευτο, "
+               "k_sh) ή Εξ. 4.27 (προστατευμένο, στοιχεία προϊόντος λ_p, d_p, c_p, ρ_p)."]},
+    "ec5_fire": {
+        "en": ["Reduced cross-section: d_ef = β_n t + 7 mm; f_d,fi = k_fi f_k (k_mod,fi = γ_M,fi = 1)."],
+        "el": ["Μειωμένη διατομή: d_ef = β_n t + 7 mm· f_d,fi = k_fi f_k (k_mod,fi = γ_M,fi = 1)."]},
+    "ec2_fire": {
+        "en": ["Tabulated data: Table 5.5 (simply supported beams, interpolated in b, corner bars "
+               "+10 mm) and Table 5.8 (slabs)."],
+        "el": ["Πίνακες: Πίνακας 5.5 (αμφιέρειστες δοκοί, παρεμβολή ως προς b, γωνιακές ράβδοι "
+               "+10 mm) και Πίνακας 5.8 (πλάκες)."]},
     "ec8_3_assessment": {
         "en": ["EN 1998-3 Annex A: θ_y (A.10a), θ_um (A.1), V_R (A.12); mean strengths ÷ CF, "
                "brittle shear also ÷ γ (Cyprus NA 2.3).",
