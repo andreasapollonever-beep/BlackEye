@@ -6,6 +6,7 @@ import numpy as np
 
 from ..core import Calculation, DesignModule, Field, InputError, register
 from ..design.annex import get_annex
+from ..report.scene3d import PALETTE, Scene3D
 from ..report.svg import spectrum_plot
 
 CT = {"Steel moment frames": 0.085, "RC moment frames / eccentric braced steel": 0.075,
@@ -29,6 +30,7 @@ class LateralForceEC8(DesignModule):
     category = "Loads"
     standard = "EN 1998-1"
     uses_annex = True
+    has_3d = True
     description = ("Design response spectrum (Type 1) and the lateral force method: fundamental "
                    "period, base shear and storey forces for regular buildings.")
 
@@ -123,3 +125,29 @@ class LateralForceEC8(DesignModule):
         calc.figure(spectrum_plot(T, design_spectrum(T, ag, S, TB, TC, TD, q, beta), T1, Sd,
                                   calc.tr("Design spectrum S_d(T) [g]")),
                     "Design spectrum (Type 1) and fundamental period")
+        calc.model3d = cls._scene(calc, zs, forces, Fb, T1)
+
+    @staticmethod
+    def _scene(calc, zs, forces, Fb, T1) -> dict:
+        sc = Scene3D("lateral_force", calc.tr)
+        for key, label in (("frame", "Building"), ("forces", "Storey forces"),
+                           ("shear", "Base shear")):
+            sc.layer(key, label, toggle=key != "frame")
+        B = 8.0
+        Fmax = max(forces) or 1.0
+        prev = 0.0
+        for z, F in zip(zs, forces):
+            for x in (-B / 2, B / 2):
+                for y in (-B / 2, B / 2):
+                    sc.box("frame", (x, (prev + z) / 2, y), (0.35, z - prev, 0.35), "#9aa0a8")
+            sc.box("frame", (0, z, 0), (B + 0.5, 0.25, B + 0.5), PALETTE["concrete"], opacity=0.8)
+            ln = 0.6 + 3.0 * F / Fmax
+            sc.arrow("forces", (-B / 2 - ln - 0.4, z, 0), (1, 0, 0), ln, PALETTE["seismic"], 0.35)
+            sc.label("forces", f"F = {F / 1000:.0f} kN", (-B / 2 - ln - 0.6, z + 0.35, 0), "force")
+            prev = z
+        sc.box("frame", (0, -0.25, 0), (B + 2, 0.5, B + 2), PALETTE["rock"], opacity=0.5)
+        sc.arrow("shear", (B / 2 + 4.0, 0.3, 0), (-1, 0, 0), 3.0, PALETTE["seismic"], 0.5)
+        sc.label("shear", calc.tr("F_b = {f:.0f} kN, T_1 = {t:.2f} s", f=Fb / 1000, t=T1),
+                 (B / 2 + 3.0, 1.0, 0), "result")
+        return sc.to_dict()
+

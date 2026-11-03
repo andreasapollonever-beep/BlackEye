@@ -7,6 +7,7 @@ import math
 from ..core import Calculation, DesignModule, Field, InputError, register
 from ..design import sitezones
 from ..design.annex import get_annex, ground_snow
+from ..report.scene3d import PALETTE, Scene3D
 
 TERRAIN = {"0": (0.003, 1.0), "I": (0.01, 1.0), "II": (0.05, 2.0), "III": (0.3, 5.0),
            "IV": (1.0, 10.0)}  # EN 1991-1-4 Table 4.1: z0, zmin [m]
@@ -34,6 +35,7 @@ class WindSnowEC1(DesignModule):
     category = "Loads"
     standard = "EN 1991-1-4, EN 1991-1-3"
     uses_annex = True
+    has_3d = True
     description = ("Peak velocity pressure q_p(z), wall pressures and roof snow load. With the "
                    "Cyprus National Annex v_b,0 and s_k are taken automatically from the project "
                    "site on the official maps.")
@@ -154,3 +156,49 @@ class WindSnowEC1(DesignModule):
         hi = A > 1000
         calc.text("ψ factors for snow (EN 1990 Table A1.1): {p}", p="ψ0 = {:g}, ψ1 = {:g}, ψ2 = {:g}"
                   .format(*na.psi["snow_high" if hi else "snow_low"]))
+        calc.model3d = cls._scene(calc, inp, qp, wD, wE, mu * Ce * sk)
+
+    @staticmethod
+    def _scene(calc, inp, qp, wD, wE, snow) -> dict:
+        H, D = inp["z"] / 1000, inp["d"] / 1000
+        W = D
+        a = math.radians(inp["roof"])
+        sc = Scene3D("wind_snow", calc.tr)
+        for key, label in (("building", "Building"), ("wind", "Wind pressures"),
+                           ("snow", "Snow on the roof")):
+            sc.layer(key, label, toggle=key != "building")
+        sc.box("building", (0, H / 2, 0), (D, H, W), "#c9ccd1", opacity=0.55)
+        ridge = H + D / 2 * math.tan(a) if a > 0 else H
+        if a > 0:
+            sc.prism("building", [(-D / 2, H), (D / 2, H), (0, ridge)], W, "#9a5b45")
+        wmax = max(abs(wD), abs(wE), 1e-9)
+        for i in range(1, 4):
+            for j in range(1, 4):
+                y, z = H * i / 4, -W / 2 + W * j / 4
+                ln = 0.6 + 1.4 * abs(wD) / wmax
+                sc.arrow("wind", (-D / 2 - ln - 0.05, y, z), (1, 0, 0), ln, "#e03b3b", 0.25)
+                ln2 = 0.6 + 1.4 * abs(wE) / wmax
+                sc.arrow("wind", (D / 2 + 0.05, y, z), (1, 0, 0), ln2, "#2f8fd8", 0.25)
+        sc.box("wind", (-D / 2 - 0.01, H / 2, 0), (0.02, H, W), "#e03b3b", opacity=0.35)
+        sc.box("wind", (D / 2 + 0.01, H / 2, 0), (0.02, H, W), "#2f8fd8", opacity=0.35)
+        sc.label("wind", calc.tr("Windward w_D = {w:.2f} kN/m²", w=wD * 1000),
+                 (-D / 2 - 1.5, H + 0.6, W / 2), "force")
+        sc.label("wind", calc.tr("Leeward w_E = {w:.2f} kN/m²", w=wE * 1000),
+                 (D / 2 + 1.5, H + 0.6, W / 2), "force")
+        sc.label("wind", calc.tr("q_p = {q:.2f} kN/m²", q=qp * 1000), (0, ridge + 1.6, 0),
+                 "result")
+        t = max(0.08, min(0.6, snow * 1000 / 2))
+        if snow > 0:
+            if a > 0:
+                for sgn in (-1, 1):
+                    sc.prism("snow", [(0, ridge + 0.02), (sgn * D / 2, H + 0.02),
+                                      (sgn * D / 2, H + 0.02 + t), (0, ridge + 0.02 + t)], W,
+                             "#f4f7fb", opacity=0.9)
+            else:
+                sc.box("snow", (0, H + t / 2, 0), (D, t, W), "#f4f7fb", opacity=0.9)
+            sc.label("snow", calc.tr("s = {s:.2f} kN/m²", s=snow * 1000), (0, ridge + t + 0.6, 0),
+                     "result")
+        sc.arrow("wind", (-D / 2 - 4.5, H + 1.5, 0), (1, 0, 0), 2.0, PALETTE["load"], 0.4)
+        sc.label("wind", calc.tr("Wind"), (-D / 2 - 4.5, H + 1.9, 0), "")
+        return sc.to_dict()
+

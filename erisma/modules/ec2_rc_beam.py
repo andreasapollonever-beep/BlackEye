@@ -6,6 +6,7 @@ import math
 
 from ..core import Calculation, DesignModule, Field, register
 from ..design.ec2 import XI_LIM, bar_area, design_flexure, section_capacity
+from ..report.scene3d import PALETTE, Scene3D
 from ..report.svg import rc_section
 
 CONCRETE = ["C20/25", "C25/30", "C30/37", "C35/45", "C40/50", "C45/55", "C50/60"]
@@ -18,6 +19,7 @@ class RCBeamEC2(DesignModule):
     title = "RC beam section design"
     category = "Concrete"
     standard = "EN 1992-1-1:2004"
+    has_3d = True
     description = ("Rectangular section with tension and compression reinforcement: flexure "
                    "(stress block, strain compatibility), "
                    "minimum/maximum reinforcement and shear with variable strut inclination.")
@@ -156,3 +158,36 @@ class RCBeamEC2(DesignModule):
         calc.check_min("Minimum links: A_sw/(s b) ≥ ρ_w,min", Asw / (s * b), rho_w_min, "",
                        "9.2.2(5)", hint="Reduce the link spacing or use larger links.")
         calc.check_limit("Link spacing: s ≤ 0.75d", s, 0.75 * d, "mm", "9.2.2(6)", hint="Reduce the link spacing.")
+        calc.model3d = cls._scene(calc, b, h, c, dl, n, dia, n2, dia2, s, x, MRd, inp)
+
+    @staticmethod
+    def _scene(calc, b, h, c, dl, n, dia, n2, dia2, s, x, MRd, inp) -> dict:
+        m = lambda v: v / 1000  # noqa: E731
+        bm, hm, L = m(b), m(h), 2.4
+        sc = Scene3D("rc_beam", calc.tr)
+        for key, label in (("concrete", "Concrete"), ("bars", "Reinforcement"),
+                           ("stress", "Compression zone"), ("loads", "Actions")):
+            sc.layer(key, label, toggle=key != "concrete")
+        sc.box("concrete", (0, hm / 2, 0), (bm, hm, L), PALETTE["concrete"], opacity=0.3)
+        cc = m(c + dl)
+
+        def row(nb, d_, y):
+            for i in range(nb):
+                xx = -bm / 2 + cc + m(d_) / 2 + i * (bm - 2 * cc - m(d_)) / max(nb - 1, 1)
+                sc.cylinder("bars", (xx, y, -L / 2), (xx, y, L / 2), m(d_) / 2, "#8a5a2b")
+        row(n, dia, cc + m(dia) / 2)
+        row(n2, dia2, hm - cc - m(dia2) / 2)
+        zl = -L / 2 + m(s) / 2
+        o = m(c + dl / 2)
+        while zl < L / 2:
+            sc.line("bars", [(-bm / 2 + o, o, zl), (bm / 2 - o, o, zl), (bm / 2 - o, hm - o, zl),
+                             (-bm / 2 + o, hm - o, zl)], "#5a6b7d", closed=True)
+            zl += m(s)
+        y = min(0.8 * m(x), hm)
+        sc.box("stress", (0, hm - y / 2, 0), (bm + 0.004, y, L + 0.004), "#e03b3b", opacity=0.3)
+        sc.label("stress", calc.tr("x = {x:.0f} mm, M_Rd = {m:.0f} kNm", x=x, m=MRd / 1e6),
+                 (bm / 2 + 0.05, hm - y / 2, L / 2), "result")
+        sc.label("loads", calc.tr("M_Ed = {m:.0f} kNm, V_Ed = {v:.0f} kN", m=inp["MEd"] / 1e6,
+                                  v=inp["VEd"] / 1000), (0, hm + 0.25, 0), "force")
+        return sc.to_dict()
+

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ..core import Calculation, DesignModule, Field, InputError, register
 from ..design.annex import get_annex
+from ..report.scene3d import Scene3D
 
 KINDS = ["Permanent G", "Imposed Q", "Snow S", "Wind W", "Temperature T", "Seismic AEd"]
 CATS = ["A", "B", "C", "D", "E", "F", "G", "H"]
@@ -16,6 +17,7 @@ class CombinationsEN1990(DesignModule):
     category = "Loads"
     standard = "EN 1990 Annex A1"
     uses_annex = True
+    has_3d = True
     description = ("Generates all ULS (6.10), seismic (6.12b) and SLS (characteristic, frequent, "
                    "quasi-permanent) combinations from your actions, with the ψ factors of the "
                    "National Annex, and finds the governing values.")
@@ -113,3 +115,41 @@ class CombinationsEN1990(DesignModule):
                 calc.text("{k}: max {mx:.2f} {u} ({lx}); min {mn:.2f} {u} ({ln})",
                           k=calc.tr(kind), mx=mx[2], lx=mx[1], mn=mn[2], ln=mn[1], u=u)
         calc.values["E_d,max"] = max(r[2] for r in results if r[0] == "ULS")
+        calc.model3d = cls._scene(calc, results, u)
+
+    @staticmethod
+    def _scene(calc, results, unit) -> dict:
+        cols = {"ULS": "#e03b3b", "Seismic": "#8e6cc4", "SLS characteristic": "#2a6f97",
+                "SLS frequent": "#2e9b5f", "SLS quasi-permanent": "#c47a2c"}
+        sc = Scene3D("combinations", calc.tr)
+        for k in cols:
+            if any(r[0] == k for r in results):
+                sc.layer(k, k)
+        vmax = max(abs(r[2]) for r in results) or 1.0
+        x, prev = 0.0, None
+        for kind, label, v in results:
+            if prev is not None and kind != prev:
+                x += 0.8
+            hgt = 6.0 * v / vmax
+            sc.box(kind, (x, hgt / 2, 0), (0.6, abs(hgt) or 0.01, 0.6), cols[kind])
+            prev = kind
+            x += 0.9
+        for kind in cols:
+            vals = [(i, r) for i, r in enumerate(results) if r[0] == kind]
+            if not vals:
+                continue
+            i, r = max(vals, key=lambda t: t[1][2])
+            xs = 0.0
+            p2 = None
+            for j, (kk, _, _) in enumerate(results):
+                if p2 is not None and kk != p2:
+                    xs += 0.8
+                if j == i:
+                    break
+                p2 = kk
+                xs += 0.9
+            sc.label(kind, f"{calc.tr(kind)}: {r[2]:.1f} {unit}", (xs, 6.0 * r[2] / vmax + 0.4, 0),
+                     "result")
+            sc.legend_item(cols[kind], calc.tr(kind))
+        return sc.to_dict()
+

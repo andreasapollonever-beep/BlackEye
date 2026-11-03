@@ -6,6 +6,8 @@ import math
 
 from ..analysis import UDL, Beam, PointLoad, Support
 from ..core import Calculation, DesignModule, Field, register
+from ..report import scene_beam as sb
+from ..report.scene3d import PALETTE, Scene3D
 from ..report.svg import beam_diagrams
 from ..sections.steel import get_section, section_names
 
@@ -26,6 +28,7 @@ class SteelBeamEC3(DesignModule):
     title = "Steel beam design"
     category = "Steel"
     standard = "EN 1993-1-1:2005"
+    has_3d = True
     description = ("Simply supported rolled I-beam: classification, bending, shear, "
                    "bending-shear interaction, lateral-torsional buckling and deflection.")
 
@@ -204,3 +207,37 @@ class SteelBeamEC3(DesignModule):
         tot = analyse(gk + qk, Gp + Qp)
         calc.formula("δ_tot", "max δ(x) under g_k + q_k", tot.max_deflection[0], "mm",
                      "Total characteristic deflection (for information)")
+        calc.model3d = cls._scene(calc, sec, L, Lcr, wEd, PEd, uls, tot)
+
+    @staticmethod
+    def _scene(calc, sec, L, Lcr, wEd, PEd, uls, tot) -> dict:
+        m = lambda v: v / 1000  # noqa: E731
+        Lm, h, b, tw, tf = m(L), m(sec.h), m(sec.b), m(sec.tw), m(sec.tf)
+        sc = Scene3D("steel_beam", calc.tr)
+        for key, label in (("beam", "Beam"), ("supports", "Supports"), ("loads", "Loads"),
+                           ("restraints", "Lateral restraints"), ("defl", "Deflected shape"),
+                           ("moment", "Bending moment")):
+            sc.layer(key, label, toggle=key != "beam")
+        col = PALETTE["steel"]
+        sc.box("beam", (Lm / 2, h - tf / 2, 0), (Lm, tf, b), col)
+        sc.box("beam", (Lm / 2, tf / 2, 0), (Lm, tf, b), col)
+        sc.box("beam", (Lm / 2, h / 2, 0), (Lm, h - 2 * tf, tw), col)
+        sb.supports(sc, "supports", [(0.0, "pinned"), (Lm, "pinned")], h, b)
+        sb.udl_arrows(sc, "loads", 0, Lm, wEd, h, wEd, calc.tr("w_Ed = {w:.1f} kN/m", w=wEd))
+        if PEd:
+            sb.point_arrow(sc, "loads", Lm / 2, PEd / 1000, h, PEd / 1000,
+                           f"P_Ed = {PEd / 1000:.0f} kN")
+        n = max(int(round(L / Lcr)), 1) if Lcr < L else 1
+        for i in range(1, n):
+            x = Lm * i / n
+            sc.box("restraints", (x, h + 0.02, 0), (0.05, 0.04, b + 0.5), "#2e9b5f")
+        sc.label("restraints", calc.tr("L_cr = {l:.2f} m", l=m(Lcr)), (Lm / 2, h + 0.15, b),
+                 "")
+        dmax = float(max(abs(tot.deflection).max(), 1e-9))
+        sb.deflected(sc, "defl", tot.xd / 1000, tot.deflection, 0.06 * Lm / dmax, b / 2 + 0.05,
+                     h / 2)
+        sc.label("defl", calc.tr("δ_tot = {d:.1f} mm", d=dmax), (Lm / 2, -0.25, b / 2), "result")
+        sb.moment_ribbon(sc, "moment", uls.x / 1000, uls.moment / 1e6, -b / 2 - 0.3, Lm / 8)
+        sc.label("beam", sec.name, (0.3, h + 0.2, 0), "")
+        return sc.to_dict()
+
