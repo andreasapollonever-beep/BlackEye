@@ -114,6 +114,7 @@ class DesignModule:
     standard: ClassVar[str] = ""
     description: ClassVar[str] = ""
     fields: ClassVar[list[Field]] = []
+    has_3d: ClassVar[bool] = False  # shown with a "3D" badge on the home page
 
     @classmethod
     def schema(cls, lang: str = "en") -> dict[str, Any]:
@@ -123,6 +124,7 @@ class DesignModule:
             "category": tr(cls.category, lang),
             "standard": tr(cls.standard, lang, quiet=True),
             "description": tr(cls.description, lang),
+            "has_3d": cls.has_3d,
             "fields": [f.to_dict(lang) for f in cls.fields],
         }
 

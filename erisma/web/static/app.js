@@ -21,6 +21,14 @@ const UI = {
     "Drag to rotate · right-drag to pan · scroll to zoom": "Σύρετε για περιστροφή · δεξί κλικ για μετακίνηση · ροδέλα για zoom",
     "Shortcuts: Ctrl+S save · Ctrl+O open · Ctrl+P print · Ctrl+3 3D view": "Συντομεύσεις: Ctrl+S αποθήκευση · Ctrl+O άνοιγμα · Ctrl+P εκτύπωση · Ctrl+3 3D",
     "No calculations match": "Δεν βρέθηκαν υπολογισμοί",
+    "Home": "Αρχική", "Welcome to Erisma": "Καλώς ήρθατε στο Erisma",
+    "Choose a calculation to start. Results, checks and the report update while you type.":
+      "Επιλέξτε έναν υπολογισμό για να ξεκινήσετε. Τα αποτελέσματα, οι έλεγχοι και το τεύχος ενημερώνονται καθώς γράφετε.",
+    "Open project file…": "Άνοιγμα αρχείου έργου…", "Continue": "Συνέχεια",
+    "Choose a calculation": "Επιλέξτε υπολογισμό",
+    "Enter your data — the defaults are a realistic worked example": "Συμπληρώστε τα δεδομένα σας — οι προεπιλογές είναι ένα ρεαλιστικό παράδειγμα",
+    "Check the results and print the report (PDF)": "Δείτε τα αποτελέσματα και εκτυπώστε το τεύχος (PDF)",
+    "last used": "τελευταίος",
   },
 };
 let LANG = (() => { try { return localStorage.getItem("erisma.lang") || "el"; } catch { return "el"; } })();
@@ -81,6 +89,7 @@ function translateChrome() {
   document.querySelectorAll("[data-t]").forEach((n) => { n.textContent = t(n.dataset.t); });
   document.querySelectorAll("[data-tt]").forEach((n) => { n.title = t(n.dataset.tt); });
   $("#search").placeholder = t("Search calculations…");
+  $("#home-search").placeholder = t("Search calculations…");
   document.querySelectorAll(".lang button").forEach((b) => b.classList.toggle("on", b.dataset.lang === LANG));
   $("#shortcuts").textContent = t("Shortcuts: Ctrl+S save · Ctrl+O open · Ctrl+P print · Ctrl+3 3D view");
 }
@@ -96,7 +105,7 @@ function renderNav() {
     nav.append(el("h3", {}, cat));
     mods.forEach((m) => nav.append(el("a", {
       href: `#${m.id}`, "data-id": m.id, class: state.schema?.id === m.id ? "active" : null, title: m.description,
-      on: { click: (e) => { e.preventDefault(); selectModule(m.id); } },
+      on: { click: (e) => { e.preventDefault(); openModule(m.id); } },
     }, m.title, el("small", {}, m.standard))));
   }
   if (!Object.keys(cats).length) nav.append(el("p", { class: "muted pad" }, t("No calculations match")));
@@ -188,6 +197,77 @@ function markInvalid(name) {
   row.scrollIntoView({ block: "center", behavior: "smooth" });
 }
 
+
+// Small pictograms for the home cards (stroke drawings, 96×48).
+const PICS = {
+  beam_analysis: '<path d="M10 22h76" stroke-width="4"/><path d="M14 24l-5 9h10z M48 24l-5 9h10z M82 24l-5 9h10z" fill="#2a6f97" stroke="none"/><path d="M20 10v8M30 10v8M40 10v8M56 10v8M66 10v8M76 10v8" stroke="#c47a2c"/>',
+  ec2_rc_beam: '<rect x="34" y="6" width="28" height="36" rx="2" fill="#e3e4e6"/><rect x="38" y="10" width="20" height="28" rx="3" stroke="#8a5a2b"/><circle cx="41" cy="35" r="2.6" fill="#333" stroke="none"/><circle cx="48" cy="35" r="2.6" fill="#333" stroke="none"/><circle cx="55" cy="35" r="2.6" fill="#333" stroke="none"/><circle cx="42" cy="13" r="1.8" fill="#555" stroke="none"/><circle cx="54" cy="13" r="1.8" fill="#555" stroke="none"/>',
+  ec3_steel_beam: '<path d="M30 8h36M30 40h36M48 8v32" stroke="#5a6b7d" stroke-width="5"/>',
+  ec7_retaining_wall: '<path d="M2 42h92" stroke="#a08060"/><path d="M44 6h50v32H50z" fill="#e9d8b8" stroke="none"/><path d="M40 6h6l2 30H40z M20 36h52v6H20z" fill="#b4b8bf"/><path d="M60 12h-8M64 20h-12M68 28h-16" stroke="#c47a2c"/>',
+  ec7_gravity_wall: '<path d="M2 42h92" stroke="#a08060"/><path d="M50 6h44v36H56z" fill="#e9d8b8" stroke="none"/><path d="M38 6h10l10 36H32z" fill="#b4b8bf"/>',
+  ec7_pad_footing: '<path d="M2 26h92" stroke="#a08060"/><rect x="42" y="4" width="12" height="24" fill="#9aa0a8"/><rect x="24" y="28" width="48" height="10" fill="#b4b8bf"/><path d="M26 44h44" stroke="#2e9b5f" stroke-width="3"/><path d="M32 46v-5M48 46v-5M64 46v-5" stroke="#2e9b5f"/>',
+  ec7_slope_stability: '<path d="M2 14h28l36 26h28v6H2z" fill="#e9d8b8" stroke="#8a6d3b"/><path d="M24 14q18 34 46 27" stroke="#e03b3b" stroke-width="3" fill="none"/><circle cx="58" cy="6" r="2.5" fill="#e03b3b" stroke="none"/>',
+  ec7_berlin_wall: '<path d="M2 30h40" stroke="#a08060"/><path d="M46 4h48v42H46z" fill="#e9d8b8" stroke="none"/><path d="M42 4v42M48 4v42" stroke="#5a6b7d" stroke-width="3"/><path d="M42 8h6M42 13h6M42 18h6M42 23h6M42 28h6" stroke="#a0703c" stroke-width="2"/><path d="M48 12l30 10" stroke="#111"/><path d="M72 20l16 5" stroke="#9ca3af" stroke-width="5"/>',
+};
+const pic = (id) => `<svg viewBox="0 0 96 48" fill="none" stroke="#334" stroke-width="2" stroke-linejoin="round">${PICS[id] || '<rect x="30" y="8" width="36" height="32" rx="4"/>'}</svg>`;
+
+function renderHome() {
+  const box = $("#home-cards");
+  box.innerHTML = "";
+  const q = $("#home-search").value.trim().toLowerCase();
+  const last = store.get("erisma.last", "");
+  const cats = {};
+  state.modules.filter((m) => !q || `${m.title} ${m.standard} ${m.category} ${m.description}`.toLowerCase().includes(q))
+    .forEach((m) => (cats[m.category] ||= []).push(m));
+  const ordered = Object.entries(cats).sort((a, b) => b[1].length - a[1].length);
+  for (const [cat, mods] of ordered) {
+    box.append(el("div", { class: "cat-title" }, cat));
+    const grid = el("div", { class: "cards" });
+    for (const m of mods) {
+      const card = el("button", { class: `card${m.id === last ? " last" : ""}`, type: "button", title: m.description,
+        on: { click: () => openModule(m.id) } });
+      card.innerHTML = `<div class="pic">${pic(m.id)}</div>`;
+      card.append(el("div", { class: "ttl" }, m.title), el("div", { class: "std" }, m.standard),
+        el("div", { class: "dsc" }, m.description),
+        el("div", { class: "badges" }, m.has_3d ? el("span", { class: "badge3d" }, "3D") : "",
+          m.id === last ? el("span", { class: "std" }, `· ${t("last used")}`) : ""));
+      grid.append(card);
+    }
+    box.append(grid);
+  }
+  if (!Object.keys(cats).length) box.append(el("p", { class: "empty" }, t("No calculations match")));
+  const lm = state.modules.find((m) => m.id === last);
+  const cont = $("#home-continue");
+  cont.hidden = !lm;
+  if (lm) { cont.textContent = `${t("Continue")}: ${lm.title} →`; cont.onclick = () => openModule(lm.id); }
+}
+
+function showHome() {
+  document.body.classList.add("at-home");
+  document.title = "Erisma";
+  renderHome();
+  setTimeout(() => $("#home-search").focus(), 50);
+}
+
+let pendingInputs = null;
+function openModule(id, inputs) {
+  pendingInputs = inputs ?? null;
+  if (location.hash.slice(1) === id) route();
+  else location.hash = id;
+}
+
+function route() {
+  const id = location.hash.slice(1);
+  if (state.modules.some((m) => m.id === id)) {
+    document.body.classList.remove("at-home");
+    const inp = pendingInputs;
+    pendingInputs = null;
+    selectModule(id, inp ?? undefined);
+  } else {
+    showHome();
+  }
+}
+
 async function selectModule(id, inputs) {
   state.schema = await api(`/api/modules/${id}`);
   const saved = store.get(inputsKey(id), null);
@@ -196,7 +276,7 @@ async function selectModule(id, inputs) {
   $("#mod-title").textContent = state.schema.title;
   $("#mod-desc").textContent = `${state.schema.standard} — ${state.schema.description}`;
   $("#restored").hidden = !(saved && !inputs);
-  history.replaceState(null, "", `#${id}`);
+  document.title = `${state.schema.title} — Erisma`;
   store.set("erisma.last", id);
   renderForm();
   run();
@@ -308,7 +388,7 @@ $("#file-open").onchange = async (e) => {
     state.project = doc.project || {};
     store.set("erisma.project", state.project);
     renderProject();
-    await selectModule(doc.module, doc.inputs);
+    openModule(doc.module, doc.inputs);
   } catch (err) { alert(err.message); }
   e.target.value = "";
 };
@@ -326,7 +406,8 @@ document.querySelectorAll(".lang button").forEach((b) => (b.onclick = async () =
   renderProject();
   state.modules = await api("/api/modules");
   renderNav();
-  selectModule(state.schema.id, state.inputs);
+  if (document.body.classList.contains("at-home")) renderHome();
+  else selectModule(state.schema.id, state.inputs);
 }));
 
 (async function init() {
@@ -335,6 +416,14 @@ document.querySelectorAll(".lang button").forEach((b) => (b.onclick = async () =
   renderProject();
   state.modules = await api("/api/modules");
   renderNav();
-  const wanted = location.hash.slice(1) || store.get("erisma.last", "");
-  selectModule(state.modules.some((m) => m.id === wanted) ? wanted : state.modules[0].id);
+  window.addEventListener("hashchange", route);
+  $("#home-search").addEventListener("input", renderHome);
+  $("#home-search").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { const first = $("#home-cards .card"); if (first) first.click(); }
+  });
+  $("#home-open").onclick = actions.open;
+  const home = (e) => { e.preventDefault(); location.hash = "home"; };
+  $("#go-home").onclick = home;
+  $("#btn-home").onclick = home;
+  route();
 })();

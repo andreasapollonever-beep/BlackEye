@@ -61,7 +61,7 @@ def _lang(lang: str) -> str:
 def list_modules(lang: str = "en") -> list[dict[str, Any]]:
     lang = _lang(lang)
     return [{k: m.schema(lang)[k] for k in ("id", "title", "category", "standard",
-                                            "description")} for m in all_modules()]
+                                            "description", "has_3d")} for m in all_modules()]
 
 
 @app.get("/api/modules/{module_id}")

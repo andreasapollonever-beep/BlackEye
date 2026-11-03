@@ -34,6 +34,7 @@ class PadFootingEC7(DesignModule):
     id = "ec7_pad_footing"
     title = "Pad footing"
     category = "Geotechnical"
+    has_3d = True
     standard = "EN 1997-1, EN 1992-1-1, EN 1998-5"
     description = ("Isolated reinforced concrete footing under a column with biaxial moments: "
                    "effective-area bearing (Annex D, shape and inclination factors), sliding, "

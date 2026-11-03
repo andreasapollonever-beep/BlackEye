@@ -11,20 +11,40 @@
              "three/addons/": "/static/vendor/three/addons/"}}
 </script>
 </head>
-<body>
+<body class="at-home">
 <header class="top">
-  <div class="logo"><svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M3 11h26" stroke="#7fc4ff" stroke-width="3.2" stroke-linecap="round"/><path d="M7 13l-4.5 9h9z M25 13l-4.5 9h9z" fill="#fff"/><path d="M1.5 25.5h29" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".55"/></svg> Erisma <small data-t="structural calculations">structural calculations</small></div>
+  <a href="#" class="logo" id="go-home" title="Αρχική"><svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M3 11h26" stroke="#7fc4ff" stroke-width="3.2" stroke-linecap="round"/><path d="M7 13l-4.5 9h9z M25 13l-4.5 9h9z" fill="#fff"/><path d="M1.5 25.5h29" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".55"/></svg> Erisma <small data-t="structural calculations">structural calculations</small></a>
   <div class="actions">
+    <button id="btn-home" class="calc-only" data-t="Home">Home</button>
     <div class="lang" role="group" aria-label="Language">
       <button data-lang="el" title="Ελληνικά">ΕΛ</button><button data-lang="en" title="English">EN</button>
     </div>
     <button id="btn-open" data-t="Open" data-tt="Open project file (Ctrl+O)">Open</button>
-    <button id="btn-save" data-t="Save" data-tt="Save project file (Ctrl+S)">Save</button>
-    <button id="btn-html" data-t="Export HTML" data-tt="Download report as HTML">Export HTML</button>
-    <button id="btn-print" class="primary" data-t="Print / PDF" data-tt="Print or save as PDF (Ctrl+P)">Print / PDF</button>
+    <button id="btn-save" class="calc-only" data-t="Save" data-tt="Save project file (Ctrl+S)">Save</button>
+    <button id="btn-html" class="calc-only" data-t="Export HTML" data-tt="Download report as HTML">Export HTML</button>
+    <button id="btn-print" class="primary calc-only" data-t="Print / PDF" data-tt="Print or save as PDF (Ctrl+P)">Print / PDF</button>
     <input type="file" id="file-open" accept=".erisma,.bkeye,.json" hidden>
   </div>
 </header>
+<section id="home" aria-label="Home">
+  <div class="home-wrap">
+    <div class="hero">
+      <h1 data-t="Welcome to Erisma">Welcome to Erisma</h1>
+      <p data-t="Choose a calculation to start. Results, checks and the report update while you type.">Choose a calculation to start.</p>
+      <div class="hero-actions">
+        <input id="home-search" type="search" autocomplete="off">
+        <button id="home-continue" class="primary" hidden></button>
+        <button id="home-open" class="ghost" data-t="Open project file…">Open project file…</button>
+      </div>
+    </div>
+    <ol class="steps">
+      <li><b>1</b><span data-t="Choose a calculation">Choose a calculation</span></li>
+      <li><b>2</b><span data-t="Enter your data — the defaults are a realistic worked example">Enter your data</span></li>
+      <li><b>3</b><span data-t="Check the results and print the report (PDF)">Print the report</span></li>
+    </ol>
+    <div id="home-cards"></div>
+  </div>
+</section>
 <main>
   <nav aria-label="Calculation library">
     <input id="search" type="search" autocomplete="off">

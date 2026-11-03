@@ -123,6 +123,7 @@ class SlopeStabilityEC7(DesignModule):
     id = "ec7_slope_stability"
     title = "Slope stability (Bishop)"
     category = "Geotechnical"
+    has_3d = True
     standard = "EN 1997-1 §11, EN 1998-5 §4.1.3"
     description = ("Circular slip surfaces by Bishop's simplified method with automatic search "
                    "of the critical circle; pore pressure ratio, crest surcharge and seismic "

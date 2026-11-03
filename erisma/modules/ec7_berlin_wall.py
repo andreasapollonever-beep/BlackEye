@@ -46,6 +46,7 @@ class BerlinWallEC7(DesignModule):
     id = "ec7_berlin_wall"
     title = "Berlin wall (soldier pile wall)"
     category = "Geotechnical"
+    has_3d = True
     standard = "EN 1997-1, EN 1993-1-1, EN 1995-1-1, EN 1998-5"
     description = ("Steel soldier piles with timber lagging, cantilever or with one anchor row: "
                    "active/passive earth pressure with spatial passive resistance, embedment "

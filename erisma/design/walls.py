@@ -211,6 +211,8 @@ def soil_fields() -> list[Field]:
 class WallModule(DesignModule):
     """Template for wall modules: subclasses provide geometry + structural design."""
 
+    has_3d = True
+
     @classmethod
     def make_geometry(cls, inp: dict) -> WallGeometry:  # pragma: no cover
         raise NotImplementedError
