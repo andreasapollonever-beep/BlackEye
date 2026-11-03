@@ -85,3 +85,19 @@ def test_cli(tmp_path, capsys):
     out = tmp_path / "r.html"
     assert main(["run", "ec2_rc_beam", "-o", str(out)]) == 0
     assert out.read_text(encoding="utf-8").startswith("<!doctype html>")
+
+
+def test_annex_is_used_and_reported():
+    from erisma.design.annex import ANNEXES, EN, replace
+    custom = replace(EN, code="XX", label="Test annex", gamma_c=1.6)
+    ANNEXES["XX"] = custom
+    try:
+        c_en = get_module("ec7_pad_footing").calculate({}, {"annex": "EN"})
+        c_xx = get_module("ec7_pad_footing").calculate({}, {"annex": "XX"})
+        ratio = c_xx.values["v_Rd,max"] / c_en.values["v_Rd,max"]  # 0.4 ν f_cd
+        assert ratio == pytest.approx(1.5 / 1.6)
+        assert "Test annex" in render_html(c_xx)
+    finally:
+        del ANNEXES["XX"]
+    r = TestClient(app).get("/api/annexes").json()
+    assert r[0]["code"] == "EN"

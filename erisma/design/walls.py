@@ -17,21 +17,16 @@ import numpy as np
 from ..core import Calculation, DesignModule, Field, InputError
 from ..core.units import from_base
 from ..report.scene3d import PALETTE, Scene3D
+from .annex import APPROACH_CHOICES, EN_APPROACHES, EN_COMBOS, get_annex
 from ..report.svg import wall_section
 from .geotech import (bearing_factors, clip_z, k_mononobe_okabe, ka_coulomb, kp_rankine,
                       kp_seismic, linear_resultant, poly_props)
 
 GAMMA_W = 9.81e-6  # N/mm³
 
-#            γG,unf γG,fav  γQ    γφ'   γc'   γR,v  γR,h   (EN 1997-1 Annex A)
-COMBOS = {
-    "DA1-C1": (1.35, 1.00, 1.50, 1.00, 1.00, 1.00, 1.00),
-    "DA1-C2": (1.00, 1.00, 1.30, 1.25, 1.25, 1.00, 1.00),
-    "DA2": (1.35, 1.00, 1.50, 1.00, 1.00, 1.40, 1.10),
-    "DA3": (1.00, 1.00, 1.30, 1.25, 1.25, 1.00, 1.00),
-}
-APPROACHES = {"DA1": ["DA1-C1", "DA1-C2"], "DA2": ["DA2"], "DA3": ["DA3"]}
-EQU = (1.10, 0.90, 1.50, 1.25, 1.25)  # γG,dst γG,stb γQ,dst γφ' γc'
+# Partial factors come from the National Annex selected for the project.
+COMBOS = EN_COMBOS          # kept for backwards compatibility (EN values)
+APPROACHES = EN_APPROACHES
 
 HINT_SLIDING = ("Increase the base width (longer heel adds stabilising soil weight), add a "
                 "shear key below the base, or improve drainage to remove water pressure.")
@@ -199,9 +194,10 @@ def soil_fields() -> list[Field]:
         Field("k_base", "Base friction factor k (tan δ = k tan φ')", "", 1.0, min=0.3, max=1.0,
               group="Foundation soil",
               help="1.0 cast in situ, 2/3 precast (EN 1997-1 6.5.3(10))."),
-        Field("approach", "Design approach", kind="choice", choices=list(APPROACHES),
-              default="DA1", group="Design basis",
-              help="Check the National Annex (DA1 recommended in many countries)."),
+        Field("approach", "Design approach", kind="choice", choices=APPROACH_CHOICES,
+              default="National Annex", group="Design basis",
+              help="'National Annex' uses the approach of the annex chosen in the project "
+                   "details."),
         Field("seismic", "Include seismic design (EN 1998-5)", kind="bool", default=True,
               group="Seismic"),
         Field("ag", "Design ground acceleration αgR·γI", "", 0.16, min=0, max=0.6,
@@ -244,24 +240,25 @@ class WallModule(DesignModule):
         if math.radians(inp["beta"]) >= math.atan(math.tan(math.radians(inp["phi_b"])) / 1.25):
             raise InputError("Backfill slope is too steep for the design angle of shearing "
                              "resistance (β must be < φ'd)", "beta")
+        na = get_annex(calc.project.annex)
         cls.record_geometry(calc, g, inp)
         fig_index = len(calc.items)
         cls._soil_section(calc, g, inp)
         weights = cls._weights(calc, g, inp)
         gov: dict = {"util": -1}
 
-        for name in APPROACHES[inp["approach"]]:
-            gu, gf, gq, gphi, gc, gRv, gRh = COMBOS[name]
+        for name in na.combinations(inp["approach"]):
+            gu, gf, gq, gphi, gc, gRv, gRh = na.combos[name]
             calc.heading(calc.tr("Stability — {name} (EN 1997-1 Annex A)", name=name))
             calc.text("Partial factors: γ_G = {gu} (unfav.) / {gf} (fav.), γ_Q = {gq}, "
                       "γ_φ' = {gphi}, γ_c' = {gc}, γ_R,v = {gRv}, γ_R,h = {gRh}.",
                       gu=gu, gf=gf, gq=gq, gphi=gphi, gc=gc, gRv=gRv, gRh=gRh)
             thrust, _ = cls._thrust(calc, g, inp, gphi, record=True)
             cls._stability(calc, g, inp, name, weights + thrust, gu, gf, gq, gphi, gc, gRv,
-                           gRh, gov)
+                           gRh, gov, gRe=na.gRe(name))
 
         calc.heading("Overturning — EQU (EN 1997-1 2.4.7.2)")
-        dst, stb, gq, gphi, _ = EQU
+        dst, stb, gq, gphi, _ = na.equ
         calc.text("Partial factors: γ_G,dst = {dst}, γ_G,stb = {stb}, γ_Q,dst = {gq}, "
                   "γ_φ' = {gphi}.", dst=dst, stb=stb, gq=gq, gphi=gphi)
         thrust, _ = cls._thrust(calc, g, inp, gphi, record=True)
@@ -275,7 +272,7 @@ class WallModule(DesignModule):
 
         seis = None
         if inp["seismic"] and inp["ag"] > 0:
-            seis = cls._seismic(calc, g, inp, weights, gov)
+            seis = cls._seismic(calc, g, inp, weights, gov, na)
 
         cls.structural(calc, g, inp, weights, seis, gov)
 
@@ -400,7 +397,7 @@ class WallModule(DesignModule):
 
     @classmethod
     def _stability(cls, calc, g, inp, name, comps, gu, gf, gq, gphi, gc, gRv, gRh,
-                   gov, theta: float = 0.0) -> None:
+                   gov, theta: float = 0.0, gRe: float = 1.0) -> None:
         t = factored(comps, gu, gf, gq)
         cls._table(calc, t, calc.tr("{name} — design actions (vertical actions favourable)",
                                     name=name))
@@ -416,7 +413,6 @@ class WallModule(DesignModule):
             Rb = calc.formula("R_h,base", "V'_d tan δ_d / γ_R,h", R_base, "kN/m",
                               "Base friction", ref="Eq. 6.3a")
             Pp, _, _ = cls._key_passive(g, phi_fd, theta)
-            gRe = 1.4 if name == "DA2" else 1.0
             calc.formula("K_p", "tan²(45° + φ'_f,d/2)" if not theta else
                               "EN 1998-5 Eq. E.4", Pp["Kp"], "", "Passive coefficient in "
                               "front of the shear key", ref="EN 1997-1 Annex C", dp=3)
@@ -483,16 +479,17 @@ class WallModule(DesignModule):
                         "q_Ed": q_ed, "x_R": tt.x_R, "bearing": g.base_pressure(tt)})
 
     @classmethod
-    def _seismic(cls, calc, g, inp, weights, gov) -> dict:
+    def _seismic(cls, calc, g, inp, weights, gov, na=None) -> dict:
+        na = na or get_annex("EN")
         calc.heading("Seismic design situation (EN 1998-5 §7.3 and Annex E)")
         alpha = calc.input("α", inp["ag"], "", "Design ground acceleration ratio a_g/g", dp=3)
         S = calc.input("S", inp["S"], "", "Soil factor", dp=2)
         r = calc.input("r", float(inp["r"]), "", "Displacement factor (Table 7.1)", dp=1)
         kh = calc.formula("k_h", "α S / r", alpha * S / r, "", ref="EN 1998-5 Eq. 7.1", dp=4)
         kv = calc.formula("k_v", "±0.5 k_h", 0.5 * kh, "", ref="Eq. 7.2", dp=4)
-        gphi = 1.25
+        gphi = na.seismic_gamma_phi
         phi_d = math.atan(math.tan(math.radians(inp["phi_b"])) / gphi)
-        calc.formula("φ'_d", "atan(tan φ'_k / γ_φ'), γ_φ' = 1.25", math.degrees(phi_d), "°",
+        calc.formula("φ'_d", "atan(tan φ'_k / γ_φ')", math.degrees(phi_d), "°",
                      ref="EN 1998-5 3.1(3)", dp=2)
         beta = math.radians(inp["beta"])
         delta = beta
@@ -554,8 +551,8 @@ class WallModule(DesignModule):
         calc.formula("ΔE_d", "E_d − ½ γ K_a h_v²", result["dE"], "kN/m",
                      "Dynamic increment, applied at mid-height of the virtual back",
                      ref="E.9(3)")
-        cls._stability(calc, g, inp, calc.tr("Seismic"), result["comps"], 1, 1, 1, gphi, 1.25,
-                       1.0, 1.0, gov, theta=result["theta"])
+        cls._stability(calc, g, inp, calc.tr("Seismic"), result["comps"], 1, 1, 1, gphi,
+                       na.seismic_gamma_c, 1.0, 1.0, gov, theta=result["theta"])
         t = result["t"]
         calc.check("Seismic overturning: M_dst ≤ M_stb", t.M_dst, t.M_stb, "kNm/m",
                    "EN 1998-5 7.3.1", hint=HINT_OVT)

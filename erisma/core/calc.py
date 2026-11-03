@@ -27,6 +27,7 @@ class ProjectInfo:
     checked_by: str = ""
     date: str = field(default_factory=lambda: date.today().isoformat())
     company: str = ""
+    annex: str = "EN"  # National Annex code (erisma.design.annex)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any] | None) -> "ProjectInfo":

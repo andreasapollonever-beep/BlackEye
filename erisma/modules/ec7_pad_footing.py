@@ -10,7 +10,7 @@ from ..core import Calculation, DesignModule, Field, InputError, register
 from ..core.units import from_base
 from ..design.ec2 import bar_area, design_flexure, section_capacity, shear_no_links
 from ..design.geotech import bearing_factors
-from ..design.walls import APPROACHES, COMBOS
+from ..design.annex import APPROACH_CHOICES, get_annex
 from ..report.scene3d import PALETTE, Scene3D, heat_color
 from ..report.svg import footing_plan
 
@@ -71,8 +71,8 @@ class PadFootingEC7(DesignModule):
         Field("phi", "Soil φ'k", "°", 30.0, min=10, max=45, group="Soil"),
         Field("c", "Soil c'k", "kN/m²", 5.0, min=0, group="Soil"),
         Field("gamma", "Soil γ", "kN/m³", 19.0, min=10, group="Soil"),
-        Field("approach", "Design approach", kind="choice", choices=list(APPROACHES),
-              default="DA1", group="Soil"),
+        Field("approach", "Design approach", kind="choice", choices=APPROACH_CHOICES,
+              default="National Annex", group="Soil"),
         Field("concrete", "Concrete class", kind="choice", choices=CONCRETE, default="C25/30",
               group="Concrete"),
         Field("fyk", "Reinforcement fyk", "N/mm²", 500.0, min=400, max=600, group="Concrete"),
@@ -107,9 +107,10 @@ class PadFootingEC7(DesignModule):
                           "kN", "Soil above footing")
         fig_index = len(calc.items)
 
+        na = get_annex(calc.project.annex)
         gov = {"u": -1.0}
-        for name in APPROACHES[inp["approach"]]:
-            gu, gf, gq, gphi, gcf, gRv, gRh = COMBOS[name]
+        for name in na.combinations(inp["approach"]):
+            gu, gf, gq, gphi, gcf, gRv, gRh = na.combos[name]
             calc.heading(calc.tr("Geotechnical design — {name}", name=name))
             calc.text("Partial factors: γ_G = {gu} (unfav.) / {gf} (fav.), γ_Q = {gq}, "
                       "γ_φ' = {gphi}, γ_c' = {gc}, γ_R,v = {gRv}, γ_R,h = {gRh}.",
@@ -127,12 +128,13 @@ class PadFootingEC7(DesignModule):
                       "γ_φ' = γ_c' = 1.25 (EN 1998-5 3.1(3)); γ_R = 1.0.")
             Mx = inp["MxE"] + inp["HxE"] * h
             cls._geo_case(calc, inp, calc.tr("Seismic"), [("E", inp["NE"] + Wf + Ws)], Mx,
-                          inp["MyE"], inp["HxE"], 1.25, 1.25, 1.0, 1.0, gov)
+                          inp["MyE"], inp["HxE"], na.seismic_gamma_phi, na.seismic_gamma_c,
+                          1.0, 1.0, gov)
 
         # ------------------------------------------------------------ STR
         fck = float(inp["concrete"].split("/")[0][1:])
-        fcd, fyk = fck / 1.5, inp["fyk"]
-        fyd = fyk / 1.15
+        fcd, fyk = na.alpha_cc * fck / na.gamma_c, inp["fyk"]
+        fyd = fyk / na.gamma_s
         calc.heading("Structural design — STR (EN 1992-1-1)")
         str_cases = [("Persistent (1.35G + 1.5Q)",
                       1.35 * inp["NG"] + 1.5 * inp["NQ"],
@@ -194,11 +196,11 @@ class PadFootingEC7(DesignModule):
             calc.check("Bending: M_Ed ≤ M_Rd", M / 1000, MRd / 1000, "kNm/m", "6.1",
                        hint=HINT_BARS)
             calc.text("Beam shear at distance d from the column face:")
-            shear_no_links(calc, 1000, dd, As, fck, 1.5, V, per_metre=True)
+            shear_no_links(calc, 1000, dd, As, fck, na.gamma_c, V, per_metre=True)
             calc.checks[-1].hint = calc.tr(HINT_SHEAR)
 
         punch = cls._punching(calc, Ngov, Mxg, Myg, Bx, By, cx, cy, (dxe + dye) / 2, Asx, Asy,
-                              fck, fcd)
+                              fck, fcd, na.gamma_c)
 
         calc.model3d = cls._scene(calc, inp, gov, punch, Wf, Ws)
         calc.figure(footing_plan(Bx / 1e3, By / 1e3, cx / 1e3, cy / 1e3,
@@ -284,7 +286,8 @@ class PadFootingEC7(DesignModule):
 
     # ------------------------------------------------------------ punching
     @staticmethod
-    def _punching(calc, V, Mx, My, Bx, By, cx, cy, d, Asx, Asy, fck, fcd) -> dict:
+    def _punching(calc, V, Mx, My, Bx, By, cx, cy, d, Asx, Asy, fck, fcd,
+                  gamma_c: float = 1.5) -> dict:
         calc.heading("Punching shear (EN 1992-1-1 6.4.4)")
         calc.input("V_Ed", V, "kN", "Column design axial load (governing STR case)")
         calc.input("d_eff", d, "mm", "Mean effective depth")
@@ -293,7 +296,7 @@ class PadFootingEC7(DesignModule):
         rho = math.sqrt(min(Asx / (1000 * d), 0.02) * min(Asy / (1000 * d), 0.02))
         k = min(1 + math.sqrt(200 / d), 2.0)
         vmin = 0.035 * k**1.5 * math.sqrt(fck)
-        crc = 0.18 / 1.5 * k * (100 * rho * fck) ** (1 / 3)
+        crc = 0.18 / gamma_c * k * (100 * rho * fck) ** (1 / 3)
         kx, ky = _k_ratio(cx / cy), _k_ratio(cy / cx)
         best = None
         for a in np.linspace(0.25 * d, 2 * d, 36):

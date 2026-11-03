@@ -13,6 +13,7 @@ import numpy as np
 
 from ..core import Calculation, DesignModule, Field, InputError, register
 from ..core.units import from_base
+from ..design.annex import get_annex
 from ..report.scene3d import PALETTE, Scene3D, heat_color
 from ..report.svg import slope_section
 
@@ -185,10 +186,12 @@ class SlopeStabilityEC7(DesignModule):
         cases.append(("char", rk))
 
         calc.heading("Persistent design situation — GEO (DA1-C2 / DA3: A2 + M2)")
-        calc.text("Design parameters: tan φ'_d = tan φ'_k / 1.25, c'_d = c'_k / 1.25, "
-                  "surcharge × 1.30. The slope is stable when the design factor F_d ≥ 1.0 "
-                  "(over-design factor, EN 1997-1 2.4.7.3).")
-        rd, _ = sm.search(tphi / 1.25, inp["c"] / 1.25, 1.3)
+        na = get_annex(calc.project.annex)
+        gp, gcc, gq = na.slope_factors
+        calc.text("Design parameters: tan φ'_d = tan φ'_k / {gp}, c'_d = c'_k / {gc}, "
+                  "surcharge × {gq}. The slope is stable when the design factor F_d ≥ 1.0 "
+                  "(over-design factor, EN 1997-1 2.4.7.3).", gp=gp, gc=gcc, gq=gq)
+        rd, _ = sm.search(tphi / gp, inp["c"] / gcc, gq)
         calc.formula("F_d", "min F (design parameters)", rd["F"], "", "Over-design factor",
                      dp=3)
         calc.check("Persistent: E_d ≤ R_d (1 ≤ F_d)", 1.0, rd["F"], "", "EN 1997-1 Eq. 2.5",
@@ -201,10 +204,11 @@ class SlopeStabilityEC7(DesignModule):
             kh = calc.formula("k_h", "0.5 α S S_T", 0.5 * inp["ag"] * inp["S"] * inp["ST"], "",
                               ref="EN 1998-5 Eq. 4.1", dp=4)
             kv = calc.formula("k_v", "±0.5 k_h", 0.5 * kh, "", ref="Eq. 4.2", dp=4)
-            calc.text("Soil strength with γ_φ' = γ_c' = 1.25; surcharge × ψ2 = 0.3; both signs "
-                      "of k_v analysed.")
+            sp, sc_ = na.seismic_gamma_phi, na.seismic_gamma_c
+            calc.text("Soil strength with γ_φ' = {gp}, γ_c' = {gc}; surcharge × ψ2 = 0.3; both "
+                      "signs of k_v analysed.", gp=sp, gc=sc_)
             for kvs in (kv, -kv):
-                r, _ = sm.search(tphi / 1.25, inp["c"] / 1.25, 0.3, kh, kvs)
+                r, _ = sm.search(tphi / sp, inp["c"] / sc_, 0.3, kh, kvs)
                 if r and (rs is None or r["F"] < rs["F"]):
                     rs = r
             if rs:

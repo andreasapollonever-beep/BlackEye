@@ -9,6 +9,7 @@ import numpy as np
 from ..core import Calculation, Field, InputError, register
 from ..core.units import from_base
 from ..design.ec2 import bar_area, design_flexure, section_capacity, shear_no_links
+from ..design.annex import get_annex
 from ..design.geotech import clip_z, ka_coulomb, poly_props
 from ..design.walls import (GAMMA_W, Totals, WallGeometry, WallModule, factored,
                             soil_fields)
@@ -192,10 +193,11 @@ class RetainingWallEC7(WallModule):
 
     @classmethod
     def structural(cls, calc, g, inp, weights, seis, gov=None) -> None:
+        na = get_annex(calc.project.annex)
         fck = float(inp["concrete"].split("/")[0][1:])
-        fcd = fck / 1.5
+        fcd = na.alpha_cc * fck / na.gamma_c
         fyk = inp["fyk"]
-        fyd = fyk / 1.15
+        fyd = fyk / na.gamma_s
         beta = math.radians(inp["beta"])
         phi = math.radians(inp["phi_b"])
         Ka_s = ka_coulomb(phi, beta, beta) * math.cos(beta)
@@ -249,13 +251,13 @@ class RetainingWallEC7(WallModule):
         M_p, V_p, M_s, V_s = stem_section(g.tb)
         cls._member(calc, "Stem (at top of base, earth face in tension)", g.t_low,
                     inp["cover_stem"], float(inp["stem_dia"]), inp["stem_s"],
-                    max(M_p, M_s), max(V_p, V_s), M_p, M_s, fck, fcd, fyk, fyd)
+                    max(M_p, M_s), max(V_p, V_s), M_p, M_s, fck, fcd, fyk, fyd, na.gamma_c)
         if g.step:
             M_p, V_p, M_s, V_s = stem_section(g.z_step)
             cls._member(calc, calc.tr("Stem at the step (z = {z:.2f} m above the base)",
                                       z=from_base(g.h_step, "m")), g.t_bot,
                         inp["cover_stem"], float(inp["stem_dia"]), inp["stem_s"],
-                        max(M_p, M_s), max(V_p, V_s), M_p, M_s, fck, fcd, fyk, fyd)
+                        max(M_p, M_s), max(V_p, V_s), M_p, M_s, fck, fcd, fyk, fyd, na.gamma_c)
             calc.note("The stem bars must be anchored past the step (lap / anchorage length "
                       "to EN 1992-1-1 8.4 and 8.7).")
 
@@ -271,11 +273,11 @@ class RetainingWallEC7(WallModule):
         cls._member(calc, "Heel (at back of stem, top face in tension)", g.tb,
                     inp["cover_base"], float(inp["heel_dia"]), inp["heel_s"],
                     max(heel_p, heel_s), max(abs(vheel_p), abs(vheel_s)), heel_p, heel_s,
-                    fck, fcd, fyk, fyd)
+                    fck, fcd, fyk, fyd, na.gamma_c)
         cls._member(calc, "Toe (at front of stem, bottom face in tension)", g.tb,
                     inp["cover_base"], float(inp["toe_dia"]), inp["toe_s"],
                     max(toe_p, toe_s), max(abs(vtoe_p), abs(vtoe_s)), toe_p, toe_s,
-                    fck, fcd, fyk, fyd)
+                    fck, fcd, fyk, fyd, na.gamma_c)
         if g.key:
             F = (gov or {}).get("key_force", 0.0)
             calc.text("Shear key: the design force is the passive resistance that has to be "
@@ -284,10 +286,11 @@ class RetainingWallEC7(WallModule):
             M_k = F * (gov or {}).get("key_lever", g.key["h"] / 2)
             cls._member(calc, "Shear key (at the underside of the base)", g.key["b"],
                         inp["cover_base"], float(inp["key_dia"]), inp["key_s"], M_k, F, M_k, 0.0,
-                        fck, fcd, fyk, fyd)
+                        fck, fcd, fyk, fyd, na.gamma_c)
 
     @staticmethod
-    def _member(calc, title, h, cover, dia, s, M, V, M_p, M_s, fck, fcd, fyk, fyd) -> None:
+    def _member(calc, title, h, cover, dia, s, M, V, M_p, M_s, fck, fcd, fyk, fyd,
+                gamma_c: float = 1.5) -> None:
         calc.heading(title, 2)
         title = calc.tr(title)
         calc.formula("M_Ed", "max(persistent, seismic)", max(M, 0.0), "kNm/m",
@@ -309,7 +312,7 @@ class RetainingWallEC7(WallModule):
         MRd, _ = section_capacity(b, d, As_prov, fcd, fyd)
         calc.formula("M_Rd", "A_s f_yd (d − 0.4x)", MRd / b, "kNm/m", "Moment resistance")
         calc.check("Bending: M_Ed ≤ M_Rd", Mt / b, MRd / b, "kNm/m", "6.1", hint=HINT_BARS)
-        shear_no_links(calc, b, d, As_prov, fck, 1.5, abs(V) * b, per_metre=True)
+        shear_no_links(calc, b, d, As_prov, fck, gamma_c, abs(V) * b, per_metre=True)
         calc.check_limit("Bar spacing: s ≤ min(3h, 400)", s, min(3 * h, 400.0), "mm",
                          "9.3.1.1(3)", hint="Reduce the bar spacing.")
 

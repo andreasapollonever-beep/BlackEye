@@ -28,7 +28,7 @@ const UI = {
     "Choose a calculation": "Επιλέξτε υπολογισμό",
     "Enter your data — the defaults are a realistic worked example": "Συμπληρώστε τα δεδομένα σας — οι προεπιλογές είναι ένα ρεαλιστικό παράδειγμα",
     "Check the results and print the report (PDF)": "Δείτε τα αποτελέσματα και εκτυπώστε το τεύχος (PDF)",
-    "last used": "τελευταίος",
+    "last used": "τελευταίος", "National Annex": "Εθνικό Προσάρτημα",
   },
 };
 let LANG = (() => { try { return localStorage.getItem("erisma.lang") || "el"; } catch { return "el"; } })();
@@ -115,6 +115,13 @@ function renderProject() {
   const box = $("#project-fields");
   box.innerHTML = "";
   if (!state.project.date) state.project.date = new Date().toISOString().slice(0, 10);
+  if (state.annexes?.length) {
+    const sel = el("select", { id: "p-annex", on: { change: (e) => {
+      state.project.annex = e.target.value; store.set("erisma.project", state.project); schedule();
+    } } }, ...state.annexes.map((a) => el("option", { value: a.code, title: a.reference }, a.label)));
+    sel.value = state.project.annex || "EN";
+    box.append(el("div", { class: "wide" }, el("label", { for: "p-annex" }, t("National Annex")), sel));
+  }
   for (const [key, label] of PROJECT_FIELDS) {
     const id = `p-${key}`;
     const input = el("input", { id, value: state.project[key] || "", type: key === "date" ? "date" : "text",
@@ -415,6 +422,7 @@ document.querySelectorAll(".lang button").forEach((b) => (b.onclick = async () =
   LANG = b.dataset.lang;
   try { localStorage.setItem("erisma.lang", LANG); } catch { /* ignore */ }
   translateChrome();
+  state.annexes = await api("/api/annexes").catch(() => []);
   renderProject();
   state.modules = await api("/api/modules");
   renderNav();
@@ -425,6 +433,7 @@ document.querySelectorAll(".lang button").forEach((b) => (b.onclick = async () =
 (async function init() {
   state.project = store.get("erisma.project", {});
   translateChrome();
+  state.annexes = await api("/api/annexes").catch(() => []);
   renderProject();
   state.modules = await api("/api/modules");
   renderNav();

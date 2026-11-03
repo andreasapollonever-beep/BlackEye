@@ -13,7 +13,8 @@ from pydantic import BaseModel, Field
 
 from .. import __version__
 from ..core import InputError, all_modules, get_module
-from ..i18n import LANGS
+from ..design.annex import ANNEXES
+from ..i18n import LANGS, tr
 from ..report import render_html
 
 STATIC = Path(__file__).parent / "static"
@@ -62,6 +63,13 @@ def list_modules(lang: str = "en") -> list[dict[str, Any]]:
     lang = _lang(lang)
     return [{k: m.schema(lang)[k] for k in ("id", "title", "category", "standard",
                                             "description", "has_3d")} for m in all_modules()]
+
+
+@app.get("/api/annexes")
+def list_annexes(lang: str = "en") -> list[dict[str, str]]:
+    lang = _lang(lang)
+    return [{"code": a.code, "label": tr(a.label, lang), "reference": a.reference}
+            for a in ANNEXES.values()]
 
 
 @app.get("/api/modules/{module_id}")

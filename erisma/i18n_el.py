@@ -587,4 +587,12 @@ EL: dict[str, str] = {
     "Shear key (at the underside of the base)": "Δόντι (στην κάτω παρειά της βάσης)",
     "Shear key passive resistance": "Παθητική αντίσταση δοντιού",
     "shear key: P_p = {p:.0f} kN/m (char.)": "δόντι: P_p = {p:.0f} kN/m (χαρακτ.)",
+    # --------------------------------------------------------- national annex
+    "National Annex": "Εθνικό Προσάρτημα", "EN recommended values": "Συνιστώμενες τιμές EN",
+    "'National Annex' uses the approach of the annex chosen in the project details.":
+        "Η επιλογή «Εθνικό Προσάρτημα» χρησιμοποιεί την προσέγγιση του προσαρτήματος που έχει επιλεγεί στα στοιχεία έργου.",
+    "Design parameters: tan φ'_d = tan φ'_k / {gp}, c'_d = c'_k / {gc}, surcharge × {gq}. The slope is stable when the design factor F_d ≥ 1.0 (over-design factor, EN 1997-1 2.4.7.3).":
+        "Παράμετροι σχεδιασμού: tan φ'_d = tan φ'_k / {gp}, c'_d = c'_k / {gc}, επιφόρτιση × {gq}. Το πρανές είναι ευσταθές όταν ο συντελεστής σχεδιασμού F_d ≥ 1.0 (συντελεστής υπερκάλυψης, EN 1997-1 2.4.7.3).",
+    "Soil strength with γ_φ' = {gp}, γ_c' = {gc}; surcharge × ψ2 = 0.3; both signs of k_v analysed.":
+        "Αντοχή εδάφους με γ_φ' = {gp}, γ_c' = {gc}· επιφόρτιση × ψ2 = 0.3· εξετάζονται και τα δύο πρόσημα του k_v.",
 }

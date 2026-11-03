@@ -7,6 +7,7 @@ import math
 from ..core import Calculation, Field, InputError, register
 from ..core.units import from_base
 from ..design.geotech import clip_z, ka_coulomb, poly_props  # noqa: F401
+from ..design.annex import get_annex
 from ..design.walls import GAMMA_W, WallGeometry, WallModule, soil_fields
 
 CONCRETE = ["C12/15", "C16/20", "C20/25", "C25/30", "C30/37"]
@@ -96,7 +97,9 @@ class GravityWallEC7(WallModule):
     @classmethod
     def structural(cls, calc, g: GravityGeometry, inp, weights, seis, gov=None) -> None:
         fck = float(inp["concrete"].split("/")[0][1:])
-        fcd = calc.formula("f_cd,pl", "α_cc,pl f_ck / γ_c", 0.8 * fck / 1.5, "N/mm²",
+        na = get_annex(calc.project.annex)
+        fcd = calc.formula("f_cd,pl", "α_cc,pl f_ck / γ_c", na.alpha_cc_pl * fck / na.gamma_c,
+                           "N/mm²",
                            "Design compressive strength, plain concrete", ref="EN 1992-1-1 12.3.1")
         calc.heading("Wall body — plain concrete sections (EN 1992-1-1 §12)")
         calc.text("Sections through the wall body are checked at the base of the body and at "

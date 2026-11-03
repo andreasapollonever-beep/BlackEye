@@ -26,7 +26,9 @@ Tekla Tedds, but doing more). Target users: practising engineers, first market G
   imported from `erisma/modules/__init__.py`.
 - 3D: modules may attach a generic scene (`erisma/report/scene3d.py`) as `calc.model3d`;
   `web/static/viewer3d.js` renders any scene (layers, prisms, boxes, meshes, arrows, labels).
-- Partial factors: EN recommended values unless a National Annex option is added.
+- Partial factors / NDPs: never hard-code — read them from `erisma/design/annex.py`
+  (`get_annex(calc.project.annex)`). Only enter annex values verified against the published
+  document, and record the document in `Annex.reference`.
 
 ## Commands
 

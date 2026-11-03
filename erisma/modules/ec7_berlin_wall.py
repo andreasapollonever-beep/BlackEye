@@ -26,7 +26,7 @@ from ..analysis import UDL, Beam, Support
 from ..core import Calculation, DesignModule, Field, InputError, register
 from ..core.units import from_base
 from ..design.geotech import k_mononobe_okabe, ka_coulomb, kp_coulomb, kp_seismic
-from ..design.walls import APPROACHES, COMBOS
+from ..design.annex import APPROACH_CHOICES, get_annex
 from ..report.scene3d import PALETTE, Scene3D
 from ..report.svg import vertical_diagrams
 from ..sections.steel import get_section, section_names
@@ -86,8 +86,8 @@ class BerlinWallEC7(DesignModule):
         Field("delta_p", "Passive wall friction δp/φ'", "", 0.333, min=0, max=0.5,
               group="Soil", help="Keep ≤ 0.5: Coulomb overestimates passive resistance."),
         Field("q", "Surcharge behind the wall (variable)", "kN/m²", 10.0, min=0, group="Soil"),
-        Field("approach", "Design approach", kind="choice", choices=list(APPROACHES),
-              default="DA1", group="Design basis"),
+        Field("approach", "Design approach", kind="choice", choices=APPROACH_CHOICES,
+              default="National Annex", group="Design basis"),
         Field("seismic", "Include seismic design (EN 1998-5)", kind="bool", default=True,
               group="Seismic"),
         Field("ag", "Design ground acceleration αgR·γI", "", 0.16, min=0, max=0.6,
@@ -144,17 +144,19 @@ class BerlinWallEC7(DesignModule):
         calc.note("Berlin walls are not watertight: the groundwater must be lowered below the "
                   "excavation level (not modelled here).")
 
+        na = get_annex(calc.project.annex)
         combos = []
-        for name in APPROACHES[inp["approach"]]:
-            gu, gf, gq, gphi, gc, _, _ = COMBOS[name]
-            gRe = 1.4 if name == "DA2" else 1.0
+        for name in na.combinations(inp["approach"]):
+            gu, gf, gq, gphi, gc, _, _ = na.combos[name]
+            gRe = na.gRe(name)
             combos.append({"name": name, "gG": gu, "gQ": gq, "gphi": gphi, "gc": gc,
                            "gRe": gRe, "seis": None})
         if inp["seismic"] and inp["ag"] > 0:
             kh = inp["ag"] * inp["S"] / float(inp["r"])
             for sgn in (1, -1):
                 combos.append({"name": calc.tr("Seismic"), "gG": 1.0, "gQ": inp["psi2"],
-                               "gphi": 1.25, "gc": 1.25, "gRe": 1.0,
+                               "gphi": na.seismic_gamma_phi, "gc": na.seismic_gamma_c,
+                               "gRe": 1.0,
                                "seis": (kh, 0.5 * kh * sgn)})
 
         results = []
