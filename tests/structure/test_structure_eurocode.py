@@ -113,3 +113,12 @@ def test_raft_default_building_passes_and_reports_everything():
     r = c.raft
     # vertical equilibrium of the soil: Σ spring reactions = Σ loads for G
     assert r["soil"][0]["p"] > 0
+
+
+def test_verification_problems_agree_with_the_literature():
+    from erisma.structure.verification import run
+
+    rows = run()
+    assert len(rows) >= 11
+    for r in rows:
+        assert abs(r["diff"]) < 0.005, (r["id"], r["diff"])

@@ -288,6 +288,23 @@ zoom. Το πλαίσιο <b>Επίπεδα</b> ανάβει/σβήνει έδα
 ]
 
 CHAPTERS += [
+    ("verification", {"en": "Verification of Erisma Structure", "el": "Επαλήθευση του Erisma Structure"}, {
+        "en": """
+<p>As the verification manuals of commercial programs, this table compares Erisma with
+independent reference values — closed-form solutions and tabulated results from the
+literature. The values are computed now, by the program you are using; the same problems run
+in the automatic test suite before every release.</p>
+<p>To compare with your own projects, model the same building in Erisma Structure and in your
+current program and compare the periods, base shears, member forces and reinforcement — and
+please send us any difference you find.</p>""",
+        "el": """
+<p>Όπως τα εγχειρίδια επαλήθευσης των εμπορικών προγραμμάτων, ο πίνακας συγκρίνει το Erisma με
+ανεξάρτητες τιμές αναφοράς — κλειστές λύσεις και πινακοποιημένα αποτελέσματα της βιβλιογραφίας.
+Οι τιμές υπολογίζονται τώρα, από το πρόγραμμα που χρησιμοποιείτε· τα ίδια προβλήματα τρέχουν
+στα αυτόματα tests πριν από κάθε έκδοση.</p>
+<p>Για σύγκριση με δικά σας έργα, προσομοιώστε το ίδιο κτίριο στο Erisma Structure και στο
+πρόγραμμα που χρησιμοποιείτε σήμερα και συγκρίνετε ιδιοπεριόδους, τέμνουσες βάσης, εντατικά
+μεγέθη και οπλισμούς — και στείλτε μας κάθε διαφορά που βρίσκετε.</p>"""}),
     ("structure", {"en": "Erisma Structure: whole buildings", "el": "Erisma Structure: ολόκληρα κτίρια"}, {
         "en": """
 <p><b>Erisma Structure</b> is the second space of the program (button on the home page). It
@@ -329,6 +346,19 @@ mesh and additional bars, shear, punching at every column (EN 1992-1-1 6.4, soil
 deducted), EC7 bearing and Annex H settlement; or foundation beams on springs; or isolated pad
 footings; seismic actions with the overstrength γ_Rd·Ω of EN 1998-1 4.4.2.6 —, storey drifts, θ, α_cr, effective modal mass
 and capacity design (ΣM_Rc ≥ 1.3 ΣM_Rb, capacity shears).</p>
+<p><b>Loads and combinations.</b> In the <b>Loads</b> tab create load cases (permanent,
+imposed with its use category, snow), pick the Area / Line / Point tool and click slab panels,
+beams or grid points (on all floors, the roof or one storey). <b>Combinations…</b> lists the
+EN 1990 combinations generated with the factors of the National Annex (ULS 6.10 with each
+variable action leading, SLS characteristic / frequent / quasi-permanent, seismic) and lets you
+add your own; members are designed for the envelope.</p>
+<p><b>Plan + 3D</b> shows both windows at once; elements can be selected in the 3D view too
+(empty positions are drawn faintly so that the tools can add columns and beams there). The
+<b>Results</b> tab switches the 3D bending-moment, shear, axial-force and deformed-shape
+diagrams and the first three mode shapes on and off; the right panel lists the periods with the
+character of each mode (X, Y or torsion) and the EC8 regularity, the left panel the storey drifts.
+The report contains the full regularity check (centres of mass and stiffness, torsional radii,
+compactness, slenderness, storey stiffness) and the resulting q.</p>
 <p><b>Auto-size</b> (Home or Design tab) repeats the complete calculation and enlarges what
 fails — columns, beams, walls, slab thickness, foundation beams, the number of modes, P-Δ —
 until every Eurocode check passes. It lists every change and applies it only when you press
@@ -380,6 +410,21 @@ the browser; <b>Save</b> writes a project file that <b>Open</b> brings back.</p>
 καθιζήσεις Παραρτήματος H· ή πεδιλοδοκοί σε ελατήρια· ή μεμονωμένα πέδιλα· σεισμικές δράσεις με
 την υπεραντοχή γ_Rd·Ω του EN 1998-1 4.4.2.6 —, σχετικές μετακινήσεις, θ, α_cr,
 δρώσα ιδιομορφική μάζα και ικανοτικός σχεδιασμός (ΣM_Rc ≥ 1.3 ΣM_Rb, ικανοτικές τέμνουσες).</p>
+<p><b>Φορτία και συνδυασμοί.</b> Στην καρτέλα <b>Φορτία</b> δημιουργείτε φορτίσεις (μόνιμες,
+κινητές με την κατηγορία χρήσης τους, χιόνι), διαλέγετε εργαλείο Επιφανειακό / Γραμμικό /
+Σημειακό και κάνετε κλικ σε φατνώματα, δοκούς ή κόμβους (σε όλους τους ορόφους, στο δώμα ή σε
+έναν όροφο). Οι <b>Συνδυασμοί…</b> δείχνουν τους συνδυασμούς EN 1990 που δημιουργούνται με τους
+συντελεστές του Εθνικού Προσαρτήματος (ΟΚΑ 6.10 με κάθε μεταβλητή δράση ως κύρια, ΟΚΛ
+χαρακτηριστικός / συχνός / οιονεί μόνιμος, σεισμικός) και επιτρέπουν δικούς σας· τα μέλη
+διαστασιολογούνται για την περιβάλλουσα.</p>
+<p>Η <b>Κάτοψη + 3D</b> δείχνει και τα δύο παράθυρα μαζί· τα στοιχεία επιλέγονται και στο 3D (οι
+κενές θέσεις εμφανίζονται αχνά ώστε τα εργαλεία να προσθέτουν εκεί υποστυλώματα και δοκούς). Η
+καρτέλα <b>Αποτελέσματα</b> ανάβει/σβήνει στο 3D τα διαγράμματα ροπών, τεμνουσών, αξονικών, τον
+παραμορφωμένο φορέα και τις τρεις πρώτες ιδιομορφές· το δεξί πάνελ δείχνει τις ιδιοπεριόδους με
+τον χαρακτήρα κάθε ιδιομορφής (X, Y ή στρέψη) και την κανονικότητα EC8, το αριστερό τις σχετικές
+μετακινήσεις ορόφων. Το τεύχος περιέχει τον πλήρη έλεγχο κανονικότητας (κέντρα μάζας και
+δυσκαμψίας, ακτίνες δυστρεψίας, συμπαγή μορφή, λυγηρότητα, δυσκαμψία ορόφων) και το q που
+προκύπτει.</p>
 <p>Η <b>Αυτόματη διαστασιολόγηση</b> (καρτέλα Αρχική ή Σχεδιασμός) επαναλαμβάνει τον πλήρη
 υπολογισμό και μεγαλώνει ό,τι ανεπαρκεί — υποστυλώματα, δοκούς, τοιχώματα, πάχος πλάκας,
 πεδιλοδοκούς, αριθμό ιδιομορφών, P-Δ — μέχρι να περάσουν όλοι οι έλεγχοι των Ευρωκωδίκων.
@@ -1067,6 +1112,18 @@ def _module_card(m, lang: str) -> str:
 
 
 @lru_cache(maxsize=4)
+def _verification_table(lang: str) -> str:
+    from .structure.verification import run
+
+    head = {"en": ("No.", "Problem", "Reference (source)", "Reference", "Erisma", "Difference"),
+            "el": ("Α/Α", "Πρόβλημα", "Αναφορά (πηγή)", "Τιμή αναφοράς", "Erisma", "Διαφορά")}[lang]
+    rows = "".join(
+        f"<tr><td>{r['id']}</td><td>{E(r['title'][lang])}</td><td>{E(r['source'])}</td>"
+        f"<td>{r['reference']:.4g} {E(r['unit'])}</td><td>{r['erisma']:.4g} {E(r['unit'])}</td>"
+        f"<td>{r['diff'] * 100:+.2f} %</td></tr>" for r in run())
+    return "<table><tr>" + "".join(f"<th>{h}</th>" for h in head) + "</tr>" + rows + "</table>"
+
+
 def build_manual(lang: str = "el") -> str:
     lang = "el" if lang == "el" else "en"
     LANG_NOW["lang"] = lang
@@ -1077,7 +1134,8 @@ def build_manual(lang: str = "el") -> str:
     toc += list(num.items())
     body = []
     for (cid, title, text), (_, numbered) in zip(CHAPTERS, toc):
-        body.append(f'<h2 id="{cid}">{E(numbered)}</h2>{text[lang]}')
+        extra = _verification_table(lang) if cid == "verification" else ""
+        body.append(f'<h2 id="{cid}">{E(numbered)}</h2>{text[lang]}{extra}')
     body.append(f'<h2 id="shortcuts">{num["shortcuts"]}</h2><table><tr><th>{T["key"][lang]}'
                 f'</th><th>{T["action"][lang]}</th></tr>' +
                 "".join(f"<tr><td><kbd>{E(k)}</kbd></td><td>{E(en if lang == 'en' else el)}</td>"
