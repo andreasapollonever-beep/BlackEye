@@ -197,6 +197,12 @@ class SpectrumResult:
     mass_ratio: float          # Σ effective mass of the modes used / total
     warnings: list[str] = field(default_factory=list)
     analysis: Analysis | None = None
+    modal: list[StaticResult] = field(default_factory=list)  # signed response of each mode
+    rho: np.ndarray | None = None                           # correlation (None = SRSS)
+
+    def combine(self, values: np.ndarray) -> np.ndarray:
+        """Combine any per-mode quantity (n_modes, ...) with this result's rule."""
+        return _combine(np.asarray(values, dtype=float), self.rho)
 
     def displacement(self, node) -> np.ndarray:
         return self.u[self.analysis.dofmap.index[str(node)]]
@@ -239,17 +245,32 @@ def response_spectrum(modes: ModalResult, Sd: Callable[[np.ndarray], np.ndarray]
         warnings.append(f"The modes used activate {ratio:.0%} of the mass in {direction} "
                         "(< 90 %, EN 1998-1 4.3.3.3.1(3)) — increase the number of modes")
     return SpectrumResult(direction, combination.upper(), T, sd, np.abs(Vn), V, u, ends, reac,
-                          ratio, warnings, an)
+                          ratio, warnings, an, results, rho)
+
+
+@dataclass
+class DesignSpectrum:
+    """EN 1998-1 Type 1 horizontal design spectrum S_d(T) [g] (Eq. 3.13–3.16)."""
+
+    ag: float      # design ground acceleration γ_I a_gR [g]
+    S: float
+    TB: float
+    TC: float
+    TD: float
+    q: float
+    beta: float
+
+    def __call__(self, T):
+        from ..design.ec8 import design_spectrum
+
+        return design_spectrum(T, self.ag, self.S, self.TB, self.TC, self.TD, self.q, self.beta)
 
 
 def ec8_spectrum(agR: float, ground: str = "B", q: float = 1.5, importance: str = "II",
-                 annex: str | None = "EN") -> Callable[[np.ndarray], np.ndarray]:
-    """EN 1998-1 Type 1 design spectrum S_d(T) [g] with the chosen National Annex values."""
+                 annex: str | None = "EN") -> DesignSpectrum:
+    """EN 1998-1 Type 1 design spectrum with the chosen National Annex values."""
     from ..design.annex import get_annex
-    from ..design.ec8 import design_spectrum
 
     na = get_annex(annex)
     S, TB, TC, TD = na.spectrum[ground]
-    ag = agR * na.gamma_I[importance]
-    beta = na.spectrum_beta
-    return lambda T: design_spectrum(T, ag, S, TB, TC, TD, q, beta)
+    return DesignSpectrum(agR * na.gamma_I[importance], S, TB, TC, TD, q, na.spectrum_beta)

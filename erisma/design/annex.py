@@ -58,6 +58,8 @@ class Annex:
         "D": (1.35, 0.20, 0.8, 2.0), "E": (1.4, 0.15, 0.5, 2.0)})
     gamma_I: dict = field(default_factory=lambda: {"I": 0.8, "II": 1.0, "III": 1.2, "IV": 1.4})
     spectrum_beta: float = 0.2
+    # EN 1998-1 4.4.3.2(2): displacement reduction factor ν per importance class
+    drift_nu: dict = field(default_factory=lambda: {"I": 0.5, "II": 0.5, "III": 0.4, "IV": 0.4})
     # EN 1990 Table A1.1 — ψ0, ψ1, ψ2
     psi: dict = field(default_factory=lambda: {
         "A": (0.7, 0.5, 0.3), "B": (0.7, 0.5, 0.3), "C": (0.7, 0.7, 0.6), "D": (0.7, 0.7, 0.6),

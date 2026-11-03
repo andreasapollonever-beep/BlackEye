@@ -357,7 +357,11 @@ class Analysis:
     def static(self, case_name: str) -> StaticResult:
         if case_name not in self.model.cases:
             raise StructureError("There is no load case called {c}", c=case_name)
-        case = self.model.cases[case_name]
+        return self.static_case(self.model.cases[case_name])
+
+    def static_case(self, case) -> StaticResult:
+        """Solve a :class:`LoadCase` that need not be stored in the model."""
+        case_name = case.name
         dm, model = self.dofmap, self.model
         nn = len(dm.node_ids)
         P = np.zeros(6 * nn)
