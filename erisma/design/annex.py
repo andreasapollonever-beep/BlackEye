@@ -97,6 +97,23 @@ class Annex:
                                                7: 1.12, 10: 1.08})
     # 7.6.2.3(8) "alternative method": minimum model factor on γ_b, γ_s (None = not set)
     pile_model_min: float | None = None
+    # EN 1992-3 9.11.1(102): minimum wall thickness t1 (class 0), t2 (classes 1, 2) [mm]
+    tank_tmin: tuple = (120.0, 150.0)
+    # EN 1997-1 Table A.15 — UPL: (γ_G,dst, γ_G,stb, γ_Q,dst)
+    upl: tuple = (1.0, 0.9, 1.5)
+    # EN 1991-4 Annex B: partial factor for liquid pressure in tanks
+    gamma_liquid: float = 1.2
+    # EN 1996-1-1 Table NA.1 / 2.4.3: γ_M for masonry, row -> classes 1..5
+    masonry_gM: dict = field(default_factory=lambda: {
+        "Category I units, designed mortar": (1.5, 1.7, 2.0, 2.2, 2.5),
+        "Category I units, prescribed mortar": (1.7, 2.0, 2.2, 2.5, 2.7),
+        "Category II units, any mortar": (2.0, 2.2, 2.5, 2.7, 3.0)})
+    masonry_fvk_max: float = 0.065  # × f_b (3.6.2(3))
+    masonry_KE: float = 1000.0      # E = K_E f_k (3.7.2(2))
+    masonry_lambda_c: float = 15.0  # 6.1.2.2(2)
+    # EN 1995-1-1 Table 2.3 (no Cyprus annex available: EN recommended values)
+    timber_gM: dict = field(default_factory=lambda: {"Solid timber": 1.3, "Glulam": 1.25})
+    timber_na: bool = False
     notes: tuple = ()
 
     def approach(self, choice: str) -> str:
@@ -132,6 +149,10 @@ CY = Annex(
     # NA to CYS EN 1997-1 NA 2.35 Tables A.6–A.8(CYS): R2 γb = γs = γt = 1.1, γs,t = 1.15;
     # NA 2.36 Tables A.9–A.11(CYS) = EN ξ values; NA 2.19: model factor ≥ 1.25.
     pile_model_min=1.25,
+    # NA to CYS EN 1997-1 NA 2.40 Table A.15(CYS) UPL 1.0/0.9/1.5 (= EN). NA to CYS
+    # EN 1996-1-1 NA 2.1 Table 1(CYS) γ_M, NA 2.5 f_vk ≤ 0.065 f_b, NA 2.7 K_E = 1000,
+    # NA 2.11 λ_c = 15 (= EN recommended). No CYS annex to EN 1995-1-1 or EN 1991-4 was
+    # provided: EN recommended values are used and the report says so.
     # NA to CYS EN 1991-1-3 NA 2.5: Annex C, Mediterranean, Z = 1 everywhere → s_k =
     # 0.289 [1 + (A/452)²]; special study above 1500 m. NA to CYS EN 1991-1-4 NA 2.4:
     # v_b,0 from the isotach map (24/30/40 m/s), c_dir = c_season = 1.0, ρ = 1.25 kg/m³.

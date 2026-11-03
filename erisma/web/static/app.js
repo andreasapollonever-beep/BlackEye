@@ -341,6 +341,12 @@ const PICS = {
   ec7_settlement: '<rect x="36" y="6" width="24" height="6" fill="#b4b8bf"/><path d="M28 14q20 44 40 0" fill="#f0c428" fill-opacity="0.35" stroke="#e03b3b"/><path d="M38 14q10 22 20 0" fill="#e03b3b" fill-opacity="0.35" stroke="none"/><path d="M4 12h88" stroke="#a08060"/>',
   ec7_gabion_wall: '<path d="M2 42h92" stroke="#a08060"/><path d="M58 6h36v36H58z" fill="#e9d8b8" stroke="none"/><rect x="20" y="30" width="38" height="12" fill="#9c9486"/><rect x="30" y="18" width="28" height="12" fill="#9c9486"/><rect x="40" y="6" width="18" height="12" fill="#9c9486"/><path d="M20 36h38M30 24h28M40 12h18" stroke="#666" stroke-width="1"/>',
   ec7_embedded_wall: '<path d="M2 32h44" stroke="#a08060"/><path d="M50 4h44v42H50z" fill="#e9d8b8" stroke="none"/><rect x="44" y="4" width="6" height="42" fill="#b4b8bf"/><path d="M50 12l24 9M50 22l24 9" stroke="#333"/><path d="M74 21l12 4M74 31l12 4" stroke="#7d8794" stroke-width="4"/>',
+  ec3_steel_column: '<path d="M38 4h20M38 44h20M48 4v40" stroke="#5a6b7d" stroke-width="5"/><path d="M28 2v8M68 2v8" stroke="#e03b3b" stroke-dasharray="2 2"/>',
+  ec3_bolted_connection: '<rect x="10" y="14" width="50" height="20" fill="#5a6b7d"/><rect x="36" y="18" width="50" height="12" fill="#7d8794"/><circle cx="42" cy="24" r="3" fill="#222"/><circle cx="52" cy="24" r="3" fill="#222"/><path d="M60 24h20" stroke="#e03b3b"/>',
+  ec3_base_plate: '<path d="M38 4h20M38 30h20M48 4v26" stroke="#5a6b7d" stroke-width="4"/><rect x="24" y="30" width="48" height="5" fill="#7d8794"/><rect x="16" y="35" width="64" height="11" fill="#b4b8bf"/><path d="M30 28v16M66 28v16" stroke="#222" stroke-width="2"/>',
+  ec5_timber_beam: '<rect x="6" y="16" width="84" height="14" fill="#c8955a"/><path d="M6 21h84M6 25h84" stroke="#8a5a2b" stroke-width="1"/><path d="M10 30l-5 8h10zM86 30l-5 8h10z" fill="#9aa0a8" stroke="none"/>',
+  ec6_masonry_wall: '<rect x="20" y="6" width="56" height="36" fill="#b5653e"/><path d="M20 15h56M20 24h56M20 33h56M34 6v9M58 6v9M46 15v9M70 15v9M34 24v9M58 24v9M46 33v9" stroke="#e6e0d6" stroke-width="1.2"/>',
+  ec2_tank: '<path d="M14 8v34h68V8" stroke="#8a8f96" stroke-width="5" fill="none"/><rect x="17" y="16" width="62" height="24" fill="#2f8fd8" fill-opacity="0.45" stroke="none"/><path d="M17 16q8-3 16 0t16 0 16 0 14 0" stroke="#2f8fd8"/>',
 };
 const pic = (id) => `<svg viewBox="0 0 96 48" fill="none" stroke="#334" stroke-width="2" stroke-linejoin="round">${PICS[id] || '<rect x="30" y="8" width="36" height="32" rx="4"/>'}</svg>`;
 

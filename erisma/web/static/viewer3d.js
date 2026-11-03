@@ -198,8 +198,10 @@ class Viewer {
     this.box = box;
     const size = box.getSize(new THREE.Vector3());
     const c = box.getCenter(new THREE.Vector3());
-    const span = Math.ceil(Math.max(size.x, size.z) + 4);
-    const grid = new THREE.GridHelper(span, span, 0x9a9182, 0xc2bbae);
+    const ext = Math.max(size.x, size.z);
+    const cell = ext < 2 ? 0.1 : 1;  // fine grid for small details (connections, plates)
+    const span = Math.ceil((ext + Math.min(4, ext)) / cell) * cell;
+    const grid = new THREE.GridHelper(span, Math.round(span / cell), 0x9a9182, 0xc2bbae);
     grid.position.set(c.x, 0.001, c.z);
     grid.material.transparent = true; grid.material.opacity = 0.5;
     this.root.add(grid);
@@ -253,7 +255,9 @@ class Viewer {
     if (!b) return;
     const size = b.getSize(new THREE.Vector3());
     const c = b.getCenter(new THREE.Vector3());
-    const d = Math.max(size.x, size.y, size.z) * 1.6 + 2;
+    if (kind && typeof kind === "object") kind = "iso";  // auto-fit is more reliable
+    const m = Math.max(size.x, size.y, size.z);
+    const d = m * 1.6 + Math.min(2, m * 0.6);
     const pos = {
       iso: [c.x - d * 0.75, c.y + d * 0.6, c.z + d * 0.95],
       front: [c.x, c.y, c.z + d * 1.4],

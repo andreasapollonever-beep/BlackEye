@@ -91,6 +91,24 @@ class ISection:
                 + (4 - math.pi) / 2 * r**2 * (h - 2 * tf) + (3 * math.pi - 10) / 3 * r**3)
 
     @cached_property
+    def Wel_z(self) -> float:
+        return 2 * self.Iz / self.b
+
+    @cached_property
+    def Wpl_z(self) -> float:
+        h, b, tw, tf, r = self.h, self.b, self.tw, self.tf, self.r
+        return (b**2 * tf / 2 + (h - 2 * tf) * tw**2 / 4 + r**3 * (10 / 3 - math.pi)
+                + (2 - math.pi / 2) * tw * r**2)
+
+    @cached_property
+    def iy(self) -> float:
+        return math.sqrt(self.Iy / self.A)
+
+    @cached_property
+    def iz(self) -> float:
+        return math.sqrt(self.Iz / self.A)
+
+    @cached_property
     def It(self) -> float:
         h, b, tw, tf, r = self.h, self.b, self.tw, self.tf, self.r
         a1 = (tw / tf) * (0.145 + 0.1 * r / tf)
