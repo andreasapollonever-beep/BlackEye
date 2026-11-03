@@ -92,6 +92,7 @@ class RCColumnEC2(DesignModule):
         calc.formula("f_yd", "f_yk / γ_s", fyd, "N/mm²")
         calc.formula("A_s", calc.tr("{n}Ø{d:g}", n=n_bars, d=dia), As, "mm²",
                      "Longitudinal reinforcement")
+        calc.input("N_Ed", NEd, "kN", "Design axial force")
         omega = calc.formula("ω", "A_s f_yd / (A_c f_cd)", As * fyd / (Ac * fcd), "", dp=3)
         n = calc.formula("n", "N_Ed / (A_c f_cd)", NEd / (Ac * fcd), "", "Relative axial force",
                          dp=3)

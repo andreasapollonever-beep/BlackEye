@@ -68,3 +68,26 @@ def from_base(value: float, unit: str) -> float:
         return value / UNIT_FACTORS[unit]
     except KeyError as exc:  # pragma: no cover - programming error
         raise ValueError(f"Unknown unit '{unit}'") from exc
+
+
+# units that measure the same quantity (a link may convert between them)
+DIMENSIONS: dict[str, str] = {
+    "mm": "L", "cm": "L", "m": "L",
+    "N": "F", "kN": "F",
+    "Nmm": "M", "kNm": "M",
+    "kNm/m": "M/L",
+    "N/mm": "F/L", "kN/m": "F/L",
+    "N/mm²": "P", "MPa": "P", "GPa": "P", "kN/m²": "P", "kPa": "P",
+    "kN/m³": "W", "MN/m³": "K",
+    "mm²": "A", "cm²": "A", "m²": "A", "mm²/m": "A/L",
+    "°": "deg", "": "1", "-": "1", "%": "1",
+}
+
+
+def compatible(u1: str, u2: str) -> bool:
+    d1, d2 = DIMENSIONS.get(u1), DIMENSIONS.get(u2)
+    return u1 == u2 or (d1 is not None and d1 == d2)
+
+
+def convert(value: float, from_unit: str, to_unit: str) -> float:
+    return from_base(to_base(value, from_unit), to_unit)

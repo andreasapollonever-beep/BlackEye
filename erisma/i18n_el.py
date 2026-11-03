@@ -1688,4 +1688,13 @@ EL: dict[str, str] = {
     'x = {x:.0f} mm, M_Rd = {m:.0f} kNm': 'x = {x:.0f} mm, M_Rd = {m:.0f} kNm',
     'δ_max = {d:.1f} mm': 'δ_max = {d:.1f} mm',
     'δ_tot = {d:.1f} mm': 'δ_tot = {d:.1f} mm',
+    # projects
+    'Structural calculations': 'Στατικοί υπολογισμοί',
+    'calculations': 'υπολογισμοί',
+    'pass': 'επαρκούν',
+    'Contents': 'Περιεχόμενα',
+    'Calculation': 'Υπολογισμός',
+    'Error': 'Σφάλμα',
+    'Circular link between calculations: {names}': 'Κυκλική σύνδεση υπολογισμών: {names}',
+    'Design axial force': 'Αξονική δύναμη σχεδιασμού',
 }

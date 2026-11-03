@@ -160,6 +160,7 @@ function renderNav() {
   const match = (m) => !q || `${m.title} ${m.standard} ${m.category} ${m.description}`.toLowerCase().includes(q);
   const mods = state.modules.filter(match);
   const byId = (id) => mods.find((m) => m.id === id);
+  if (!q && window.Proj) nav.append(Proj.navSection());
   if (!q) {
     for (const sec of [navSection("fav", `★ ${t("Favourites")}`, favs().map(byId).filter(Boolean)),
       navSection("recent", t("Recent"), recent().map(byId).filter(Boolean))]) if (sec) nav.append(sec);
@@ -214,6 +215,7 @@ function renderProject() {
       on: { input: (e) => { state.project[key] = e.target.value; store.set("erisma.project", state.project); schedule(); } } });
     box.append(el("div", {}, el("label", { for: id }, t(label)), input));
   }
+  window.logoField?.();
 }
 
 // ------------------------------------------------------------------ form
@@ -327,6 +329,7 @@ function undo(dir) {
   clearTimeout(hist.timer);
   hist.pos = np;
   state.inputs = JSON.parse(hist.stack[np]);
+  if (state.uid && window.Proj?.current()) Proj.current().inputs = state.inputs;
   renderForm();
   hist.lock = false;
   schedule();
@@ -445,6 +448,7 @@ function renderForm() {
         el("div", { class: "inp" }, input, el("span", {}, f.unit || "")));
       if (f.help) row.append(el("div", { class: "help" }, f.help));
       if (f.name === "ag") row.append(zoneChips(input));
+      window.Proj?.decorate(row, f, input);
       input.addEventListener("focus", () => row.classList.add("focus"));
       input.addEventListener("blur", () => row.classList.remove("focus"));
       fs.append(row);
@@ -581,6 +585,12 @@ function openModule(id, inputs) {
 
 function route() {
   const id = location.hash.slice(1);
+  if (id.startsWith("p/") && window.Proj?.item(id.slice(2))) {
+    const c = Proj.item(id.slice(2));
+    document.body.classList.remove("at-home");
+    selectModule(c.module, null, c.uid);
+    return;
+  }
   if (state.modules.some((m) => m.id === id)) {
     document.body.classList.remove("at-home");
     const inp = pendingInputs;
@@ -591,12 +601,14 @@ function route() {
   }
 }
 
-async function selectModule(id, inputs) {
+async function selectModule(id, inputs, uid) {
   state.schema = await api(`/api/modules/${id}`);
-  const saved = store.get(inputsKey(id), null);
-  state.inputs = inputs ? structuredClone(inputs) : saved ? saved : {};
+  state.uid = uid || null;
+  const item = uid ? Proj.item(uid) : null;
+  const saved = item ? null : store.get(inputsKey(id), null);
+  state.inputs = item ? (item.inputs ||= {}) : inputs ? structuredClone(inputs) : saved ? saved : {};
   document.querySelectorAll("nav a").forEach((a) => a.classList.toggle("active", a.dataset.id === id));
-  $("#mod-title").textContent = state.schema.title;
+  $("#mod-title").textContent = item ? `${item.name} — ${state.schema.title}` : state.schema.title;
   $("#mod-help").href = `/manual?lang=${LANG}#${id}`;
   $("#mod-desc").textContent = `${state.schema.standard} — ${state.schema.description}`;
   $("#restored").hidden = !(saved && !inputs);
@@ -606,6 +618,7 @@ async function selectModule(id, inputs) {
   renderNav();
   renderForm();
   resetHistory();
+  window.Proj?.headButton();
   run();
 }
 
@@ -632,8 +645,11 @@ let runId = 0;
 async function run() {
   const status = $("#status");
   const my = ++runId;
-  store.set(inputsKey(state.schema.id), state.inputs);
+  if (state.uid && window.Proj?.current()) { Proj.current().inputs = state.inputs; Proj.save(); }
+  else store.set(inputsKey(state.schema.id), state.inputs);
   try {
+    if (window.Proj) await Proj.resolve();
+    if (my !== runId) return;
     const res = await api(`/api/modules/${state.schema.id}/run`, { inputs: state.inputs, project: state.project });
     if (my !== runId) return; // a newer run is in flight
     clearInvalid();
@@ -651,6 +667,7 @@ async function run() {
       window.dispatchEvent(new CustomEvent("erisma:model3d", { detail: window.__erismaModel }));
     }
     renderStatus(res.summary);
+    if (state.uid) window.Proj?.afterRun();
   } catch (err) {
     if (my !== runId) return;
     status.className = "err";
@@ -784,11 +801,24 @@ const fileBase = () => (state.project.job_no || "calc").replace(/[^\w.-]+/g, "_"
 const actions = {
   print: () => $("#report").contentWindow.print(),
   html: () => download(`${fileBase()}.html`, state.lastHtml, "text/html"),
-  save: () => download(`${fileBase()}.erisma`, JSON.stringify({
-    format: "erisma", version: 1, module: state.schema.id, project: state.project, inputs: state.inputs,
-  }, null, 2), "application/json"),
+  save: () => {
+    if (window.Proj?.ws.calcs.length) {
+      const name = (state.project.job_no || state.project.project || "project").replace(/[^\w.-]+/g, "_");
+      download(`${name}.erisma`, JSON.stringify(Proj.doc(), null, 2), "application/json");
+      return;
+    }
+    if (!state.schema) return;
+    download(`${fileBase()}.erisma`, JSON.stringify({
+      format: "erisma", version: 1, module: state.schema.id, project: state.project, inputs: state.inputs,
+    }, null, 2), "application/json");
+  },
   open: () => $("#file-open").click(),
-  reset: () => { store.del(inputsKey(state.schema.id)); selectModule(state.schema.id, {}); },
+  reset: () => {
+    if (state.uid && window.Proj?.current()) {
+      const c = Proj.current(); c.inputs = {}; c.links = {}; Proj.save(); selectModule(c.module, null, c.uid); return;
+    }
+    store.del(inputsKey(state.schema.id)); selectModule(state.schema.id, {});
+  },
 };
 $("#btn-print").onclick = actions.print;
 $("#btn-manual").onclick = () => openManual();
@@ -805,6 +835,12 @@ $("#file-open").onchange = async (e) => {
     state.project = doc.project || {};
     store.set("erisma.project", state.project);
     renderProject();
+    if (doc.version === 2 && Array.isArray(doc.calcs)) {
+      Proj.ws = { calcs: doc.calcs }; Proj.status = {}; Proj.save();
+      await Proj.refresh(); renderNav();
+      if (doc.calcs.length) location.hash = `p/${doc.calcs[0].uid}`;
+      return;
+    }
     openModule(doc.module, doc.inputs);
   } catch (err) { alert(err.message); }
   e.target.value = "";
@@ -857,4 +893,5 @@ $("#side-toggle").onclick = () => setSide(!document.body.classList.contains("sid
   $("#go-home").onclick = home;
   $("#btn-home").onclick = home;
   route();
+  if (window.Proj?.ws.calcs.length) Proj.refresh().then(renderNav);
 })();

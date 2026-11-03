@@ -17,6 +17,7 @@ from ..design import sitezones
 from ..design.annex import ANNEXES
 from ..i18n import LANGS, tr
 from ..manual import build_manual
+from ..project import project_report, run_project
 from ..report import render_html
 
 STATIC = Path(__file__).parent / "static"
@@ -111,6 +112,24 @@ def run_module(module_id: str, req: RunRequest) -> dict[str, Any]:
 @app.post("/api/modules/{module_id}/report", response_class=HTMLResponse)
 def module_report(module_id: str, req: RunRequest) -> HTMLResponse:
     return HTMLResponse(run_module(module_id, req)["html"])
+
+
+class ProjectRequest(BaseModel):
+    doc: dict[str, Any] = Field(default_factory=dict)
+    lang: str = "en"
+
+
+@app.post("/api/project/run")
+def project_run(req: ProjectRequest) -> dict[str, Any]:
+    """Run all calculations of a project (links resolved in dependency order)."""
+    from ..core.units import DIMENSIONS
+    return _json_safe({**run_project(req.doc, _lang(req.lang)), "dims": DIMENSIONS})
+
+
+@app.post("/api/project/report", response_class=HTMLResponse)
+def project_report_html(req: ProjectRequest) -> HTMLResponse:
+    """The whole project as one printable document (cover, contents, all calculations)."""
+    return HTMLResponse(project_report(req.doc, _lang(req.lang)))
 
 
 @app.get("/manual", response_class=HTMLResponse, include_in_schema=False)

@@ -31,6 +31,7 @@ class ProjectInfo:
     site: str = ""      # site name (optional)
     lat: str = ""       # site latitude / longitude (WGS84, decimal degrees)
     lon: str = ""
+    logo: str = ""      # company logo as a data: URL (shown in report headers)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any] | None) -> "ProjectInfo":
@@ -88,6 +89,8 @@ class Calculation:
         self.items: list[Item] = []
         self.checks: list[Check] = []
         self.values: dict[str, float] = {}
+        # every recorded quantity in display units, for links between calculations
+        self.outputs: dict[str, dict[str, Any]] = {}
         self.warnings: list[str] = []
         self.model3d: dict[str, Any] | None = None  # optional 3D scene for viewers
 
@@ -115,6 +118,7 @@ class Calculation:
               dp: int | None = None) -> float:
         """Record a design input (value is in base units)."""
         self.values[symbol] = value
+        self._out(symbol, value, unit, description)
         self.items.append(Item("input", {
             "symbol": symbol, "value": from_base(value, unit), "unit": unit,
             "description": self.tr(description), "dp": dp,
@@ -133,12 +137,22 @@ class Calculation:
                 dp: int | None = None) -> float:
         """Record a derived quantity: ``symbol = expression = value unit``."""
         self.values[symbol] = value
+        self._out(symbol, value, unit, description)
         self.items.append(Item("formula", {
             "symbol": symbol, "expression": self.tr(expression, quiet=True),
             "value": from_base(value, unit), "unit": unit,
             "description": self.tr(description), "ref": ref, "dp": dp,
         }))
         return value
+
+    def _out(self, symbol: str, value: Any, unit: str, description: str) -> None:
+        try:
+            v = float(from_base(float(value), unit))
+        except (TypeError, ValueError, KeyError):
+            return
+        if v == v and abs(v) != float("inf"):
+            self.outputs[symbol] = {"value": v, "unit": unit,
+                                    "description": self.tr(description, quiet=True)}
 
     def table(self, headers: list[str], rows: list[list[Any]], caption: str = "") -> None:
         self.items.append(Item("table", {"headers": [self.tr(h) for h in headers],

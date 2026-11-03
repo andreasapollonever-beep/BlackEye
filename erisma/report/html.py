@@ -80,6 +80,8 @@ header.tb .v{font-weight:600;min-height:1.2em}
 header.tb .brand{grid-row:span 2;background:var(--accent);color:#fff}
 header.tb .brand .v{font-size:18px}
 header.tb .brand .k{color:#c5d3e6}
+header.tb .brand .logo{float:right;max-height:40px;max-width:110px;background:#fff;border-radius:3px;
+padding:2px;margin-left:6px}
 h1{font-size:20px;margin:6px 0 2px;color:var(--accent)}
 .std{color:var(--muted);margin-bottom:12px}
 h2{font-size:15px;margin:22px 0 8px;padding-bottom:3px;border-bottom:2px solid var(--accent);
@@ -187,7 +189,10 @@ def render_html(calc: Calculation, standalone: bool = True) -> str:
     L = calc.lang
     t = lambda x: escape(tr(x, L))  # noqa: E731
     tb = (
-        f'<header class="tb"><div class="brand"><div class="k">{t("Company")}</div>'
+        f'<header class="tb"><div class="brand">'
+        + (f'<img class="logo" src="{escape(p.logo)}" alt="">' if p.logo.startswith("data:image/")
+           else "")
+        + f'<div class="k">{t("Company")}</div>'
         f'<div class="v">{escape(p.company)}</div><div class="k">{t("Project")}</div>'
         f'<div class="v">{escape(p.project)}</div></div>'
         f'<div><div class="k">{t("Job no.")}</div><div class="v">{escape(p.job_no)}</div></div>'
