@@ -310,3 +310,14 @@ border-bottom:1px solid var(--line);font-size:12.5px;cursor:pointer}
 .linkdlg .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
 .logo-prev{max-height:34px;max-width:120px;background:#fff;border-radius:4px;padding:2px}
 #proj-add button{font-size:12px}
+
+dialog.linkdlg.wide{width:min(780px,96vw)}
+.optout .tbl.res td{padding:4px 8px}.optout tr.chg td{color:var(--accent2);font-weight:600}
+.optout .big{font-size:15px;font-weight:700;color:var(--pass,#2e9b5f)}
+.optout .busy{color:var(--accent2)}.optout .err,.linkdlg .err{color:var(--fail)}
+.muted.small,.small{font-size:11.5px}
+#status .cost{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:var(--ink2)}
+table.cmp td{vertical-align:top}table.cmp td.ok{color:var(--pass,#2e9b5f);font-weight:700}
+table.cmp td.ko{color:var(--fail);font-weight:700}table.cmp tr.best td{background:var(--accent-soft)}
+table.cmp td.num{text-align:right;white-space:nowrap}table.cmp tr.tot td{font-weight:700;border-top:2px solid var(--line)}
+#btn-opt{font-size:13px}

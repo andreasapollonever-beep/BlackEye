@@ -32,6 +32,7 @@ class ProjectInfo:
     lat: str = ""       # site latitude / longitude (WGS84, decimal degrees)
     lon: str = ""
     logo: str = ""      # company logo as a data: URL (shown in report headers)
+    prices: str = ""    # unit prices for the cost estimate, JSON {"concrete": 130, ...}
 
     @classmethod
     def from_dict(cls, data: dict[str, Any] | None) -> "ProjectInfo":
@@ -93,6 +94,7 @@ class Calculation:
         self.outputs: dict[str, dict[str, Any]] = {}
         self.warnings: list[str] = []
         self.model3d: dict[str, Any] | None = None  # optional 3D scene for viewers
+        self.quantities: dict[str, Any] | None = None  # material quantities and cost
 
     def tr(self, text: str, quiet: bool = False, **kw: Any) -> str:
         """Translate ``text`` (exact match) and format it with ``kw``."""

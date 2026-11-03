@@ -216,6 +216,8 @@ function renderProject() {
     box.append(el("div", {}, el("label", { for: id }, t(label)), input));
   }
   window.logoField?.();
+  if (window.Opt) box.append(el("div", { class: "wide" }, el("button", { type: "button", class: "ghost",
+    on: { click: () => Opt.prices() } }, `💶 ${ot("Unit prices")}`)));
 }
 
 // ------------------------------------------------------------------ form
@@ -667,6 +669,12 @@ async function run() {
       window.dispatchEvent(new CustomEvent("erisma:model3d", { detail: window.__erismaModel }));
     }
     renderStatus(res.summary);
+    if (res.quantities && typeof itemName === "function") {
+      const q = res.quantities;
+      $("#status").append(el("div", { class: "cost", title: q.rows.map((x) => `${itemName(x.item)}: ${fmtNum(+x.qty.toFixed(2))} ${x.unit}`).join("\n") },
+        `💶 ≈ ${eur(q.total)} · ${q.basis}`,
+        el("button", { type: "button", class: "mini", title: ot("Unit prices"), on: { click: () => Opt.prices() } }, "✎")));
+    }
     if (state.uid) window.Proj?.afterRun();
   } catch (err) {
     if (my !== runId) return;

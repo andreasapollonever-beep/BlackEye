@@ -151,6 +151,8 @@ class DesignModule:
             cls.run(calc, inputs)
         except InputError as exc:
             raise InputError(tr(str(exc), lang), exc.field) from exc
+        from ..quantities import record
+        record(calc, inputs)
         if cls.uses_annex:
             from ..design.annex import record_annex
             record_annex(calc)

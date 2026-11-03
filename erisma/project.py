@@ -95,7 +95,8 @@ def run_project(doc: dict, lang: str = "en", html: bool = False) -> dict[str, An
             res.update(error=str(exc), field=exc.field)
             results[uid] = res
             continue
-        res.update(summary=calc.summary(), outputs=calc.outputs, title=calc.title)
+        res.update(summary=calc.summary(), outputs=calc.outputs, title=calc.title,
+                   quantities=calc.quantities)
         if html:
             res["html"] = render_html(calc, standalone=False)
         results[uid] = res

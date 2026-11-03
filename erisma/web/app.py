@@ -17,6 +17,7 @@ from ..design import sitezones
 from ..design.annex import ANNEXES
 from ..i18n import LANGS, tr
 from ..manual import build_manual
+from ..optimize import optimise, spec
 from ..project import project_report, run_project
 from ..report import render_html
 
@@ -106,7 +107,25 @@ def run_module(module_id: str, req: RunRequest) -> dict[str, Any]:
     except InputError as exc:
         raise HTTPException(422, {"message": str(exc), "field": exc.field}) from exc
     return _json_safe({"summary": calc.summary(), "html": render_html(calc),
-                       "model3d": calc.model3d})
+                       "model3d": calc.model3d, "quantities": calc.quantities})
+
+
+class OptimiseRequest(RunRequest):
+    variables: list[dict[str, Any]] = Field(default_factory=list)
+
+
+@app.get("/api/modules/{module_id}/optimise")
+def optimise_spec(module_id: str, lang: str = "en") -> list[dict[str, Any]]:
+    _module(module_id)
+    return [{**v, "label": tr(v["label"], _lang(lang))} for v in spec(module_id)]
+
+
+@app.post("/api/modules/{module_id}/optimise")
+def optimise_run(module_id: str, req: OptimiseRequest) -> dict[str, Any]:
+    """Cheapest design that passes every check, varying the chosen design variables."""
+    _module(module_id)
+    return _json_safe(optimise(module_id, req.inputs, req.project, req.variables,
+                               _lang(req.lang)))
 
 
 @app.post("/api/modules/{module_id}/report", response_class=HTMLResponse)
