@@ -136,3 +136,56 @@ def shear_no_links(calc: Calculation, b: float, d: float, As: float, fck: float,
     calc.check("Shear: V_Ed ≤ V_Rd,c", VEd * scale, VRdc, u, "6.2.2",
                hint="Increase the member thickness (or the tension reinforcement).")
     return VRdc / scale
+
+
+def section_layers(b: float, h: float, nb: int, nh: int, dia: float, cover_to_bar: float):
+    """Bar layers (area, depth from the compressed face) for bending across ``h``.
+
+    ``nb`` bars along each face of width b (incl. corners), ``nh`` bars along each face of
+    depth h (incl. corners); ``cover_to_bar`` = distance from the face to the bar centre.
+    """
+    a = bar_area(dia)
+    d1 = cover_to_bar
+    layers = [(nb * a, d1), (nb * a, h - d1)]
+    mid = nh - 2
+    for k in range(mid):
+        y = d1 + (h - 2 * d1) * (k + 1) / (mid + 1)
+        layers.append((2 * a, y))
+    return layers
+
+
+def moment_resistance(b: float, h: float, layers, fcd: float, fyd: float, NEd: float
+                      ) -> tuple[float, float]:
+    """M_Rd about the centroid for axial force NEd (compression +) — strain compatibility.
+
+    Rectangular stress block (λ = 0.8, η = 1.0), ε_cu3 = 3.5 ‰, elastic–plastic steel.
+    Returns ``(M_Rd, x)``; M_Rd = 0 when NEd exceeds the squash load.
+    """
+    As_tot = sum(a for a, _ in layers)
+    N_max = b * h * fcd + As_tot * fyd
+    N_min = -As_tot * fyd
+    if NEd >= N_max or NEd <= N_min:
+        return 0.0, float("nan")
+
+    def forces(x):
+        y = min(0.8 * x, h)
+        Fc = y * b * fcd
+        Fs, Ms = 0.0, 0.0
+        for a, d in layers:
+            eps = EPS_CU3 * (x - d) / x
+            sig = max(min(ES * eps, fyd), -fyd)
+            if d < y:  # bar inside the compressed block: deduct displaced concrete
+                sig -= fcd if sig > 0 else 0.0
+            Fs += a * sig
+            Ms += a * sig * (h / 2 - d)
+        return Fc + Fs, Fc * (h / 2 - y / 2) + Ms
+
+    lo, hi = 1e-3 * h, 50 * h
+    for _ in range(200):
+        mid = 0.5 * (lo + hi)
+        if forces(mid)[0] > NEd:
+            hi = mid
+        else:
+            lo = mid
+    x = 0.5 * (lo + hi)
+    return forces(x)[1], x

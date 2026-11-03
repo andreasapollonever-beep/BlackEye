@@ -21,6 +21,14 @@ SCENARIOS = {
     "ec7_gravity_wall": [{}, {"t_footing": 0}, {"h_w": 1.0, "B_body": 1.2}],
     "ec7_pad_footing": [{}, {"h": 0.4}, {"Bx": 1.2, "By": 1.2}, {"approach": "DA2"}],
     "ec7_slope_stability": [{}, {"slope": 45, "c": 0}],
+    "ec2_rc_column": [{}, {"NEd": 3500}, {"L": 8, "Mh_top": 10}, {"seismic": False},
+                      {"s": 300}, {"braced": False, "L": 6}, {"Mb_top": 200, "VEd": 400}],
+    "ec2_rc_slab": [{}, {"punch": True}, {"type": "One-way continuous"},
+                    {"type": "One-way continuous", "spans": 1}, {"e1": "Simply supported",
+                    "e3": "Simply supported"}, {"h": 120, "q": 15},
+                    {"punch": True, "pos": "Edge", "VEd": 150}],
+    "ec7_strip_footing": [{}, {"seismic": True}, {"B": 0.6, "MG": 40}, {"tie": False},
+                          {"th": 0.3, "tn": 4, "tdia": "10"}],
 }
 BAD = [("ec3_steel_beam", {"L": -1}), ("ec3_steel_beam", {"L": "abc"}),
        ("ec3_steel_beam", {"section": "XYZ"}), ("ec7_retaining_wall", {"t_top": 0.5, "t_bot": 0.3}),
@@ -32,7 +40,8 @@ BAD = [("ec3_steel_beam", {"L": -1}), ("ec3_steel_beam", {"L": "abc"}),
        ("ec7_berlin_wall", {"a": 0.1}), ("ec7_retaining_wall", {"step": True, "t_low": 0.3}),
        ("ec7_retaining_wall", {"step": True, "h_step": 5}),
        ("ec7_retaining_wall", {"key": True, "key_x": 9}), ("en1990_combinations", {"actions": []}),
-       ("ec8_lateral_force", {"storeys": []})]
+       ("ec8_lateral_force", {"storeys": []}),
+       ("ec7_strip_footing", {"D": 0.3}), ("ec7_strip_footing", {"bw": 2})]
 
 
 def collect() -> set[str]:

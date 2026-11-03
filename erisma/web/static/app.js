@@ -331,6 +331,12 @@ const PICS = {
   ec7_pad_footing: '<path d="M2 26h92" stroke="#a08060"/><rect x="42" y="4" width="12" height="24" fill="#9aa0a8"/><rect x="24" y="28" width="48" height="10" fill="#b4b8bf"/><path d="M26 44h44" stroke="#2e9b5f" stroke-width="3"/><path d="M32 46v-5M48 46v-5M64 46v-5" stroke="#2e9b5f"/>',
   ec7_slope_stability: '<path d="M2 14h28l36 26h28v6H2z" fill="#e9d8b8" stroke="#8a6d3b"/><path d="M24 14q18 34 46 27" stroke="#e03b3b" stroke-width="3" fill="none"/><circle cx="58" cy="6" r="2.5" fill="#e03b3b" stroke="none"/>',
   ec7_berlin_wall: '<path d="M2 30h40" stroke="#a08060"/><path d="M46 4h48v42H46z" fill="#e9d8b8" stroke="none"/><path d="M42 4v42M48 4v42" stroke="#5a6b7d" stroke-width="3"/><path d="M42 8h6M42 13h6M42 18h6M42 23h6M42 28h6" stroke="#a0703c" stroke-width="2"/><path d="M48 12l30 10" stroke="#111"/><path d="M72 20l16 5" stroke="#9ca3af" stroke-width="5"/>',
+  ec2_rc_column: '<rect x="40" y="4" width="16" height="40" fill="#b4b8bf"/><path d="M44 4v40M52 4v40" stroke="#8a5a2b"/><path d="M40 12h16M40 20h16M40 28h16M40 36h16" stroke="#555" stroke-width="1"/>',
+  ec2_rc_slab: '<path d="M8 20l20-12h60l-20 12z" fill="#b4b8bf"/><path d="M8 20h60v6H8z M68 20l20-12v6l-20 12z" fill="#9aa0a8"/><path d="M16 26v16M60 26v16" stroke="#9aa0a8" stroke-width="5"/>',
+  ec7_strip_footing: '<path d="M2 26h92" stroke="#a08060"/><rect x="20" y="4" width="10" height="24" fill="#9aa0a8"/><rect x="8" y="28" width="34" height="8" fill="#b4b8bf"/><rect x="66" y="4" width="10" height="24" fill="#9aa0a8"/><rect x="54" y="28" width="34" height="8" fill="#b4b8bf"/><path d="M42 31h12" stroke="#7d8794" stroke-width="5"/>',
+  ec1_wind_snow: '<path d="M6 14h40q8 0 8-6M6 24h56q8 0 8 6M6 34h34" stroke="#2f8fd8"/><path d="M70 40l12-14 12 14z" fill="#e3e4e6"/><circle cx="78" cy="10" r="2" fill="#9ab"/><circle cx="88" cy="16" r="2" fill="#9ab"/>',
+  ec8_lateral_force: '<path d="M30 44V8h26v36" stroke="#334"/><path d="M30 17h26M30 26h26M30 35h26" stroke="#334" stroke-width="1"/><path d="M58 11h16M58 20h12M58 29h8" stroke="#e03b3b" stroke-width="3"/><path d="M4 44q6-8 10 0t10 0" stroke="#e03b3b"/>',
+  en1990_combinations: '<path d="M18 10h60M18 20h60M18 30h60M18 40h60" stroke="#8892a0" stroke-width="1"/><text x="20" y="27" font-size="16" fill="#2a6f97" stroke="none" font-family="sans-serif">γ·ψ</text>',
 };
 const pic = (id) => `<svg viewBox="0 0 96 48" fill="none" stroke="#334" stroke-width="2" stroke-linejoin="round">${PICS[id] || '<rect x="30" y="8" width="36" height="32" rx="4"/>'}</svg>`;
 
