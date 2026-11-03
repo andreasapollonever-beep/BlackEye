@@ -49,3 +49,16 @@ def test_api_blocks_after_trial(monkeypatch):
     r = c.post("/api/modules/ec7_pad_footing/run", json={})
     assert r.status_code == 402 and r.json()["detail"]["license"]
     assert c.post("/api/license", json={"key": "nonsense"}).status_code == 400
+
+
+def test_every_paid_feature_is_blocked_after_trial(monkeypatch):
+    c = TestClient(app)
+    monkeypatch.setattr(lic, "allowed", lambda: False)
+    doc = {"format": "erisma", "version": 2, "project": {},
+           "calcs": [{"uid": "a", "module": "ec7_pad_footing", "name": "F1", "inputs": {}, "links": {}}]}
+    for path, body in [("/api/modules/ec7_pad_footing/report", {}),
+                       ("/api/modules/ec7_pad_footing/dxf", {}),
+                       ("/api/modules/ec7_pad_footing/optimise", {"variables": []}),
+                       ("/api/project/run", {"doc": doc}),
+                       ("/api/project/report", {"doc": doc})]:
+        assert c.post(path, json=body).status_code == 402, path

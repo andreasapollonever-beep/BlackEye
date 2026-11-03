@@ -866,7 +866,7 @@ function licenseDialog() {
     el("div", { class: "btns" }, el("button", { type: "button", class: "ghost", on: { click: () => d.close() } }, t("Cancel")),
       el("button", { type: "button", class: "primary", on: { click: async () => {
         try {
-          const r = await fetch("/api/license", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: inp.value }) });
+          const r = await fetch("/api/license", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: inp.value, lang: LANG }) });
           const j = await r.json();
           if (!r.ok) throw new Error(j.detail || r.statusText);
           msg.textContent = t("Licence activated — thank you!"); msg.className = "ok";
@@ -881,7 +881,10 @@ refreshLicense();
 $("#btn-dxf").onclick = async () => {
   const res = await fetch(`/api/modules/${state.schema.id}/dxf`, { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ inputs: state.inputs, project: state.project, lang: LANG }) });
-  if (!res.ok) { alert((await res.json().catch(() => ({}))).detail?.message || res.statusText); return; }
+  if (!res.ok) {
+    if (res.status === 402) { licenseDialog(); return; }
+    alert((await res.json().catch(() => ({}))).detail?.message || res.statusText); return;
+  }
   const a = el("a", { href: URL.createObjectURL(await res.blob()), download: `${fileBase()}.dxf` });
   document.body.append(a); a.click(); a.remove();
 };

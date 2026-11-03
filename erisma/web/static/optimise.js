@@ -85,7 +85,10 @@ const Opt = {
           el("div", { class: "btns" }, el("button", { type: "button", class: "primary", on: { click: () => {
             Object.assign(state.inputs, r.best); snapshot(); renderForm(); schedule(); d.close();
           } } }, `✓ ${ot("Apply")}`)));
-      } catch (err) { out.innerHTML = ""; out.append(el("p", { class: "err" }, err.message)); }
+      } catch (err) {
+        out.innerHTML = ""; out.append(el("p", { class: "err" }, err.message));
+        if (err.license) { d.close(); licenseDialog(); }
+      }
       finally { go.disabled = false; }
     };
   },
@@ -110,7 +113,11 @@ const Opt = {
 
   async compare() {
     if (!Proj.ws.calcs.length) { alert(pt("The project is empty — open a calculation and press “+ Add to project”.")); return; }
-    const res = await api("/api/project/run", { doc: Proj.doc() });
+    let res;
+    try { res = await api("/api/project/run", { doc: Proj.doc() }); } catch (err) {
+      if (err.license) licenseDialog(); else alert(err.message);
+      return;
+    }
     const items = Proj.ws.calcs.map((c) => ({ c, r: res.results?.[c.uid] || {} }));
     const best = {};
     for (const { c, r } of items) {

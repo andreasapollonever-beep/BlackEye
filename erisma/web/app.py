@@ -106,6 +106,7 @@ def module_dxf(module_id: str, req: RunRequest):
     """DXF drawing (plan / section, reinforcement, dimensions) for CAD."""
     from fastapi.responses import Response
     mod = _module(module_id)
+    _check_license(_lang(req.lang))
     if not dxf_supported(module_id):
         raise HTTPException(404, "No drawing for this calculation")
     try:
@@ -119,6 +120,7 @@ def module_dxf(module_id: str, req: RunRequest):
 
 class LicenseRequest(BaseModel):
     key: str = ""
+    lang: str = "en"
 
 
 @app.get("/api/license")
@@ -130,8 +132,8 @@ def license_status() -> dict[str, Any]:
 def license_activate(req: LicenseRequest) -> dict[str, Any]:
     try:
         lic.activate(req.key)
-    except ValueError as exc:
-        raise HTTPException(400, str(exc)) from exc
+    except lic.LicenseError as exc:
+        raise HTTPException(400, tr(exc.template, _lang(req.lang), **exc.params)) from exc
     return lic.status()
 
 
@@ -168,6 +170,7 @@ def optimise_spec(module_id: str, lang: str = "en") -> list[dict[str, Any]]:
 def optimise_run(module_id: str, req: OptimiseRequest) -> dict[str, Any]:
     """Cheapest design that passes every check, varying the chosen design variables."""
     _module(module_id)
+    _check_license(_lang(req.lang))
     return _json_safe(optimise(module_id, req.inputs, req.project, req.variables,
                                _lang(req.lang)))
 
@@ -186,12 +189,14 @@ class ProjectRequest(BaseModel):
 def project_run(req: ProjectRequest) -> dict[str, Any]:
     """Run all calculations of a project (links resolved in dependency order)."""
     from ..core.units import DIMENSIONS
+    _check_license(_lang(req.lang))
     return _json_safe({**run_project(req.doc, _lang(req.lang)), "dims": DIMENSIONS})
 
 
 @app.post("/api/project/report", response_class=HTMLResponse)
 def project_report_html(req: ProjectRequest) -> HTMLResponse:
     """The whole project as one printable document (cover, contents, all calculations)."""
+    _check_license(_lang(req.lang))
     return HTMLResponse(project_report(req.doc, _lang(req.lang)))
 
 

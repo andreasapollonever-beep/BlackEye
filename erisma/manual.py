@@ -16,7 +16,7 @@ E = html.escape
 
 # ------------------------------------------------------------------ chapters
 CHAPTERS: list[tuple[str, dict[str, str], dict[str, str]]] = [
-    ("intro", {"en": "1. What Erisma is", "el": "1. Τι είναι το Erisma"}, {
+    ("intro", {"en": "What Erisma is", "el": "Τι είναι το Erisma"}, {
         "en": """
 <p>Erisma is a suite of structural and geotechnical calculations to the Eurocodes. Every
 calculation is written out step by step — <b>input → formula → value → clause → check</b> —
@@ -50,8 +50,23 @@ the model, the input values and the interpretation of the results.</p>""",
 </ul>
 <p class="warn">Το Erisma είναι εργαλείο για διπλωματούχους μηχανικούς. Την ευθύνη για το
 προσομοίωμα, τα δεδομένα και την ερμηνεία των αποτελεσμάτων έχει ο μηχανικός.</p>"""}),
-    ("start", {"en": "2. Installation and start", "el": "2. Εγκατάσταση και εκκίνηση"}, {
+    ("start", {"en": "Installation and start", "el": "Εγκατάσταση και εκκίνηση"}, {
         "en": """
+<h4>Windows — installer (recommended)</h4>
+<ol>
+<li>Run <code>Erisma-Setup-<i>version</i>.exe</code>. Python or anything else is not needed.
+Choose the language (Greek / English) and, if you wish, a desktop icon. No administrator
+rights are required (it installs for the current user; an administrator can choose all
+users).</li>
+<li>Start <b>Erisma</b> from the Start menu or the desktop. A small window
+“Erisma — στατικοί υπολογισμοί” appears and the program opens in your browser. The window
+shows the address (normally <code>http://127.0.0.1:8000</code>; if that port is busy the next
+free one is used). <b>Άνοιγμα</b> opens the program again in the browser, <b>Τερματισμός</b> or
+closing the window stops Erisma.</li>
+<li>The Start menu also has <b>Εγχειρίδιο Erisma</b> (this manual as PDF) and the uninstaller.
+Updating = running the new Setup; your licence and settings are kept.</li>
+</ol>
+<h4>Without installer (Windows, Mac, Linux)</h4>
 <ol>
 <li>Install <a href="https://www.python.org/downloads/">Python 3.10 or newer</a> (on Windows
 tick <i>Add Python to PATH</i>).</li>
@@ -59,11 +74,28 @@ tick <i>Add Python to PATH</i>).</li>
 <li><b>Windows:</b> double-click <code>Erisma.bat</code>. <b>Mac:</b> right-click
 <code>Erisma.command</code> → Open.</li>
 </ol>
-<p>The first start installs the program (1–2 minutes, internet needed once). Erisma then opens
-by itself in your browser at <code>http://127.0.0.1:8000</code>. Everything runs on your own
-computer and works offline; nothing is sent to the internet. To stop Erisma close the black
-window.</p>""",
+<p>The first start installs the program (1–2 minutes, internet needed once); then Erisma opens
+in your browser at <code>http://127.0.0.1:8000</code>. To stop it close the black window.</p>
+<p>Either way everything runs on your own computer and works offline; nothing is sent to the
+internet. Your projects are ordinary <code>.erisma</code> files that you keep wherever you
+like.</p>""",
         "el": """
+<h4>Windows — πρόγραμμα εγκατάστασης (συνιστάται)</h4>
+<ol>
+<li>Τρέξτε το <code>Erisma-Setup-<i>έκδοση</i>.exe</code>. Δεν χρειάζεται Python ή τίποτε άλλο.
+Επιλέξτε γλώσσα (Ελληνικά / Αγγλικά) και, αν θέλετε, εικονίδιο στην επιφάνεια εργασίας. Δεν
+χρειάζονται δικαιώματα διαχειριστή (εγκαθίσταται για τον τρέχοντα χρήστη· ο διαχειριστής
+μπορεί να επιλέξει όλους τους χρήστες).</li>
+<li>Ξεκινήστε το <b>Erisma</b> από το μενού Έναρξη ή την επιφάνεια εργασίας. Εμφανίζεται ένα
+μικρό παράθυρο «Erisma — στατικοί υπολογισμοί» και το πρόγραμμα ανοίγει στον browser. Το
+παράθυρο δείχνει τη διεύθυνση (κανονικά <code>http://127.0.0.1:8000</code>· αν η θύρα είναι
+κατειλημμένη χρησιμοποιείται η επόμενη ελεύθερη). Το <b>Άνοιγμα</b> ανοίγει ξανά το πρόγραμμα
+στον browser, το <b>Τερματισμός</b> ή το κλείσιμο του παραθύρου σταματά το Erisma.</li>
+<li>Στο μενού Έναρξη υπάρχουν επίσης το <b>Εγχειρίδιο Erisma</b> (αυτό το εγχειρίδιο σε PDF)
+και η απεγκατάσταση. Ενημέρωση = εκτέλεση του νέου Setup· η άδεια και οι ρυθμίσεις
+διατηρούνται.</li>
+</ol>
+<h4>Χωρίς πρόγραμμα εγκατάστασης (Windows, Mac, Linux)</h4>
 <ol>
 <li>Εγκαταστήστε την <a href="https://www.python.org/downloads/">Python 3.10 ή νεότερη</a>
 (στα Windows τσεκάρετε <i>Add Python to PATH</i>).</li>
@@ -71,11 +103,13 @@ window.</p>""",
 <li><b>Windows:</b> διπλό κλικ στο <code>Erisma.bat</code>. <b>Mac:</b> δεξί κλικ στο
 <code>Erisma.command</code> → Άνοιγμα.</li>
 </ol>
-<p>Την πρώτη φορά γίνεται αυτόματα η εγκατάσταση (1–2 λεπτά, χρειάζεται internet μόνο τότε).
-Μετά το Erisma ανοίγει μόνο του στον browser στη διεύθυνση <code>http://127.0.0.1:8000</code>.
-Όλα τρέχουν στον υπολογιστή σας και λειτουργούν χωρίς internet· τίποτα δεν αποστέλλεται.
-Για τερματισμό κλείστε το μαύρο παράθυρο.</p>"""}),
-    ("ui", {"en": "3. The screen", "el": "3. Η οθόνη"}, {
+<p>Την πρώτη φορά γίνεται αυτόματα η εγκατάσταση (1–2 λεπτά, χρειάζεται internet μόνο τότε)·
+μετά το Erisma ανοίγει στον browser στη διεύθυνση <code>http://127.0.0.1:8000</code>. Για
+τερματισμό κλείστε το μαύρο παράθυρο.</p>
+<p>Και στους δύο τρόπους όλα τρέχουν στον υπολογιστή σας και λειτουργούν χωρίς internet·
+τίποτα δεν αποστέλλεται. Τα έργα σας είναι κανονικά αρχεία <code>.erisma</code> που τα
+φυλάτε όπου θέλετε.</p>"""}),
+    ("ui", {"en": "The screen", "el": "Η οθόνη"}, {
         "en": """
 <ul>
 <li><b>Home page:</b> all calculations as cards grouped by category, with search. “Continue”
@@ -88,8 +122,13 @@ every report and are kept for all calculations.</li>
 <li><b>Input form</b> (middle): fields grouped in boxes. Above it the <b>status banner</b>:
 green when all checks pass, red with the failing checks and what to change.</li>
 <li><b>Report / 3D model</b> (right): the full calculation sheet and the interactive model.</li>
-<li>Top bar: Home, light/dark theme, language ΕΛ/EN, Open, Save, Export HTML,
-Print / PDF, Manual.</li>
+<li><b>Above the form:</b> <b>+ Add to project</b> (see “Projects”), <b>🎯</b> automatic
+design (most economical solution) and <b>Reset to defaults</b>. In the status banner the
+<b>💶</b> cost estimate.</li>
+<li><b>Top bar:</b> Home, light/dark theme, language ΕΛ/EN, licence state, Manual, Open, Save,
+<b>DXF</b> (only for calculations with a drawing), Export HTML, Print / PDF.</li>
+<li>At the top of the left sidebar the <b>📁 Project</b> list with the buttons 📄 project report,
+⚖ comparison and ✚ new project.</li>
 </ul>""",
         "el": """
 <ul>
@@ -105,10 +144,16 @@ Print / PDF, Manual.</li>
 να αλλάξετε.</li>
 <li><b>Τεύχος / 3D μοντέλο</b> (δεξιά): το πλήρες τεύχος υπολογισμών και το διαδραστικό
 μοντέλο.</li>
-<li>Πάνω μπάρα: Αρχική, φωτεινό/σκούρο θέμα, γλώσσα ΕΛ/EN, Άνοιγμα, Αποθήκευση, Εξαγωγή
-HTML, Εκτύπωση / PDF, Εγχειρίδιο.</li>
+<li><b>Πάνω από τη φόρμα:</b> <b>+ Στο έργο</b> (βλ. «Έργα»), <b>🎯</b> αυτόματη
+διαστασιολόγηση (οικονομικότερη λύση) και <b>Επαναφορά προεπιλογών</b>. Στη μπάρα κατάστασης
+η εκτίμηση κόστους <b>💶</b>.</li>
+<li><b>Πάνω μπάρα:</b> Αρχική, φωτεινό/σκούρο θέμα, γλώσσα ΕΛ/EN, κατάσταση άδειας,
+Εγχειρίδιο, Άνοιγμα, Αποθήκευση, <b>DXF</b> (μόνο σε υπολογισμούς με σχέδιο), Εξαγωγή HTML,
+Εκτύπωση / PDF.</li>
+<li>Στην κορυφή της αριστερής μπάρας η λίστα <b>📁 Έργο</b> με τα κουμπιά 📄 τεύχος έργου,
+⚖ σύγκριση και ✚ νέο έργο.</li>
 </ul>"""}),
-    ("input", {"en": "4. Entering data", "el": "4. Εισαγωγή δεδομένων"}, {
+    ("input", {"en": "Entering data", "el": "Εισαγωγή δεδομένων"}, {
         "en": """
 <ul>
 <li><b>Decimals:</b> type <code>1,5</code> or <code>1.5</code> — both work.</li>
@@ -156,14 +201,16 @@ and the field concerned is highlighted.</li>
 <li><b>Λάθος τιμές</b> γίνονται αμέσως κόκκινες· αν ο υπολογισμός δεν μπορεί να γίνει, η μπάρα
 κατάστασης εξηγεί γιατί και το σχετικό πεδίο τονίζεται.</li>
 </ul>"""}),
-    ("files", {"en": "5. Saving, files and printing", "el": "5. Αποθήκευση, αρχεία και εκτύπωση"}, {
+    ("files", {"en": "Saving, files and printing", "el": "Αποθήκευση, αρχεία και εκτύπωση"}, {
         "en": """
 <ul>
 <li><b>Autosave:</b> the inputs of every calculation are kept in the browser; when you reopen a
 calculation you continue where you left off.</li>
-<li><b>Save</b> (<kbd>Ctrl</kbd>+<kbd>S</kbd>) downloads a project file <code>.erisma</code>
-with the inputs and the project details; <b>Open</b> (<kbd>Ctrl</kbd>+<kbd>O</kbd>) loads it
-again — send it to a colleague or keep it with the project.</li>
+<li><b>Save</b> (<kbd>Ctrl</kbd>+<kbd>S</kbd>) downloads a file <code>.erisma</code> with the
+inputs and the project details — the whole project (all items, links, logo, unit prices) when
+the project list is not empty, otherwise the current calculation. <b>Open</b>
+(<kbd>Ctrl</kbd>+<kbd>O</kbd>) loads either kind again — send it to a colleague or keep it with
+the job.</li>
 <li><b>Print / PDF</b> (<kbd>Ctrl</kbd>+<kbd>P</kbd>) prints the report; choose “Save as PDF”
 as the printer to get a PDF. <b>Export HTML</b> saves the report as a web page.</li>
 </ul>""",
@@ -171,14 +218,15 @@ as the printer to get a PDF. <b>Export HTML</b> saves the report as a web page.<
 <ul>
 <li><b>Αυτόματη αποθήκευση:</b> τα δεδομένα κάθε υπολογισμού κρατούνται στον browser· όταν
 ξανανοίγετε έναν υπολογισμό συνεχίζετε από εκεί που σταματήσατε.</li>
-<li><b>Αποθήκευση</b> (<kbd>Ctrl</kbd>+<kbd>S</kbd>) κατεβάζει αρχείο έργου
-<code>.erisma</code> με τα δεδομένα και τα στοιχεία έργου· το <b>Άνοιγμα</b>
-(<kbd>Ctrl</kbd>+<kbd>O</kbd>) το φορτώνει ξανά — στείλτε το σε συνάδελφο ή κρατήστε το με
-τον φάκελο του έργου.</li>
+<li><b>Αποθήκευση</b> (<kbd>Ctrl</kbd>+<kbd>S</kbd>) κατεβάζει αρχείο <code>.erisma</code> με τα
+δεδομένα και τα στοιχεία έργου — ολόκληρο το έργο (όλα τα στοιχεία, συνδέσεις, λογότυπο,
+τιμές μονάδας) όταν η λίστα του έργου δεν είναι κενή, αλλιώς τον τρέχοντα υπολογισμό. Το
+<b>Άνοιγμα</b> (<kbd>Ctrl</kbd>+<kbd>O</kbd>) φορτώνει και τα δύο — στείλτε το σε συνάδελφο ή
+κρατήστε το με τον φάκελο του έργου.</li>
 <li><b>Εκτύπωση / PDF</b> (<kbd>Ctrl</kbd>+<kbd>P</kbd>) τυπώνει το τεύχος· επιλέξτε «Αποθήκευση
 ως PDF» ως εκτυπωτή για αρχείο PDF. Η <b>Εξαγωγή HTML</b> αποθηκεύει το τεύχος ως ιστοσελίδα.</li>
 </ul>"""}),
-    ("annex", {"en": "6. National Annex and project site", "el": "6. Εθνικό Προσάρτημα και τοποθεσία"}, {
+    ("annex", {"en": "National Annex and project site", "el": "Εθνικό Προσάρτημα και τοποθεσία"}, {
         "en": """
 <p>Choose the <b>National Annex</b> in the project details. All partial factors and nationally
 determined parameters (NDPs) come from it, and each report ends with a table of the NDPs used.
@@ -201,7 +249,7 @@ EN 1995-1-1 για την Κύπρο) χρησιμοποιούνται οι συ
 δυσμενέστερη ζώνη σε ακτίνα 1 km), και ο υπολογισμός ανέμου-χιονιού διαβάζει τα
 v<sub>b,0</sub> και s<sub>k</sub> για την ίδια θέση. Δίπλα σε κάθε πεδίο a<sub>gR</sub> τα
 κουμπιά ζωνών βάζουν την τιμή με ένα κλικ.</p>"""}),
-    ("report", {"en": "7. Reading the report", "el": "7. Το τεύχος υπολογισμών"}, {
+    ("report", {"en": "Reading the report", "el": "Το τεύχος υπολογισμών"}, {
         "en": """
 <ul>
 <li>The <b>title block</b> carries the project details; the summary lists every check with its
@@ -223,7 +271,7 @@ carry a hint in the status banner.</li>
 πραγματικές τιμές.</li>
 <li>Ο τελευταίος πίνακας δείχνει τις παραμέτρους του Εθνικού Προσαρτήματος.</li>
 </ul>"""}),
-    ("3d", {"en": "8. The 3D model", "el": "8. Το 3D μοντέλο"}, {
+    ("3d", {"en": "The 3D model", "el": "Το 3D μοντέλο"}, {
         "en": """
 <p>Every calculation has an interactive 3D model (tab “3D model” or <kbd>Ctrl</kbd>+<kbd>3</kbd>).
 Drag to rotate, right-drag to pan, scroll to zoom. The <b>Layers</b> panel switches soil, loads,
@@ -237,6 +285,309 @@ zoom. Το πλαίσιο <b>Επίπεδα</b> ανάβει/σβήνει έδα
 παραμορφωμένους άξονες και ετικέτες· τα κουμπιά δίνουν 3D, όψη και κάτοψη και το <b>PNG</b>
 αποθηκεύει εικόνα για το τεύχος σας. Δεξιά φαίνεται η αξιοποίηση κάθε ελέγχου· το μοντέλο
 ενημερώνεται σε κάθε αλλαγή.</p>"""}),
+]
+
+CHAPTERS += [
+    ("project", {"en": "Projects: several calculations together", "el": "Έργα: πολλοί υπολογισμοί μαζί"}, {
+        "en": """
+<p>A <b>project</b> collects all the calculations of one job (e.g. column C1, footing F1,
+retaining wall W1) so that they are saved, linked, priced and printed together.</p>
+<ol>
+<li>Open a calculation and set its inputs.</li>
+<li>Press <b>+ Add to project</b> (above the form) and give the element a name, e.g.
+“Footing F1”. The calculation is copied into the project; from now on the inputs you change
+are kept in that project item.</li>
+<li>Repeat for every element. The same calculation can be added several times (F1, F2, …).</li>
+</ol>
+<p>The <b>📁 Project</b> section at the top of the left sidebar lists the items. The dot in front
+of each name is <span class="ok">green</span> when all checks pass, <span class="ko">red</span>
+when a check fails and grey before the first run; hover over it to see the maximum utilisation
+U. 🔗<i>n</i> shows how many inputs are linked. Next to each item: <b>↑</b> moves it up (this is
+also the order in the project report), <b>✎</b> renames, <b>×</b> removes it (links that used it
+are removed too). The header buttons are <b>📄</b> project report, <b>⚖</b> comparison and
+<b>✚</b> new, empty project.</p>
+<p>The project is autosaved in the browser. <b>Save</b> (<kbd>Ctrl</kbd>+<kbd>S</kbd>) then
+writes <i>one</i> <code>.erisma</code> file with all items, their inputs, links and the project
+details (file name from the job no. or project name); <b>Open</b> restores the whole project.
+<b>Reset to defaults</b> on a project item also removes its links.</p>""",
+        "el": """
+<p>Ένα <b>έργο</b> συγκεντρώνει όλους τους υπολογισμούς μιας μελέτης (π.χ. υποστύλωμα Κ1, πέδιλο
+Π1, τοίχος Τ1) ώστε να αποθηκεύονται, να συνδέονται, να κοστολογούνται και να τυπώνονται
+μαζί.</p>
+<ol>
+<li>Ανοίξτε έναν υπολογισμό και δώστε τα δεδομένα του.</li>
+<li>Πατήστε <b>+ Στο έργο</b> (πάνω από τη φόρμα) και δώστε όνομα στοιχείου, π.χ. «Πέδιλο Π1».
+Ο υπολογισμός αντιγράφεται στο έργο· από εκεί και πέρα οι αλλαγές σας κρατούνται σε αυτό το
+στοιχείο του έργου.</li>
+<li>Επαναλάβετε για κάθε στοιχείο. Ο ίδιος υπολογισμός μπορεί να μπει πολλές φορές (Π1, Π2, …).</li>
+</ol>
+<p>Η ενότητα <b>📁 Έργο</b> στην κορυφή της αριστερής μπάρας δείχνει τα στοιχεία. Η τελεία μπροστά
+από κάθε όνομα είναι <span class="ok">πράσινη</span> όταν όλοι οι έλεγχοι επαρκούν,
+<span class="ko">κόκκινη</span> όταν κάποιος δεν επαρκεί και γκρι πριν τον πρώτο υπολογισμό·
+με το ποντίκι πάνω της φαίνεται η μέγιστη αξιοποίηση U. Το 🔗<i>n</i> δείχνει πόσα δεδομένα
+είναι συνδεδεμένα. Δίπλα σε κάθε στοιχείο: <b>↑</b> μετακίνηση πάνω (αυτή είναι και η σειρά στο
+τεύχος έργου), <b>✎</b> μετονομασία, <b>×</b> αφαίρεση (αφαιρούνται και οι συνδέσεις που το
+χρησιμοποιούσαν). Τα κουμπιά της κεφαλίδας: <b>📄</b> τεύχος έργου, <b>⚖</b> σύγκριση και
+<b>✚</b> νέο, κενό έργο.</p>
+<p>Το έργο αποθηκεύεται αυτόματα στον browser. Η <b>Αποθήκευση</b> (<kbd>Ctrl</kbd>+<kbd>S</kbd>)
+γράφει <i>ένα</i> αρχείο <code>.erisma</code> με όλα τα στοιχεία, τα δεδομένα τους, τις
+συνδέσεις και τα στοιχεία έργου (όνομα αρχείου από τον αρ. έργου ή το όνομα του έργου)· το
+<b>Άνοιγμα</b> επαναφέρει ολόκληρο το έργο. Η <b>Επαναφορά προεπιλογών</b> σε στοιχείο έργου
+καταργεί και τις συνδέσεις του.</p>"""}),
+    ("chain", {"en": "Linking calculations (calculation chain)", "el": "Σύνδεση υπολογισμών (αλυσίδα)"}, {
+        "en": """
+<p>An input of one project item can take its value from a <b>result</b> of another item, so a
+change travels down the chain by itself — e.g. the axial force of the column becomes the load
+on the footing.</p>
+<ol>
+<li>Open the receiving item (e.g. “Footing F1”) from the project list. Every numeric input now
+has a <b>🔗</b> button next to its label.</li>
+<li>Click 🔗. Choose the <b>source calculation</b>; the list shows only its results whose unit
+is of the <b>same kind</b> as the input (force with force, moment with moment, …), with symbol,
+description and current value. Units are converted automatically (e.g. kN → MN).</li>
+<li>Optionally type a <b>factor</b> — e.g. <code>1/1,35</code> to turn a design value N<sub>Ed</sub>
+into a characteristic permanent load G — and tick <b>Use absolute value</b> for results that may
+be negative (e.g. hogging moments).</li>
+<li>Press <b>Link</b>. The field becomes read-only and shows
+“🔗 from Column C1: N_Ed × 0,741”; <b>×</b> in that line removes the link.</li>
+</ol>
+<p>Value used = factor × (|source result| if “absolute” is ticked, else source result).
+Before each run Erisma recalculates the whole project in dependency order (sources first), so
+the value is always current. If the source item is deleted or its result no longer exists, the
+field is marked red (“Link broken”) and the last value is kept. Links that form a loop
+(A → B → A) are refused with the message “Circular link between calculations” naming the items.
+Linked values are visible in the report as ordinary inputs, so the sheet remains checkable by
+hand.</p>""",
+        "el": """
+<p>Ένα δεδομένο ενός στοιχείου του έργου μπορεί να παίρνει την τιμή του από ένα
+<b>αποτέλεσμα</b> άλλου στοιχείου, ώστε κάθε αλλαγή να περνά μόνη της στην αλυσίδα — π.χ. η
+αξονική δύναμη του υποστυλώματος γίνεται φορτίο του πεδίλου.</p>
+<ol>
+<li>Ανοίξτε από τη λίστα του έργου το στοιχείο που δέχεται την τιμή (π.χ. «Πέδιλο Π1»). Κάθε
+αριθμητικό δεδομένο έχει τώρα κουμπί <b>🔗</b> δίπλα στην ετικέτα του.</li>
+<li>Πατήστε 🔗. Επιλέξτε τον <b>υπολογισμό προέλευσης</b>· η λίστα δείχνει μόνο τα αποτελέσματά
+του με μονάδα <b>ίδιου είδους</b> με το δεδομένο (δύναμη με δύναμη, ροπή με ροπή, …), με
+σύμβολο, περιγραφή και τρέχουσα τιμή. Οι μονάδες μετατρέπονται αυτόματα (π.χ. kN → MN).</li>
+<li>Προαιρετικά δώστε <b>συντελεστή</b> — π.χ. <code>1/1,35</code> για μετατροπή της τιμής
+σχεδιασμού N<sub>Ed</sub> σε χαρακτηριστικό μόνιμο φορτίο G — και τσεκάρετε <b>Απόλυτη τιμή</b>
+για αποτελέσματα που μπορεί να είναι αρνητικά (π.χ. αρνητικές ροπές).</li>
+<li>Πατήστε <b>Σύνδεση</b>. Το πεδίο γίνεται μόνο για ανάγνωση και δείχνει
+«🔗 από Υποστύλωμα Κ1: N_Ed × 0,741»· το <b>×</b> σε αυτή τη γραμμή καταργεί τη σύνδεση.</li>
+</ol>
+<p>Τιμή που χρησιμοποιείται = συντελεστής × (|αποτέλεσμα| αν έχει τσεκαριστεί η «Απόλυτη τιμή»,
+αλλιώς αποτέλεσμα). Πριν από κάθε υπολογισμό το Erisma ξαναϋπολογίζει όλο το έργο με τη σειρά
+των εξαρτήσεων (πρώτα οι πηγές), οπότε η τιμή είναι πάντα τρέχουσα. Αν το στοιχείο προέλευσης
+διαγραφεί ή το αποτέλεσμα δεν υπάρχει πια, το πεδίο γίνεται κόκκινο («Η σύνδεση δεν ισχύει»)
+και κρατιέται η τελευταία τιμή. Συνδέσεις που κλείνουν κύκλο (Α → Β → Α) απορρίπτονται με το
+μήνυμα «Κυκλική σύνδεση μεταξύ υπολογισμών» και τα ονόματα των στοιχείων. Οι συνδεδεμένες
+τιμές εμφανίζονται στο τεύχος ως κανονικά δεδομένα, ώστε ο έλεγχος με το χέρι να είναι
+δυνατός.</p>"""}),
+    ("preport", {"en": "Project report and company logo", "el": "Τεύχος έργου και λογότυπο"}, {
+        "en": """
+<p><b>📄</b> in the project header produces the whole project as one printable document:</p>
+<ul>
+<li><b>Cover page</b> with your company logo, project name and the project details (company,
+job no., engineer, checker, date, National Annex).</li>
+<li><b>Contents</b>: every item with its calculation, result (PASS / FAIL) and maximum
+utilisation.</li>
+<li>Every calculation sheet in full, in the order of the project list.</li>
+</ul>
+<p>It opens in a new tab; print it with <kbd>Ctrl</kbd>+<kbd>P</kbd> or save it as PDF.
+<b>Logo:</b> in the project details press <b>🖼 …</b> next to “Company logo” and choose an
+image (PNG, JPG, SVG…). It is reduced to at most 360 px to keep project files small, stored in
+the project file and printed on the cover and in the title block. “Remove logo” deletes it.</p>""",
+        "el": """
+<p>Το <b>📄</b> στην κεφαλίδα του έργου παράγει όλο το έργο ως ένα τεύχος για εκτύπωση:</p>
+<ul>
+<li><b>Εξώφυλλο</b> με το λογότυπο της εταιρείας σας, το όνομα του έργου και τα στοιχεία έργου
+(εταιρεία, αρ. έργου, συντάκτης, έλεγχος, ημερομηνία, Εθνικό Προσάρτημα).</li>
+<li><b>Περιεχόμενα</b>: κάθε στοιχείο με τον υπολογισμό του, το αποτέλεσμα (ΕΠΑΡΚΕΙ /
+ΑΝΕΠΑΡΚΕΙ) και τη μέγιστη αξιοποίηση.</li>
+<li>Κάθε φύλλο υπολογισμών πλήρες, με τη σειρά της λίστας του έργου.</li>
+</ul>
+<p>Ανοίγει σε νέα καρτέλα· τυπώστε το με <kbd>Ctrl</kbd>+<kbd>P</kbd> ή αποθηκεύστε το ως PDF.
+<b>Λογότυπο:</b> στα στοιχεία έργου πατήστε <b>🖼 …</b> δίπλα στο «Λογότυπο εταιρείας» και
+επιλέξτε εικόνα (PNG, JPG, SVG…). Μικραίνει σε έως 360 px ώστε τα αρχεία να μένουν μικρά,
+αποθηκεύεται στο αρχείο έργου και τυπώνεται στο εξώφυλλο και στην κεφαλίδα. Το «Αφαίρεση
+λογοτύπου» το διαγράφει.</p>"""}),
+    ("cost", {"en": "Quantities and cost estimate", "el": "Ποσότητες και εκτίμηση κόστους"}, {
+        "en": """
+<p>Calculations of members that are built (footings, walls, beams, columns, slabs, piles, steel
+and timber members, strengthening…) end with a table <b>Quantities and cost estimate</b>:
+concrete, reinforcement, structural steel, timber, masonry, gabions, formwork, excavation, pile
+boring, ground anchors or FRP, each with quantity, unit price and cost. The total also appears
+in the status banner (<b>💶 ≈ … €</b>; hover for the quantities). Section “Calculation
+reference” states for each calculation whether it has quantities.</p>
+<ul>
+<li>Quantities come from the actual geometry and the reinforcement chosen in the calculation
+(steel at 7850 kg/m³). Where the bar layout is not modelled in detail (e.g. walls, tanks) a
+typical reinforcement ratio is used and stated under the table.</li>
+<li><b>Unit prices</b>: press <b>💶 Unit prices</b> in the project details or <b>✎</b> on the
+cost chip. Defaults (€, supply and placing): concrete 130/m³, reinforcement 1,30/kg, structural
+steel 3,20/kg, timber 950/m³, masonry 160/m³, gabions 95/m³, formwork 25/m², excavation 12/m³,
+pile boring 70/m, anchors 90/m, FRP 120/m² per layer. Your prices are kept with the project and
+the project file; “Reset prices” returns to the defaults.</li>
+</ul>
+<p class="warn">The estimate is for comparing alternatives and preliminary budgets; it is not
+a bill of quantities (no laps, wastage, site overheads or VAT).</p>""",
+        "el": """
+<p>Οι υπολογισμοί στοιχείων που κατασκευάζονται (πέδιλα, τοίχοι, δοκοί, υποστυλώματα, πλάκες,
+πάσσαλοι, μεταλλικά και ξύλινα μέλη, ενισχύσεις…) τελειώνουν με πίνακα <b>Ποσότητες και
+εκτίμηση κόστους</b>: σκυρόδεμα, οπλισμός, δομικός χάλυβας, ξυλεία, τοιχοποιία,
+συρματοκιβώτια, ξυλότυποι, εκσκαφή, διάτρηση πασσάλων, αγκύρια ή ΙΟΠ, το καθένα με ποσότητα,
+τιμή μονάδας και κόστος. Το σύνολο φαίνεται και στη μπάρα κατάστασης (<b>💶 ≈ … €</b>· με το
+ποντίκι φαίνονται οι ποσότητες). Ο «Οδηγός υπολογισμών» αναφέρει για κάθε υπολογισμό αν έχει
+ποσότητες.</p>
+<ul>
+<li>Οι ποσότητες προκύπτουν από την πραγματική γεωμετρία και τον οπλισμό του υπολογισμού
+(χάλυβας 7850 kg/m³). Όπου η διάταξη ράβδων δεν προσομοιώνεται αναλυτικά (π.χ. τοίχοι,
+δεξαμενές) λαμβάνεται τυπικό ποσοστό οπλισμού, που αναγράφεται κάτω από τον πίνακα.</li>
+<li><b>Τιμές μονάδας</b>: πατήστε <b>💶 Τιμές μονάδας</b> στα στοιχεία έργου ή το <b>✎</b> στην
+ένδειξη κόστους. Προεπιλογές (€, προμήθεια και τοποθέτηση): σκυρόδεμα 130/m³, οπλισμός
+1,30/kg, δομικός χάλυβας 3,20/kg, ξυλεία 950/m³, τοιχοποιία 160/m³, συρματοκιβώτια 95/m³,
+ξυλότυποι 25/m², εκσκαφή 12/m³, διάτρηση πασσάλων 70/m, αγκύρια 90/m, ΙΟΠ 120/m² ανά στρώση.
+Οι τιμές σας κρατούνται με το έργο και το αρχείο έργου· το «Προεπιλεγμένες τιμές» επαναφέρει
+τις αρχικές.</li>
+</ul>
+<p class="warn">Η εκτίμηση προορίζεται για σύγκριση λύσεων και προϋπολογισμό προμελέτης· δεν
+είναι προμέτρηση (δεν περιλαμβάνει υπερκαλύψεις, φύρα, γενικά έξοδα ή ΦΠΑ).</p>"""}),
+    ("optimise", {"en": "Automatic design — most economical solution", "el": "Αυτόματη διαστασιολόγηση — οικονομικότερη λύση"}, {
+        "en": """
+<p><b>🎯</b> (above the form) searches for the <b>cheapest design that passes every check</b>.
+It is available for the calculations listed with “Automatic design” in the calculation
+reference, together with the variables it may change.</p>
+<ol>
+<li>The dialog lists the design variables (e.g. footing B<sub>x</sub>, B<sub>y</sub>, h; beam
+depth, number and diameter of bars; steel section). Untick the ones that must stay as they are
+(e.g. a width fixed by the architect) and adjust <b>From / To / Step</b> (in the field's unit).
+Choice variables (sections, bar diameters) try all options.</li>
+<li>Press <b>Search</b>. Every candidate is calculated in full with your other inputs, loads
+and National Annex. Ranking: first designs where all checks pass, then lowest cost (from the
+quantities and your unit prices), then lowest utilisation.</li>
+<li>The result shows current and optimum values side by side (changed rows highlighted), cost
+and utilisation of both, number of trials, method and time. <b>Apply</b> puts the optimum into
+the form (<kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes it).</li>
+</ol>
+<p><b>Method:</b> if the combinations are at most 2500 every one is tried (<i>exhaustive</i>,
+the true optimum on the grid). Otherwise <i>coordinate descent</i>: starting from your design,
+each variable in turn is run over its whole range and the best value kept, repeated (up to 5
+rounds) until nothing improves — this gives a very good but not always the global optimum, so
+it is worth starting from a sensible design. A search stops after 40 s and returns the best
+found. If nothing passes in the ranges: “No passing design found — widen the ranges”. The
+optimum is an ordinary design: check it and round it to practical dimensions if necessary.</p>""",
+        "el": """
+<p>Το <b>🎯</b> (πάνω από τη φόρμα) αναζητά τη <b>φθηνότερη λύση που επαρκεί σε όλους τους
+ελέγχους</b>. Υπάρχει στους υπολογισμούς που στον «Οδηγό υπολογισμών» έχουν «Αυτόματη
+διαστασιολόγηση», μαζί με τις μεταβλητές που μπορεί να αλλάξει.</p>
+<ol>
+<li>Το παράθυρο δείχνει τις μεταβλητές σχεδιασμού (π.χ. πέδιλο B<sub>x</sub>, B<sub>y</sub>, h·
+δοκός ύψος, πλήθος και διάμετρος ράβδων· μεταλλική διατομή). Ξετσεκάρετε όσες πρέπει να
+μείνουν ως έχουν (π.χ. πλάτος που ορίζει ο αρχιτέκτονας) και ρυθμίστε τα <b>Από / Έως / Βήμα</b>
+(στη μονάδα του πεδίου). Οι μεταβλητές επιλογής (διατομές, διάμετροι) δοκιμάζουν όλες τις
+επιλογές.</li>
+<li>Πατήστε <b>Αναζήτηση</b>. Κάθε υποψήφια λύση υπολογίζεται πλήρως με τα υπόλοιπα δεδομένα,
+τα φορτία και το Εθνικό Προσάρτημα. Κατάταξη: πρώτα οι λύσεις που επαρκούν σε όλους τους
+ελέγχους, μετά το μικρότερο κόστος (από τις ποσότητες και τις τιμές σας), μετά η μικρότερη
+αξιοποίηση.</li>
+<li>Το αποτέλεσμα δείχνει την τρέχουσα και τη βέλτιστη λύση δίπλα-δίπλα (οι αλλαγμένες γραμμές
+τονίζονται), το κόστος και την αξιοποίηση και των δύο, πλήθος δοκιμών, μέθοδο και χρόνο. Η
+<b>Εφαρμογή</b> περνά τη βέλτιστη λύση στη φόρμα (το <kbd>Ctrl</kbd>+<kbd>Z</kbd> την
+αναιρεί).</li>
+</ol>
+<p><b>Μέθοδος:</b> αν οι συνδυασμοί είναι έως 2500 δοκιμάζονται όλοι (<i>πλήρης αναζήτηση</i>,
+το πραγματικό βέλτιστο στον κάνναβο). Αλλιώς <i>αναζήτηση ανά μεταβλητή</i>: ξεκινώντας από τη
+δική σας λύση, κάθε μεταβλητή με τη σειρά διατρέχει όλο το εύρος της και κρατιέται η καλύτερη
+τιμή, επαναληπτικά (έως 5 κύκλοι) μέχρι να μη βελτιώνεται τίποτα — δίνει πολύ καλή αλλά όχι
+πάντα την ολικά βέλτιστη λύση, γι' αυτό αξίζει να ξεκινάτε από λογική λύση. Η αναζήτηση
+σταματά μετά από 40 s και δίνει την καλύτερη που βρήκε. Αν καμία δεν επαρκεί στα εύρη:
+«Δεν βρέθηκε λύση που επαρκεί — διευρύνετε τα όρια». Η βέλτιστη λύση είναι κανονική λύση:
+ελέγξτε τη και στρογγυλέψτε τη σε πρακτικές διαστάσεις αν χρειάζεται.</p>"""}),
+    ("compare", {"en": "Comparing alternatives", "el": "Σύγκριση εναλλακτικών λύσεων"}, {
+        "en": """
+<p><b>⚖</b> in the project header shows all project items in one table: element, calculation,
+result (PASS / FAIL), maximum utilisation U, quantities and cost, with the project total Σ.
+To compare alternatives add the same element several times with different designs — e.g.
+“Wall – cantilever RC”, “Wall – gravity”, “Wall – gabions”, or two footing sizes. Among
+items of the <b>same calculation type</b> the cheapest one that passes is marked
+<b>★</b>.</p>""",
+        "el": """
+<p>Το <b>⚖</b> στην κεφαλίδα του έργου δείχνει όλα τα στοιχεία του έργου σε έναν πίνακα:
+στοιχείο, υπολογισμός, αποτέλεσμα (ΕΠΑΡΚΕΙ / ΑΝΕΠΑΡΚΕΙ), μέγιστη αξιοποίηση U, ποσότητες και
+κόστος, με το σύνολο του έργου Σ. Για σύγκριση εναλλακτικών προσθέστε το ίδιο στοιχείο
+πολλές φορές με διαφορετικές λύσεις — π.χ. «Τοίχος – πρόβολος ΟΣ», «Τοίχος – βαρύτητας»,
+«Τοίχος – συρματοκιβώτια», ή δύο μεγέθη πεδίλου. Μεταξύ στοιχείων του <b>ίδιου τύπου
+υπολογισμού</b> η φθηνότερη λύση που επαρκεί σημειώνεται με <b>★</b>.</p>"""}),
+    ("dxf", {"en": "DXF drawings for CAD", "el": "Σχέδια DXF για CAD"}, {
+        "en": """
+<p>For the calculations marked “DXF drawing” in the calculation reference the <b>DXF</b> button
+in the top bar downloads a drawing of the current design: plan and/or section with outline,
+reinforcement (bars and diameters, e.g. 5Ø16/200), soil line, dimensions
+and a title with element and project. It opens in AutoCAD and compatible CAD programs
+(BricsCAD, ZWCAD, progeCAD…) (format DXF R12, Greek code page, so Greek text is correct).</p>
+<ul>
+<li><b>Units:</b> drawing units are millimetres at true size (1 unit = 1 mm); scale it at
+plotting.</li>
+<li><b>Layers</b> (with colours): CONCRETE (7), REBAR (1 red), SOIL (34), DIM (3 green), TEXT
+(2 yellow), AXIS (8), STEEL (5 blue), HATCH (9) — so you can freeze or re-colour them to your
+office standard.</li>
+<li>The drawing is a starting point for the construction drawing; detailing (laps, anchorage
+lengths, bar schedules) is the designer's responsibility.</li>
+</ul>""",
+        "el": """
+<p>Στους υπολογισμούς με «Σχέδιο DXF» στον «Οδηγό υπολογισμών» το κουμπί <b>DXF</b> στην πάνω
+μπάρα κατεβάζει σχέδιο της τρέχουσας λύσης: κάτοψη ή/και τομή με περίγραμμα, οπλισμό (ράβδοι
+και διάμετροι, π.χ. 5Ø16/200), γραμμή εδάφους, διαστάσεις και τίτλο με στοιχείο και έργο.
+Ανοίγει σε AutoCAD και συμβατά προγράμματα CAD (BricsCAD, ZWCAD, progeCAD…) (μορφή DXF R12 με ελληνική
+κωδικοσελίδα, ώστε τα ελληνικά να εμφανίζονται σωστά).</p>
+<ul>
+<li><b>Μονάδες:</b> το σχέδιο είναι σε χιλιοστά σε φυσικό μέγεθος (1 μονάδα = 1 mm)· η κλίμακα
+ορίζεται στην εκτύπωση.</li>
+<li><b>Layers</b> (με χρώματα): CONCRETE (7), REBAR (1 κόκκινο), SOIL (34), DIM (3 πράσινο), TEXT
+(2 κίτρινο), AXIS (8), STEEL (5 μπλε), HATCH (9) — ώστε να τα παγώνετε ή να τα προσαρμόζετε στο
+πρότυπο του γραφείου σας.</li>
+<li>Το σχέδιο είναι βάση για το κατασκευαστικό σχέδιο· η όπλιση σε λεπτομέρεια (υπερκαλύψεις,
+μήκη αγκύρωσης, πίνακες οπλισμού) είναι ευθύνη του μελετητή.</li>
+</ul>"""}),
+    ("licence", {"en": "Trial and licence", "el": "Δοκιμαστική περίοδος και άδεια χρήσης"}, {
+        "en": """
+<p>Erisma can be used free of charge with all functions for <b>30 days</b> from the first
+start on a computer. The button in the top bar shows the state: “⏳ Trial: <i>n</i> days left”,
+“✓ Licensed to <i>name</i>” or “⚠ Trial ended”.</p>
+<ul>
+<li><b>Activating:</b> click that button, paste the licence key you received
+(<code>ERISMA-…</code>; spaces and line breaks are ignored) and press <b>Activate</b>. The key
+is checked on your computer (no internet needed) and kept in your user profile
+(<code>%APPDATA%\\Erisma</code> on Windows, <code>~/.config/erisma</code> on Mac/Linux), so it
+survives updates of the program.</li>
+<li><b>After the trial</b> without a key, calculations, reports, project reports, comparison,
+automatic design and DXF are blocked and the licence window opens; your inputs and project
+files are kept and everything works again as soon as a key is entered. The manual stays
+available.</li>
+<li>A key carries the licensee's name, the plan and possibly an expiry date. A key that is not
+accepted gets a clear reply (“not an Erisma licence key”, “damaged — copy it again”, “not
+valid”, “expired on …”). When a key with an expiry date runs out the program falls back to the
+trial state. Keys are digitally signed (Ed25519) and cannot be altered or made up.</li>
+</ul>""",
+        "el": """
+<p>Το Erisma χρησιμοποιείται δωρεάν με όλες τις λειτουργίες για <b>30 ημέρες</b> από την πρώτη
+εκκίνηση σε έναν υπολογιστή. Το κουμπί στην πάνω μπάρα δείχνει την κατάσταση: «⏳ Δοκιμαστική:
+<i>n</i> ημέρες», «✓ Άδεια: <i>όνομα</i>» ή «⚠ Η δοκιμή έληξε».</p>
+<ul>
+<li><b>Ενεργοποίηση:</b> πατήστε αυτό το κουμπί, επικολλήστε το κλειδί άδειας που λάβατε
+(<code>ERISMA-…</code>· κενά και αλλαγές γραμμής αγνοούνται) και πατήστε <b>Ενεργοποίηση</b>. Το
+κλειδί ελέγχεται στον υπολογιστή σας (χωρίς internet) και φυλάσσεται στο προφίλ χρήστη
+(<code>%APPDATA%\\Erisma</code> στα Windows, <code>~/.config/erisma</code> σε Mac/Linux), οπότε
+παραμένει και μετά από ενημέρωση του προγράμματος.</li>
+<li><b>Μετά τη δοκιμαστική περίοδο</b> χωρίς κλειδί, μπλοκάρονται οι υπολογισμοί, τα τεύχη,
+το τεύχος έργου, η σύγκριση, η αυτόματη διαστασιολόγηση και τα DXF και ανοίγει το παράθυρο
+άδειας· τα δεδομένα και τα αρχεία έργου σας διατηρούνται και όλα λειτουργούν ξανά μόλις
+δοθεί κλειδί. Το εγχειρίδιο μένει διαθέσιμο.</li>
+<li>Το κλειδί περιέχει το όνομα του κατόχου, το πακέτο και ενδεχομένως ημερομηνία λήξης. Αν ένα
+κλειδί δεν γίνει δεκτό, το μήνυμα λέει γιατί («δεν είναι κλειδί άδειας Erisma», «κατεστραμμένο
+— αντιγράψτε το ξανά», «δεν είναι έγκυρο», «έληξε στις …»). Όταν λήξει κλειδί με ημερομηνία
+λήξης, το πρόγραμμα επιστρέφει σε κατάσταση δοκιμής. Τα κλειδιά έχουν ψηφιακή υπογραφή
+(Ed25519) και δεν αλλοιώνονται ούτε κατασκευάζονται.</li>
+</ul>"""}),
 ]
 
 SHORTCUTS = [
@@ -447,9 +798,15 @@ NOTES: dict[str, dict[str, list[str]]] = {
 T = {
     "title": {"en": "Erisma — User manual", "el": "Erisma — Εγχειρίδιο χρήσης"},
     "toc": {"en": "Contents", "el": "Περιεχόμενα"},
-    "shortcuts": {"en": "9. Keyboard shortcuts", "el": "9. Συντομεύσεις πληκτρολογίου"},
-    "annexes": {"en": "10. National Annexes in Erisma", "el": "10. Εθνικά Προσαρτήματα στο Erisma"},
-    "ref": {"en": "11. Calculation reference", "el": "11. Οδηγός υπολογισμών"},
+    "shortcuts": {"en": "Keyboard shortcuts", "el": "Συντομεύσεις πληκτρολογίου"},
+    "annexes": {"en": "National Annexes in Erisma", "el": "Εθνικά Προσαρτήματα στο Erisma"},
+    "ref": {"en": "Calculation reference", "el": "Οδηγός υπολογισμών"},
+    "tools": {"en": "Available tools", "el": "Διαθέσιμα εργαλεία"},
+    "t3d": {"en": "3D model", "el": "3D μοντέλο"},
+    "tq": {"en": "quantities and cost", "el": "ποσότητες και κόστος"},
+    "tdxf": {"en": "DXF drawing", "el": "σχέδιο DXF"},
+    "topt": {"en": "automatic design", "el": "αυτόματη διαστασιολόγηση"},
+    "tlink": {"en": "Results that can be linked", "el": "Αποτελέσματα για σύνδεση"},
     "inputs": {"en": "Inputs", "el": "Δεδομένα"},
     "checks": {"en": "Checks performed (worked example)", "el": "Έλεγχοι (παράδειγμα προεπιλογών)"},
     "method": {"en": "Method and assumptions", "el": "Μέθοδος και παραδοχές"},
@@ -508,11 +865,38 @@ def _num(v) -> str:
     return txt.replace(".", ",") if LANG_NOW["lang"] == "el" else txt
 
 
+def _tools(m, lang: str) -> str:
+    """Which tools this calculation offers — read from the registries, so always true."""
+    from . import drawings, optimize, quantities
+    try:
+        calc = m.calculate({}, {"annex": "CY"}, lang)
+    except Exception:  # noqa: BLE001
+        calc = None
+    have = []
+    if calc is not None and getattr(calc, "model3d", None):
+        have.append(T["t3d"][lang])
+    if m.id in quantities._FN:
+        have.append(T["tq"][lang])
+    if drawings.supported(m.id):
+        have.append(T["tdxf"][lang])
+    opt = optimize.spec(m.id)
+    if opt:
+        names = ", ".join(tr(v["label"], lang) for v in opt)
+        have.append(f"{T['topt'][lang]} ({E(names)})")
+    txt = f"<p class='std'><b>{T['tools'][lang]}:</b> {' · '.join(have)}</p>"
+    outs = getattr(calc, "outputs", None) or {}
+    if outs:
+        syms = ", ".join(E(k) for k in list(outs)[:14]) + (" …" if len(outs) > 14 else "")
+        txt += f"<p class='std'><b>{T['tlink'][lang]}:</b> {syms}</p>"
+    return txt
+
+
 def _module_card(m, lang: str) -> str:
     sch = m.schema(lang)
     out = [f'<div class="card" id="{m.id}"><h3>{E(sch["title"])}</h3>',
            f'<div class="std">{E(T["standard"][lang])}: {E(sch["standard"])}</div>',
            f"<p>{E(sch['description'])}</p>"]
+    out.append(_tools(m, lang))
     notes = NOTES.get(m.id, {}).get(lang)
     if notes:
         out.append(f"<h4>{T['method'][lang]}</h4><ul>" +
@@ -565,13 +949,15 @@ def _module_card(m, lang: str) -> str:
 def build_manual(lang: str = "el") -> str:
     lang = "el" if lang == "el" else "en"
     LANG_NOW["lang"] = lang
-    toc = [(cid, title[lang]) for cid, title, _ in CHAPTERS]
-    toc += [("shortcuts", T["shortcuts"][lang]), ("annexes", T["annexes"][lang]),
-            ("reference", T["ref"][lang])]
+    n = len(CHAPTERS)
+    num = {"shortcuts": f"{n + 1}. {T['shortcuts'][lang]}", "annexes": f"{n + 2}. {T['annexes'][lang]}",
+           "reference": f"{n + 3}. {T['ref'][lang]}"}
+    toc = [(cid, f"{k}. {title[lang]}") for k, (cid, title, _) in enumerate(CHAPTERS, 1)]
+    toc += list(num.items())
     body = []
-    for cid, title, text in CHAPTERS:
-        body.append(f'<h2 id="{cid}">{E(title[lang])}</h2>{text[lang]}')
-    body.append(f'<h2 id="shortcuts">{T["shortcuts"][lang]}</h2><table><tr><th>{T["key"][lang]}'
+    for (cid, title, text), (_, numbered) in zip(CHAPTERS, toc):
+        body.append(f'<h2 id="{cid}">{E(numbered)}</h2>{text[lang]}')
+    body.append(f'<h2 id="shortcuts">{num["shortcuts"]}</h2><table><tr><th>{T["key"][lang]}'
                 f'</th><th>{T["action"][lang]}</th></tr>' +
                 "".join(f"<tr><td><kbd>{E(k)}</kbd></td><td>{E(en if lang == 'en' else el)}</td>"
                         f"</tr>" for k, en, el in SHORTCUTS) + "</table>")
@@ -580,8 +966,8 @@ def build_manual(lang: str = "el") -> str:
         notes = "".join(f"<li>{E(tr(n, lang))}</li>" for n in a.notes)
         ann.append(f"<h4>{E(tr(a.label, lang))}</h4><p class='std'>{E(a.reference)}</p>"
                    + (f"<ul>{notes}</ul>" if notes else ""))
-    body.append(f'<h2 id="annexes">{T["annexes"][lang]}</h2>' + "".join(ann))
-    body.append(f'<h2 id="reference">{T["ref"][lang]}</h2>')
+    body.append(f'<h2 id="annexes">{num["annexes"]}</h2>' + "".join(ann))
+    body.append(f'<h2 id="reference">{num["reference"]}</h2>')
     cats: dict[str, list] = {}
     for m in all_modules():
         cats.setdefault(tr(m.category, lang), []).append(m)

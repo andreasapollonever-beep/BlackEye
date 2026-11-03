@@ -28,3 +28,23 @@ def test_manual_contains_every_module():
 def test_manual_route():
     r = TestClient(app).get("/manual?lang=el")
     assert r.status_code == 200 and "Εγχειρίδιο" in r.text
+
+
+def test_manual_documents_every_feature():
+    """Each program feature has its chapter, and every card states its tools truthfully."""
+    import re
+
+    from erisma import drawings, optimize
+    from erisma.manual import CHAPTERS, build_manual
+    ids = {c[0] for c in CHAPTERS}
+    assert {"start", "project", "chain", "preport", "cost", "optimise", "compare", "dxf",
+            "licence"} <= ids
+    for lang, word_dxf, word_opt in (("en", "DXF drawing", "automatic design"),
+                                     ("el", "σχέδιο DXF", "αυτόματη διαστασιολόγηση")):
+        html = build_manual(lang)
+        for m in all_modules():
+            card = html.split(f'<div class="card" id="{m.id}">', 1)[1].split('<div class="card"', 1)[0]
+            tools = re.search(r"<p class='std'><b>[^<]+:</b>(.*?)</p>", card).group(1)
+            assert (word_dxf in tools) == drawings.supported(m.id), (lang, m.id)
+            assert (word_opt in tools) == bool(optimize.spec(m.id)), (lang, m.id)
+        assert re.findall(r'<h2 id="[^"]+">(\d+)\.', html) == [str(i) for i in range(1, len(CHAPTERS) + 4)]

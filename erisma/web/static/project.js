@@ -208,9 +208,10 @@ const Proj = {
   // ------------------------------------------------------- report / compare
   async report() {
     if (!this.ws.calcs.length) { alert(pt("The project is empty — open a calculation and press “+ Add to project”.")); return; }
-    const w = window.open("", "erisma-project-report");
     const res = await fetch(`/api/project/report`, { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ doc: this.doc(), lang: LANG }) });
+    if (res.status === 402) { licenseDialog(); return; }
+    const w = window.open("", "erisma-project-report");
     const html = await res.text();
     w.document.open(); w.document.write(html); w.document.close();
   },

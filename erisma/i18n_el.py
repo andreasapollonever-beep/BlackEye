@@ -2064,4 +2064,5 @@ EL: dict[str, str] = {
     'This is not an Erisma licence key': 'Αυτό δεν είναι κλειδί άδειας Erisma',
     'The licence key is damaged — copy it again': 'Το κλειδί άδειας είναι κατεστραμμένο — αντιγράψτε το ξανά',
     'The licence key is not valid': 'Το κλειδί άδειας δεν είναι έγκυρο',
+    'The licence expired on {d}': 'Η άδεια έληξε στις {d}',
 }

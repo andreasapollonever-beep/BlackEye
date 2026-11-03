@@ -38,6 +38,14 @@ def _unb32(s: str) -> bytes:
     return base64.b32decode(s + "=" * (-len(s) % 8))
 
 
+class LicenseError(ValueError):
+    """User-facing licence error; ``template``/``params`` allow translation."""
+
+    def __init__(self, template: str, **params):
+        self.template, self.params = template, params
+        super().__init__(template.format(**params))
+
+
 def make_key(secret: bytes, name: str, email: str = "", plan: str = "pro",
              expires: str = "") -> str:
     payload = json.dumps({"name": name, "email": email, "plan": plan, "expires": expires},
@@ -49,17 +57,20 @@ def parse_key(key: str, public: bytes = PUBLIC_KEY) -> dict:
     """Return the licence data or raise ValueError with a user-facing reason."""
     key = "".join(key.split())
     if not key.upper().startswith("ERISMA-") or "." not in key:
-        raise ValueError("This is not an Erisma licence key")
+        raise LicenseError("This is not an Erisma licence key")
     body, sig = key[7:].split(".", 1)
     try:
         payload, signature = _unb32(body), _unb32(sig)
     except (ValueError, base64.binascii.Error) as exc:
-        raise ValueError("The licence key is damaged — copy it again") from exc
+        raise LicenseError("The licence key is damaged — copy it again") from exc
     if not ed25519.verify(public, payload, signature):
-        raise ValueError("The licence key is not valid")
-    data = json.loads(payload)
+        raise LicenseError("The licence key is not valid")
+    try:
+        data = json.loads(payload)
+    except ValueError as exc:
+        raise LicenseError("The licence key is not valid") from exc
     if data.get("expires") and date.fromisoformat(data["expires"]) < date.today():
-        raise ValueError("The licence expired on {d}".format(d=data["expires"]))
+        raise LicenseError("The licence expired on {d}", d=data["expires"])
     return data
 
 
