@@ -421,7 +421,8 @@ function renderForm() {
   const form = $("#inputs");
   form.innerHTML = "";
   const groups = {};
-  state.schema.fields.forEach((f) => (groups[f.group] ||= []).push(f));
+  // "json" fields (e.g. the plan layout of Erisma Structure) are edited graphically, not here
+  state.schema.fields.filter((f) => f.kind !== "json").forEach((f) => (groups[f.group] ||= []).push(f));
   const collapsed = new Set(store.get(collapsedKey(), []));
   for (const [g, fields] of Object.entries(groups)) {
     const legend = el("legend", { tabindex: "0", title: t("Click to collapse / expand") },

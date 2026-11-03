@@ -34,7 +34,7 @@ class Field:
     label: str
     unit: str = ""
     default: Any = None
-    kind: str = "float"  # float | int | choice | bool | text | table
+    kind: str = "float"  # float | int | choice | bool | text | table | json
     choices: list[str] | None = None
     min: float | None = None
     max: float | None = None
@@ -62,6 +62,11 @@ class Field:
         def err(msg: str, **kw: Any) -> InputError:
             return InputError(tr(msg, lang, label=L, **kw), self.name)
 
+        if self.kind == "json":  # structured data edited by a graphical editor
+            raw = self.default if raw in (None, "") else raw
+            if not isinstance(raw, dict):
+                raise err("'{label}' is invalid")
+            return raw
         if raw is None or raw == "":
             raw = self.default
         if raw is None:

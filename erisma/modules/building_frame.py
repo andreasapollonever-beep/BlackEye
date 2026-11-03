@@ -64,6 +64,9 @@ class BuildingFrame(DesignModule):
                        Field("t", "Thickness", "mm", 250.0, min=150, max=600)],
               help="A wall replaces the column at that grid point (e.g. B1). Beams framing "
                    "along the wall get rigid end zones of half its length."),
+        Field("layout", "Plan layout", kind="json", default={}, group="Grid",
+              help="Missing columns/beams, slab openings and member sizes — drawn in "
+                   "Erisma Structure."),
         Field("col_b", "Column side along X", "mm", 400.0, min=200, max=1500, group="Members"),
         Field("col_h", "Column side along Y", "mm", 400.0, min=200, max=1500, group="Members"),
         Field("beam_b", "Beam width", "mm", 250.0, min=150, max=800, group="Members"),
@@ -130,7 +133,8 @@ class BuildingFrame(DesignModule):
             inp["beam_h"], inp["slab_t"], float(inp["concrete"].split("/")[0][1:]),
             inp["cracked"] if seismic else 1.0, inp["g_finish"], inp["q"], inp["q_roof"],
             inp["g_wall"],
-            [{"at": r["at"], "dir": r["dir"], "L": r["L"], "t": r["t"]} for r in inp["walls"]])
+            [{"at": r["at"], "dir": r["dir"], "L": r["L"], "t": r["t"]} for r in inp["walls"]],
+            inp["layout"])
         if inp["beam_h"] <= inp["slab_t"]:
             raise InputError("The beam depth must be greater than the slab thickness", "beam_h")
         g_unf, _, g_q = na.combos["DA1-C1"][:3]
@@ -142,8 +146,9 @@ class BuildingFrame(DesignModule):
             lin = analyse(model) if pdelta else an
             acr = critical_load_factor(lin, {"G": 1.0, "Q": psi2})
         except StructureError as exc:
-            raise InputError(exc.message(calc.lang), "walls" if "Wall" in exc.text else None) \
-                from exc
+            fld = "walls" if "Wall" in exc.text else "layout" if (
+                "Layout" in exc.text or "Slab panel" in exc.text or "Beam {g}" in exc.text) else None
+            raise InputError(exc.message(calc.lang), fld) from exc
         res = an.run_all()
         uls = an.combine(res, {"G": g_unf, "Q": g_q}, "ULS")
         quasi = an.combine(res, {"G": 1.0, "Q": psi2}, "G+ψ2Q")
@@ -166,6 +171,7 @@ class BuildingFrame(DesignModule):
             designs = cls._design_section(calc, inp, spec, info, res, seis, uls, quasi,
                                           (g_unf, g_q, psi2))
         calc.building_qty = cls._quantities(spec, info, an, designs)
+        calc.structure = cls._results(calc, info, seis, designs)
         calc.model3d = cls._scene(calc, spec, info, an, seis, designs)
 
     # ---------------------------------------------------------------- model
@@ -294,18 +300,21 @@ class BuildingFrame(DesignModule):
         calc.text("Every beam and column is designed with the EN 1992/1998 modules of this "
                   "program; the lightest bars that pass all checks are chosen. Combinations: {c}.",
                   c=combos)
-        calc.note("Columns: braced = no (r_m = 1), l_0 = clear height; capacity design "
-                  "(ΣM_Rc ≥ 1.3 ΣM_Rb, 4.4.2.3) and capacity-design shears are not yet included.")
+        calc.note("Columns: braced = no (r_m = 1), l_0 = clear height.")
+        if seis is not None and not inp["capacity"]:
+            calc.warn("Capacity design is switched off: ΣM_Rc ≥ 1.3 ΣM_Rb (4.4.2.3) and the "
+                      "capacity-design shears are not checked.")
         project = calc.project
         cols = {}
         for c in info["columns"]:
             k = int(c[1:c.index(".")])
             cols[c] = (k, spec.heights[k - 1])
         dc = design_columns(res, seis, uls, quasi, spec.col_b, spec.col_h, spec.beam_h,
-                            inp["concrete"], cols, project, inp["fyk"], inp["cover"])
+                            inp["concrete"], cols, project, inp["fyk"], inp["cover"],
+                            sizes=info["sizes"])
         beams = {b: int(b[1:b.index(".")]) for b in info["beams_x"] + info["beams_y"]}
         db = design_beams(beams, seis, uls, quasi, spec.beam_b, spec.beam_h, inp["concrete"],
-                          project, inp["fyk"], inp["cover"])
+                          project, inp["fyk"], inp["cover"], sizes=info["sizes"])
         walls = {f"W1.{g}": w for g, w in info["wall_spec"].items()}
         dw = design_walls(walls, seis, uls, quasi, inp["concrete"], spec.heights, spec.beam_h,
                           project, inp["fyk"], inp["cover"])
@@ -381,7 +390,7 @@ class BuildingFrame(DesignModule):
         res = capacity_design(dc, db, joints, quasi, seis, (spec.col_b, spec.col_h),
                               (spec.beam_b, spec.beam_h), inp["concrete"], inp["fyk"],
                               inp["cover"], na.gamma_c, na.gamma_s, na.alpha_cc)
-        clear = {d.member: spec.heights[d.storey - 1] - spec.beam_h for d in dc}
+        clear = {d.member: spec.heights[d.storey - 1] - spec.beam_h for d in dc}  # conservative
         capacity_shears(dc, db, quasi, clear, inp["concrete"], (spec.beam_b, spec.beam_h),
                         project, inp["fyk"], inp["cover"], na.gamma_c, na.gamma_s, na.alpha_cc)
         calc.heading("Capacity design", 2)
@@ -403,6 +412,27 @@ class BuildingFrame(DesignModule):
                            hint="Increase the column size or reduce the beam reinforcement.")
 
     @staticmethod
+    def _results(calc, info, seis, designs) -> dict:
+        """Per-member results for the graphical workspace (Erisma Structure)."""
+        out = {"members": {}, "storeys": [], "periods": []}
+        for d in designs:
+            out["members"][d.member] = {
+                "kind": d.kind, "storey": d.storey, "ok": d.ok, "util": d.utilisation,
+                "rho": d.rho, "reinforcement": BuildingFrame._reinf(calc, d.reinforcement),
+                "governing": calc.tr(d.governing, quiet=True), "module": d.module,
+                "inputs": d.inputs,
+                "notes": [n.message(calc.lang) if hasattr(n, "message") else calc.tr(n)
+                          for n in d.notes]}
+        if seis is not None:
+            out["periods"] = [float(t) for t in seis.modes.periods[:6]]
+            out["base_shear"] = {d: v / 1e3 for d, v in seis.base_shear.items()}
+            for s in seis.storeys:
+                out["storeys"].append({"index": s.index, "drift": {d: v / s.h for d, v in
+                                                                   s.drift.items()},
+                                       "theta": s.theta})
+        return out
+
+    @staticmethod
     def _quantities(spec, info, an, designs) -> dict:
         """Concrete, formwork and (if designed) reinforcement of the whole frame."""
         model = an.model
@@ -415,7 +445,7 @@ class BuildingFrame(DesignModule):
             if vertical:
                 g = mem.id.split(".", 1)[1]
                 w = info["wall_spec"].get(g) if mem.id.startswith("W") else None
-                b, h = (w["L"], w["t"]) if w else (spec.col_b, spec.col_h)
+                b, h = (w["L"], w["t"]) if w else info["sizes"][mem.id]
                 Lc = L - spec.beam_h
                 conc += b * h * Lc
                 form += 2 * (b + h) * Lc
@@ -432,7 +462,8 @@ class BuildingFrame(DesignModule):
                     web = 2 * 78.5 * (b / 200) * L + 2 * 78.5 * (L / 200) * b  # Ø10/200 ×2
                     steel += As * L * 1.1 + web
             else:
-                b, hw = spec.beam_b, spec.beam_h - spec.slab_t
+                bb, hb = info["sizes"][mem.id]
+                b, hw = bb, hb - spec.slab_t
                 Lb = L - spec.col_b
                 conc += b * hw * Lb
                 form += (b + 2 * hw) * Lb
@@ -441,7 +472,7 @@ class BuildingFrame(DesignModule):
                     i = d.inputs
                     As = (i["n_bars"] * float(i["dia"]) ** 2 + i["n_comp"]
                           * float(i["dia_comp"]) ** 2) * np.pi / 4
-                    per = 2 * (spec.beam_b + spec.beam_h - 4 * 30.0)
+                    per = 2 * (bb + hb - 4 * 30.0)
                     steel += As * L * 1.15 + 50.3 * per * Lb / i["link_s"]
         A = info["plan_area"] * len(spec.heights)
         conc += A * spec.slab_t
@@ -484,14 +515,16 @@ class BuildingFrame(DesignModule):
                 w = info["wall_spec"].get(mem.id.split(".", 1)[1]) if mem.id.startswith("W") \
                     else None
                 bx, by = ((w["L"], w["t"]) if w["dir"] == "X" else (w["t"], w["L"])) if w \
-                    else (spec.col_b, spec.col_h)
+                    else info["sizes"][mem.id]
                 size = (bx, abs(a.z - b.z), by)
             elif abs(a.x - b.x) > 1:
-                size = (abs(a.x - b.x), spec.beam_h, spec.beam_b)
-                c = (c[0], c[1] - spec.beam_h / 2, c[2])
+                bb, hb = info["sizes"][mem.id]
+                size = (abs(a.x - b.x), hb, bb)
+                c = (c[0], c[1] - hb / 2, c[2])
             else:
-                size = (spec.beam_b, spec.beam_h, abs(a.y - b.y))
-                c = (c[0], c[1] - spec.beam_h / 2, c[2])
+                bb, hb = info["sizes"][mem.id]
+                size = (bb, hb, abs(a.y - b.y))
+                c = (c[0], c[1] - hb / 2, c[2])
             d = des.get(mem.id)
             if d is None:
                 col = PALETTE["concrete"]
@@ -504,8 +537,14 @@ class BuildingFrame(DesignModule):
             sc.box("frame", tuple(m(v) for v in c), tuple(m(v) for v in size), col)
         xs, ys, zs = info["xs"], info["ys"], info["zs"]
         for z in zs[1:]:
-            sc.box("slabs", (m(xs[-1] / 2), m(z - spec.slab_t / 2), m(ys[-1] / 2)),
-                   (m(xs[-1]), m(spec.slab_t), m(ys[-1])), PALETTE["concrete"], opacity=0.35)
+            for i in range(len(xs) - 1):
+                for j in range(len(ys) - 1):
+                    if grid_label(i, j) in info["openings"]:
+                        continue
+                    sc.box("slabs", (m((xs[i] + xs[i + 1]) / 2), m(z - spec.slab_t / 2),
+                                     m((ys[j] + ys[j + 1]) / 2)),
+                           (m(xs[i + 1] - xs[i]), m(spec.slab_t), m(ys[j + 1] - ys[j])),
+                           PALETTE["concrete"], opacity=0.35, edges=False)
         if seis is not None:
             shape = seis.modes.mode_shape(0)
             scale = 0.08 * max(xs[-1], ys[-1], zs[-1])
@@ -519,7 +558,6 @@ class BuildingFrame(DesignModule):
                 sc.line("mode", pts, PALETTE["seismic"])
             sc.label("mode", calc.tr("T_1 = {t:.3f} s", t=float(seis.modes.periods[0])),
                      (m(xs[-1] / 2), m(zs[-1]) + 1.2, m(ys[-1] / 2)), "result")
-        from ..structure.builder import grid_label
         for i, x in enumerate(xs):
             sc.label("grid", str(i + 1), (m(x), -0.4, -1.0))
         for j, y in enumerate(ys):

@@ -153,7 +153,8 @@ def run_module(module_id: str, req: RunRequest) -> dict[str, Any]:
     except InputError as exc:
         raise HTTPException(422, {"message": str(exc), "field": exc.field}) from exc
     return _json_safe({"summary": calc.summary(), "html": render_html(calc),
-                       "model3d": calc.model3d, "quantities": calc.quantities})
+                       "model3d": calc.model3d, "quantities": calc.quantities,
+                       "structure": getattr(calc, "structure", None)})
 
 
 class OptimiseRequest(RunRequest):

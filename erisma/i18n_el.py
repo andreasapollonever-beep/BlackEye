@@ -2367,4 +2367,15 @@ EL: dict[str, str] = {
         "διατομές των υποστυλωμάτων",
     "Member {m}: the rigid end zones are longer than the member":
         "Μέλος {m}: τα άκαμπτα τμήματα είναι μακρύτερα από το μέλος",
+    "'{label}' is invalid": "Το πεδίο «{label}» δεν είναι έγκυρο",
+    "Plan layout": "Διάταξη κάτοψης",
+    "Layout: there is no grid point {g}": "Διάταξη: δεν υπάρχει θέση καννάβου {g}",
+    "Layout: there is no grid segment {g} (e.g. A1-A2)": "Διάταξη: δεν υπάρχει τμήμα καννάβου {g} (π.χ. A1-A2)",
+    "Layout: there is no slab panel {g}": "Διάταξη: δεν υπάρχει φάτνωμα πλάκας {g}",
+    "Layout: the section of {g} must be two sizes ≥ 150 mm":
+        "Διάταξη: η διατομή του {g} πρέπει να έχει δύο διαστάσεις ≥ 150 mm",
+    "Beam {g}: the depth must be greater than the slab thickness":
+        "Δοκός {g}: το ύψος πρέπει να είναι μεγαλύτερο από το πάχος της πλάκας",
+    "Slab panel {p} has no supporting beam — add a beam or make it an opening":
+        "Το φάτνωμα {p} δεν στηρίζεται σε καμία δοκό — προσθέστε δοκό ή κάντε το άνοιγμα",
 }

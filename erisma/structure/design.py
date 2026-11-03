@@ -106,12 +106,16 @@ def _beam_candidates() -> list[dict]:
 def design_columns(res: dict[str, StaticResult], seis: SeismicResult | None, uls: StaticResult,
                    quasi: StaticResult, b: float, h: float, beam_h: float, concrete: str,
                    storeys: dict[str, tuple[int, float]], project: dict | None = None,
-                   fyk: float = 500.0, cover: float = 30.0) -> list[MemberDesign]:
-    """``storeys`` maps column id → (storey index, storey height mm)."""
+                   fyk: float = 500.0, cover: float = 30.0,
+                   sizes: dict[str, tuple[float, float]] | None = None) -> list[MemberDesign]:
+    """``storeys`` maps column id → (storey index, storey height mm); ``sizes`` overrides
+    (b, h) per column."""
     module = get_module("ec2_rc_column")
     cands = _col_candidates()
     out = []
+    b0, h0 = b, h
     for mid, (k, hs) in storeys.items():
+        b, h = (sizes or {}).get(mid, (b0, h0))
         base = {"b": b, "h": h, "cover": cover, "concrete": concrete, "fyk": fyk,
                 "L": (hs - beam_h) / 1000, "k_h": 1.0, "k_b": 1.0, "braced": False,
                 "seismic": seis is not None, "phi_ef": 0.8}
@@ -163,12 +167,16 @@ def _col_actions(f: dict, env: np.ndarray | None, sgn: int) -> dict:
 def design_beams(beams: dict[str, int], seis: SeismicResult | None, uls: StaticResult,
                  quasi: StaticResult, b: float, h: float, concrete: str,
                  project: dict | None = None, fyk: float = 500.0,
-                 cover: float = 30.0) -> list[MemberDesign]:
-    """Bottom (sagging) and top (hogging) bars and links for each beam; ``beams``: id → storey."""
+                 cover: float = 30.0,
+                 sizes: dict[str, tuple[float, float]] | None = None) -> list[MemberDesign]:
+    """Bottom (sagging) and top (hogging) bars and links for each beam; ``beams``: id → storey;
+    ``sizes`` overrides (b, h) per beam."""
     module = get_module("ec2_rc_beam")
     cands = _beam_candidates()
     out = []
+    b0, h0 = b, h
     for mid, k in beams.items():
+        b, h = (sizes or {}).get(mid, (b0, h0))
         e = uls.analysis.elements[uls.analysis.member_index[mid]]
         a1, a2 = e.oi, e.L - e.oj   # faces of the supports (rigid zones of walls)
 
@@ -359,6 +367,8 @@ def capacity_design(columns: list[MemberDesign], beams: list[MemberDesign],
     """EN 1998-1 4.4.2.3(4): ΣM_Rc ≥ 1.3 ΣM_Rb at every beam–column joint (frames).
 
     ``joints``: {"node", "dir", "cols": [below, above], "beams": [left, right]}.
+    Member sizes are read from each design record (``col_bh``/``beam_bh`` are kept for
+    backward compatibility and are not used).
     When a joint fails, the bars of both columns are increased (same arrangement
     family as the automatic design) until the rule is met; the column design
     records are updated in place.
@@ -374,7 +384,7 @@ def capacity_design(columns: list[MemberDesign], beams: list[MemberDesign],
         bms = [bd[b] for b in jt["beams"] if b in bd]
         if len(cols) < 2 or not bms:
             continue
-        hog_sag = [_beam_MRd(b, *beam_bh, fcd, fyd, cover) for b in bms]
+        hog_sag = [_beam_MRd(b, b.inputs["b"], b.inputs["h"], fcd, fyd, cover) for b in bms]
         if len(hog_sag) == 2:  # one beam hogging + the other sagging, worst sense
             sum_b = max(hog_sag[0][0] + hog_sag[1][1], hog_sag[0][1] + hog_sag[1][0])
         else:
@@ -402,7 +412,8 @@ def capacity_design(columns: list[MemberDesign], beams: list[MemberDesign],
                 c.inputs = {**c.inputs, **cands[n]}
                 nb = 4 * cands[n]["nb"] - 4
                 c.reinforcement = f"{nb}Ø{cands[n]['dia']}, Ø8/{cands[n]['s']:g}"
-                c.rho = nb * np.pi * float(cands[n]["dia"]) ** 2 / 4 / (col_bh[0] * col_bh[1])
+                c.rho = nb * np.pi * float(cands[n]["dia"]) ** 2 / 4 / (c.inputs["b"]
+                                                                        * c.inputs["h"])
                 if "Bars increased by capacity design (ΣM_Rc ≥ 1.3 ΣM_Rb)" not in c.notes:
                     c.notes.append("Bars increased by capacity design (ΣM_Rc ≥ 1.3 ΣM_Rb)")
             raised = True
@@ -429,7 +440,7 @@ def capacity_shears(columns: list[MemberDesign], beams: list[MemberDesign],
     for d in beams:
         e = quasi.analysis.elements[quasi.analysis.member_index[d.member]]
         lcl = e.Lf
-        hog, sag = _beam_MRd(d, *beam_bh, fcd, fyd, cover)
+        hog, sag = _beam_MRd(d, d.inputs["b"], d.inputs["h"], fcd, fyd, cover)
         Vg = np.abs(quasi.forces(d.member, 21)["Vz"]).max()
         V = Vg + (hog + sag) / lcl
         if V / 1e3 <= d.inputs["VEd"]:

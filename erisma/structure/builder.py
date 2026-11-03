@@ -60,6 +60,12 @@ class BuildingSpec:
     q_roof: float = 2.0e-3
     g_wall: float = 8.0                # N/mm (8 kN/m) on perimeter beams, not on the roof
     walls: list[dict] = field(default_factory=list)  # {"at": "A1", "dir": "X"|"Y", "L", "t"} mm
+    # free layout (typical floor, all storeys):
+    #   omit_columns: ["B2", …] grid points without a column;
+    #   omit_beams: ["A1-A2", …] grid segments without a beam;
+    #   openings: ["A1", …] slab panels (named by their corner with the lowest indices) left open;
+    #   col_sizes: {"A1": [b, h]} and beam_sizes: {"A1-A2": [b, h]} in mm override the defaults.
+    layout: dict = field(default_factory=dict)
     labels: dict[str, str] = field(default_factory=dict)
 
     def check(self) -> None:
@@ -86,6 +92,34 @@ class BuildingSpec:
                 raise StructureError("Wall at {g}: direction must be X or Y", g=at)
             if not (w.get("L", 0) > 0 and w.get("t", 0) > 0):
                 raise StructureError("Wall at {g}: give its length and thickness", g=at)
+        segs = set(grid_segments(nx, ny))
+        panels = {grid_label(i, j) for i in range(nx - 1) for j in range(ny - 1)}
+        lay = self.layout or {}
+        for g in list(lay.get("omit_columns", [])) + list(lay.get("col_sizes", {})):
+            if g not in valid:
+                raise StructureError("Layout: there is no grid point {g}", g=g)
+        for key in list(lay.get("omit_beams", [])) + list(lay.get("beam_sizes", {})):
+            if key not in segs:
+                raise StructureError("Layout: there is no grid segment {g} (e.g. A1-A2)", g=key)
+        for g in lay.get("openings", []):
+            if g not in panels:
+                raise StructureError("Layout: there is no slab panel {g}", g=g)
+        for key, bh in list(lay.get("col_sizes", {}).items()) + \
+                list(lay.get("beam_sizes", {}).items()):
+            if len(bh) != 2 or min(bh) < 150:
+                raise StructureError("Layout: the section of {g} must be two sizes ≥ 150 mm",
+                                     g=key)
+        for key, bh in lay.get("beam_sizes", {}).items():
+            if bh[1] <= self.slab_t:
+                raise StructureError("Beam {g}: the depth must be greater than the slab "
+                                     "thickness", g=key)
+
+
+def grid_segments(nx: int, ny: int) -> list[str]:
+    """All grid segments ``"A1-A2"`` (along X) and ``"A1-B1"`` (along Y)."""
+    out = [f"{grid_label(i, j)}-{grid_label(i + 1, j)}" for j in range(ny) for i in range(nx - 1)]
+    out += [f"{grid_label(i, j)}-{grid_label(i, j + 1)}" for i in range(nx) for j in range(ny - 1)]
+    return out
 
 
 def tributary(side: float, other: float, p: float) -> list[tuple[float, float, float, float]]:
@@ -127,8 +161,6 @@ def build(spec: BuildingSpec) -> tuple[Model, dict]:
         for i, x in enumerate(xs):
             for j, y in enumerate(ys):
                 m.node(node_id(i, j, k), x, y, z)
-                if k == 0:
-                    m.support(node_id(i, j, k), "fixed")
     wall_at = {str(w["at"]).strip().upper(): w for w in spec.walls}
     wall_sec = {}
     for g, w in wall_at.items():
@@ -149,9 +181,22 @@ def build(spec: BuildingSpec) -> tuple[Model, dict]:
         w = wall_at.get(g)
         return w["L"] / 2 if w and w["dir"] == along else 0.0
 
-    w_beam = -CONCRETE_WEIGHT * spec.beam_b * (spec.beam_h - spec.slab_t)
+    lay = spec.layout or {}
+    omit_cols = set(lay.get("omit_columns", []))
+    omit_beams = set(lay.get("omit_beams", []))
+    openings = set(lay.get("openings", []))
+    col_size = {g: tuple(map(float, v)) for g, v in lay.get("col_sizes", {}).items()}
+    beam_size = {g: tuple(map(float, v)) for g, v in lay.get("beam_sizes", {}).items()}
+    sec_cache: dict[tuple, Section] = {}
+
+    def rect(b: float, h: float) -> Section:
+        if (b, h) not in sec_cache:
+            sec_cache[(b, h)] = Section.rectangle(b, h, f"{b:g}×{h:g}")
+        return sec_cache[(b, h)]
+
     p_g = CONCRETE_WEIGHT * spec.slab_t + spec.g_finish
     columns, beams_x, beams_y, walls = [], [], [], []
+    sizes: dict[str, tuple[float, float]] = {}  # member → (b, h) of its rectangle
     for k in range(1, ns + 1):
         roof = k == ns
         for i in range(nx):
@@ -160,35 +205,45 @@ def build(spec: BuildingSpec) -> tuple[Model, dict]:
                 if g in wall_at:
                     cid, sec = f"W{k}.{g}", wall_sec[g]
                     walls.append(cid)
+                elif g in omit_cols:
+                    continue
                 else:
-                    cid, sec = f"C{k}.{g}", col
+                    bh = col_size.get(g, (spec.col_b, spec.col_h))
+                    cid, sec = f"C{k}.{g}", rect(*bh)
+                    sizes[cid] = bh
                     columns.append(cid)
                 m.member(cid, node_id(i, j, k - 1), node_id(i, j, k), sec, conc)
                 m.load_member("G", cid, wz=-CONCRETE_WEIGHT * sec.A)
+                if k == 1:
+                    m.support(node_id(i, j, 0), "fixed")
+
+        def add_beam(i1, j1, i2, j2, along, perimeter, store):
+            a, b = grid_label(i1, j1), grid_label(i2, j2)
+            key = f"{a}-{b}"
+            if key in omit_beams:
+                return
+            bh = beam_size.get(key, (spec.beam_b, spec.beam_h))
+            bid = f"B{k}.{key}"
+            m.member(bid, node_id(i1, j1, k), node_id(i2, j2, k), rect(*bh), conc,
+                     offset_i=offset(a, along), offset_j=offset(b, along))
+            sizes[bid] = bh
+            m.load_member("G", bid, wz=-CONCRETE_WEIGHT * bh[0] * (bh[1] - spec.slab_t))
+            if not roof and perimeter and spec.g_wall:
+                m.load_member("G", bid, wz=-spec.g_wall)
+            store.append(bid)
+
         for j in range(ny):
             for i in range(nx - 1):
-                a, b = grid_label(i, j), grid_label(i + 1, j)
-                bid = f"B{k}.{a}-{b}"
-                m.member(bid, node_id(i, j, k), node_id(i + 1, j, k), beam, conc,
-                         offset_i=offset(a, "X"), offset_j=offset(b, "X"))
-                m.load_member("G", bid, wz=w_beam)
-                if not roof and j in (0, ny - 1) and spec.g_wall:
-                    m.load_member("G", bid, wz=-spec.g_wall)
-                beams_x.append(bid)
+                add_beam(i, j, i + 1, j, "X", j in (0, ny - 1), beams_x)
         for i in range(nx):
             for j in range(ny - 1):
-                a, b = grid_label(i, j), grid_label(i, j + 1)
-                bid = f"B{k}.{a}-{b}"
-                m.member(bid, node_id(i, j, k), node_id(i, j + 1, k), beam, conc,
-                         offset_i=offset(a, "Y"), offset_j=offset(b, "Y"))
-                m.load_member("G", bid, wz=w_beam)
-                if not roof and i in (0, nx - 1) and spec.g_wall:
-                    m.load_member("G", bid, wz=-spec.g_wall)
-                beams_y.append(bid)
-        # slab panels → edge beams
+                add_beam(i, j, i, j + 1, "Y", i in (0, nx - 1), beams_y)
+        # slab panels → edge beams (45° rule); a missing edge beam's share goes to the others
         q = spec.q_roof if roof else spec.q
         for i in range(nx - 1):
             for j in range(ny - 1):
+                if grid_label(i, j) in openings:
+                    continue
                 lx, ly = xs[i + 1] - xs[i], ys[j + 1] - ys[j]
                 edges = [  # (beam id, edge length, other dimension)
                     (f"B{k}.{grid_label(i, j)}-{grid_label(i + 1, j)}", lx, ly),
@@ -196,16 +251,31 @@ def build(spec: BuildingSpec) -> tuple[Model, dict]:
                     (f"B{k}.{grid_label(i, j)}-{grid_label(i, j + 1)}", ly, lx),
                     (f"B{k}.{grid_label(i + 1, j)}-{grid_label(i + 1, j + 1)}", ly, lx),
                 ]
-                for bid, a, b in edges:
+                present = [e for e in edges if e[0] in m.members]
+                if not present:
+                    raise StructureError("Slab panel {p} has no supporting beam — add a beam "
+                                         "or make it an opening", p=grid_label(i, j))
+                share = lambda a, b: min(a, b) / 2 * (a - min(a, b) / 2)  # noqa: E731
+                scale = sum(share(a, b) for _, a, b in edges) / \
+                    sum(share(a, b) for _, a, b in present)
+                for bid, a, b in present:
                     for case, p in (("G", p_g), ("Q", q)):
                         if not p:
                             continue
-                        for x1, x2, w1, w2 in tributary(a, b, p):
+                        for x1, x2, w1, w2 in tributary(a, b, p * scale):
                             m.load_member(case, bid, wz=-w1, w2=(0.0, 0.0, -w2),
                                           a=x1 / a, b=x2 / a)
-        m.diaphragm(f"L{k}", [node_id(i, j, k) for i in range(nx) for j in range(ny)])
+        used = {mm.i for mm in m.members.values()} | {mm.j for mm in m.members.values()}
+        level = [node_id(i, j, k) for i in range(nx) for j in range(ny)
+                 if node_id(i, j, k) in used]
+        m.diaphragm(f"L{k}", level)
+    used = {mm.i for mm in m.members.values()} | {mm.j for mm in m.members.values()}
+    for nid in [n for n in m.nodes if n not in used]:
+        del m.nodes[nid]
+    area = sum((xs[i + 1] - xs[i]) * (ys[j + 1] - ys[j]) for i in range(nx - 1)
+               for j in range(ny - 1) if grid_label(i, j) not in openings)
     info = {"xs": xs, "ys": ys, "zs": zs, "columns": columns, "walls": walls,
             "wall_spec": wall_at, "beams_x": beams_x,
             "beams_y": beams_y, "concrete": conc, "col": col, "beam": beam,
-            "plan_area": xs[-1] * ys[-1]}
+            "plan_area": area, "sizes": sizes, "openings": openings}
     return m, info

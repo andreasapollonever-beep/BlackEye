@@ -44,3 +44,28 @@ def test_load_takedown_matches_hand_sum():
     # all mass above the fixed base (the base half of the ground columns goes to the support)
     assert md.total_mass["X"] * 9810 < G + 0.3 * Q
     assert md.cumulative("X")[-1] > 0.9
+
+
+def test_free_layout_load_takedown_and_sizes():
+    """Missing column, missing beam, an opening and own sizes: Σ loads still exact."""
+    lay = {"omit_columns": ["B2"], "omit_beams": ["A1-A2"], "openings": ["B1"],
+           "col_sizes": {"A1": [500, 300]}, "beam_sizes": {"B1-B2": [300, 600]}}
+    sp = BuildingSpec([5000, 4000], [6000, 5000], [3000, 3000], g_wall=0.0, layout=lay)
+    m, info = build(sp)
+    assert "C1.B2" not in m.members and "B1.A1-A2" not in m.members
+    assert info["sizes"]["C1.A1"] == (500.0, 300.0)
+    assert info["sizes"]["B2.B1-B2"] == (300.0, 600.0)
+    assert "B2@0" not in m.nodes  # no column → no base node, no support
+    res = analyse(m).run_all()
+    area = 9000 * 11000 - 5000 * 5000            # panel B1 (x 0–5 m, y 6–11 m) is open
+    n_cols = 3 * 3 - 1
+    cols = 25e-6 * 3000 * 2 * (400 * 400 * (n_cols - 1) + 500 * 300)
+    beams = 0.0
+    for b, (bw, bh) in info["sizes"].items():
+        if b.startswith("B"):
+            beams += 25e-6 * bw * (bh - 180) * m.length(m.members[b])
+    slab = (25e-6 * 180 + 1.5e-3) * area * 2
+    G = sum(r[2] for r in res["G"].reactions.values())
+    assert G == pytest.approx(cols + beams + slab, rel=1e-9)
+    Q = sum(r[2] for r in res["Q"].reactions.values())
+    assert Q == pytest.approx(2e-3 * area * 2, rel=1e-9)
