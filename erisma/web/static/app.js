@@ -43,7 +43,7 @@ const UI = {
     "NA to CYS EN 1998-1, zonation map": "χάρτης ζωνών ΕΠ CYS EN 1998-1",
     "Location is not available in this browser.": "Η θέση δεν είναι διαθέσιμη σε αυτόν τον browser.",
     "Search places…": "Αναζήτηση τοποθεσίας…",
-    "Manual": "Εγχειρίδιο", "User manual (F1)": "Εγχειρίδιο χρήσης (F1)",
+    "Drawing for AutoCAD (DXF)": "Σχέδιο για AutoCAD (DXF)", "Manual": "Εγχειρίδιο", "User manual (F1)": "Εγχειρίδιο χρήσης (F1)",
     "How this calculation works (F1)": "Πώς λειτουργεί ο υπολογισμός (F1)",
     "Arithmetic allowed, e.g. 2*3,5": "Επιτρέπονται πράξεις, π.χ. 2*3,5", "Not a number": "Δεν είναι αριθμός",
     "Duplicate row": "Αντιγραφή γραμμής", "Tip: paste rows from Excel (Ctrl+V)": "Συμβουλή: επικόλληση γραμμών από Excel (Ctrl+V)",
@@ -612,6 +612,7 @@ async function selectModule(id, inputs, uid) {
   document.querySelectorAll("nav a").forEach((a) => a.classList.toggle("active", a.dataset.id === id));
   $("#mod-title").textContent = item ? `${item.name} — ${state.schema.title}` : state.schema.title;
   $("#mod-help").href = `/manual?lang=${LANG}#${id}`;
+  $("#btn-dxf").hidden = !state.schema.has_dxf;
   $("#mod-desc").textContent = `${state.schema.standard} — ${state.schema.description}`;
   $("#restored").hidden = !(saved && !inputs);
   document.title = `${state.schema.title} — Erisma`;
@@ -830,6 +831,13 @@ const actions = {
 };
 $("#btn-print").onclick = actions.print;
 $("#btn-manual").onclick = () => openManual();
+$("#btn-dxf").onclick = async () => {
+  const res = await fetch(`/api/modules/${state.schema.id}/dxf`, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ inputs: state.inputs, project: state.project, lang: LANG }) });
+  if (!res.ok) { alert((await res.json().catch(() => ({}))).detail?.message || res.statusText); return; }
+  const a = el("a", { href: URL.createObjectURL(await res.blob()), download: `${fileBase()}.dxf` });
+  document.body.append(a); a.click(); a.remove();
+};
 $("#btn-html").onclick = actions.html;
 $("#btn-save").onclick = actions.save;
 $("#btn-open").onclick = actions.open;

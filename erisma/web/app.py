@@ -17,6 +17,7 @@ from ..design import sitezones
 from ..design.annex import ANNEXES
 from ..i18n import LANGS, tr
 from ..manual import build_manual
+from ..drawings import make as make_dxf, supported as dxf_supported
 from ..optimize import optimise, spec
 from ..project import project_report, run_project
 from ..report import render_html
@@ -96,7 +97,23 @@ def site_zone(annex: str = "CY", lat: float | None = None, lon: float | None = N
 
 @app.get("/api/modules/{module_id}")
 def module_schema(module_id: str, lang: str = "en") -> dict[str, Any]:
-    return _module(module_id).schema(_lang(lang))
+    return {**_module(module_id).schema(_lang(lang)), "has_dxf": dxf_supported(module_id)}
+
+
+@app.post("/api/modules/{module_id}/dxf")
+def module_dxf(module_id: str, req: RunRequest):
+    """DXF drawing (plan / section, reinforcement, dimensions) for CAD."""
+    from fastapi.responses import Response
+    mod = _module(module_id)
+    if not dxf_supported(module_id):
+        raise HTTPException(404, "No drawing for this calculation")
+    try:
+        calc = mod.calculate(req.inputs, req.project, _lang(req.lang))
+        text = make_dxf(calc, mod.parse_inputs(req.inputs, _lang(req.lang)))
+    except InputError as exc:
+        raise HTTPException(422, {"message": str(exc), "field": exc.field}) from exc
+    return Response(text, media_type="application/dxf",
+                    headers={"Content-Disposition": f'attachment; filename="{module_id}.dxf"'})
 
 
 @app.post("/api/modules/{module_id}/run")

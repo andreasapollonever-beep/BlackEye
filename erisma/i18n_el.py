@@ -1730,4 +1730,5 @@ EL: dict[str, str] = {
     'Pile boring': 'Διάτρηση πασσάλων',
     'Ground anchors (drilling, tendon, grout)': 'Αγκύρια εδάφους (διάτρηση, τένοντας, ένεμα)',
     'FRP wrapping (per layer)': 'Περιτύλιξη ΙΟΠ (ανά στρώση)',
+    'PLAN': 'ΚΑΤΟΨΗ', 'SECTION': 'ΤΟΜΗ', 'SECTION A-A': 'ΤΟΜΗ Α-Α',
 }
