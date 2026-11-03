@@ -125,6 +125,7 @@ class SlopeStabilityEC7(DesignModule):
     title = "Slope stability (Bishop)"
     category = "Geotechnical"
     has_3d = True
+    uses_annex = True
     standard = "EN 1997-1 §11, EN 1998-5 §4.1.3"
     description = ("Circular slip surfaces by Bishop's simplified method with automatic search "
                    "of the critical circle; pore pressure ratio, crest surcharge and seismic "
@@ -148,7 +149,9 @@ class SlopeStabilityEC7(DesignModule):
         Field("seismic", "Include seismic (pseudo-static)", kind="bool", default=True,
               group="Seismic"),
         Field("ag", "Design ground acceleration αgR·γI", "", 0.16, min=0, max=0.6,
-              group="Seismic", help="In g. Greece: Zone I 0.16, Zone II 0.24, Zone III 0.36."),
+              group="Seismic",
+              help="In g (a_gR × γI). Pick a zone with the buttons of the selected National "
+                   "Annex."),
         Field("S", "Soil factor S", "", 1.2, min=1.0, max=1.8, group="Seismic"),
         Field("ST", "Topography factor S_T", "", 1.0, min=1.0, max=1.4, group="Seismic",
               help="EN 1998-5 Annex A: 1.0 for slopes < 15°, up to 1.2–1.4 for high ridges."),
@@ -185,15 +188,30 @@ class SlopeStabilityEC7(DesignModule):
                      "Lowest factor of safety", dp=3)
         cases.append(("char", rk))
 
-        calc.heading("Persistent design situation — GEO (DA1-C2 / DA3: A2 + M2)")
         na = get_annex(calc.project.annex)
-        gp, gcc, gq = na.slope_factors
-        calc.text("Design parameters: tan φ'_d = tan φ'_k / {gp}, c'_d = c'_k / {gc}, "
-                  "surcharge × {gq}. The slope is stable when the design factor F_d ≥ 1.0 "
-                  "(over-design factor, EN 1997-1 2.4.7.3).", gp=gp, gc=gcc, gq=gq)
-        rd, _ = sm.search(tphi / gp, inp["c"] / gcc, gq)
-        calc.formula("F_d", "min F (design parameters)", rd["F"], "", "Over-design factor",
-                     dp=3)
+        if na.slope_mode == "DA2":
+            gG, gQ = na.combos["DA2"][0], na.combos["DA2"][2]
+            calc.heading("Persistent design situation — GEO (Design Approach 2)")
+            calc.text("Design Approach 2 (A1 + M1 + R2), factors applied to the effects of "
+                      "actions: E_d = γ_G E_G,k + γ_Q E_Q,k and R_d = R_k / γ_R,e with "
+                      "γ_G = {g}, γ_Q = {q}, γ_R,e = {re}. Characteristic soil strength is "
+                      "used; the surcharge is scaled by γ_Q/γ_G so that F' = R_k/(E_G,k + "
+                      "(γ_Q/γ_G) E_Q,k), and F_d = F' / (γ_G γ_R,e) ≥ 1.0.",
+                      g=gG, q=gQ, re=na.slope_gRe)
+            rd0, _ = sm.search(tphi, inp["c"], gQ / gG)
+            calc.formula("F'", "R_k / (E_G,k + γ_Q/γ_G E_Q,k)", rd0["F"], "", dp=3)
+            rd = dict(rd0, F=rd0["F"] / (gG * na.slope_gRe))
+            calc.formula("F_d", "F' / (γ_G γ_R,e)", rd["F"], "", "Over-design factor",
+                         ref="EN 1997-1 2.4.7.3 / A.14 (NA)", dp=3)
+        else:
+            calc.heading("Persistent design situation — GEO (DA1-C2 / DA3: A2 + M2)")
+            gp, gcc, gq = na.slope_factors
+            calc.text("Design parameters: tan φ'_d = tan φ'_k / {gp}, c'_d = c'_k / {gc}, "
+                      "surcharge × {gq}. The slope is stable when the design factor F_d ≥ 1.0 "
+                      "(over-design factor, EN 1997-1 2.4.7.3).", gp=gp, gc=gcc, gq=gq)
+            rd, _ = sm.search(tphi / gp, inp["c"] / gcc, gq)
+            calc.formula("F_d", "min F (design parameters)", rd["F"], "", "Over-design factor",
+                         dp=3)
         calc.check("Persistent: E_d ≤ R_d (1 ≤ F_d)", 1.0, rd["F"], "", "EN 1997-1 Eq. 2.5",
                    hint=HINT_SLOPE)
         cases.append(("design", rd))

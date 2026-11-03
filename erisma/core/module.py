@@ -116,6 +116,7 @@ class DesignModule:
     description: ClassVar[str] = ""
     fields: ClassVar[list[Field]] = []
     has_3d: ClassVar[bool] = False  # shown with a "3D" badge on the home page
+    uses_annex: ClassVar[bool] = False  # append the National Annex parameters to the report
 
     @classmethod
     def schema(cls, lang: str = "en") -> dict[str, Any]:
@@ -150,6 +151,9 @@ class DesignModule:
             cls.run(calc, inputs)
         except InputError as exc:
             raise InputError(tr(str(exc), lang), exc.field) from exc
+        if cls.uses_annex:
+            from ..design.annex import record_annex
+            record_annex(calc)
         return calc
 
     @classmethod

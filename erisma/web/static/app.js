@@ -117,10 +117,13 @@ function renderProject() {
   if (!state.project.date) state.project.date = new Date().toISOString().slice(0, 10);
   if (state.annexes?.length) {
     const sel = el("select", { id: "p-annex", on: { change: (e) => {
-      state.project.annex = e.target.value; store.set("erisma.project", state.project); schedule();
+      state.project.annex = e.target.value; store.set("erisma.project", state.project);
+      renderProject(); if (state.schema) renderForm(); schedule();
     } } }, ...state.annexes.map((a) => el("option", { value: a.code, title: a.reference }, a.label)));
     sel.value = state.project.annex || "EN";
-    box.append(el("div", { class: "wide" }, el("label", { for: "p-annex" }, t("National Annex")), sel));
+    const na = state.annexes.find((a) => a.code === sel.value);
+    box.append(el("div", { class: "wide" }, el("label", { for: "p-annex" }, t("National Annex")), sel,
+      ...(na?.notes || []).map((n) => el("div", { class: "help" }, n))));
   }
   for (const [key, label] of PROJECT_FIELDS) {
     const id = `p-${key}`;
@@ -188,6 +191,7 @@ function renderForm() {
       const row = el("div", { class: "field", "data-name": f.name, "data-show-if": f.show_if || null }, el("label", { for: id }, f.label),
         el("div", { class: "inp" }, input, el("span", {}, f.unit || "")));
       if (f.help) row.append(el("div", { class: "help" }, f.help));
+      if (f.name === "ag") row.append(zoneChips(input));
       fs.append(row);
     }
     form.append(fs);
@@ -202,6 +206,23 @@ function updateVisibility() {
     row.hidden = !on;
     row.classList.toggle("sub", on);
   });
+}
+
+// One-click seismic zones of the selected National Annex (sets a_gR, γI = 1.0).
+function zoneChips(input) {
+  const na = (state.annexes || []).find((a) => a.code === (state.project.annex || "EN"));
+  const box = el("div", { class: "chips" });
+  if (!na?.zones?.length) return box;
+  for (const z of na.zones) {
+    box.append(el("button", { type: "button", class: "chip", title: `a_gR = ${z.ag} g`,
+      on: { click: () => { input.value = z.ag; state.inputs.ag = z.ag; markChips(box, z.ag); schedule(); } } },
+      `${z.label} · ${z.ag} g`));
+  }
+  markChips(box, Number(state.inputs.ag));
+  return box;
+}
+function markChips(box, ag) {
+  box.querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", c.title === `a_gR = ${ag} g`));
 }
 
 function clearInvalid() {

@@ -66,10 +66,11 @@ def list_modules(lang: str = "en") -> list[dict[str, Any]]:
 
 
 @app.get("/api/annexes")
-def list_annexes(lang: str = "en") -> list[dict[str, str]]:
+def list_annexes(lang: str = "en") -> list[dict[str, Any]]:
     lang = _lang(lang)
-    return [{"code": a.code, "label": tr(a.label, lang), "reference": a.reference}
-            for a in ANNEXES.values()]
+    return [{"code": a.code, "label": tr(a.label, lang), "reference": a.reference,
+             "zones": [{"label": tr(z, lang), "ag": ag} for z, ag in a.zones],
+             "notes": [tr(n, lang) for n in a.notes]} for a in ANNEXES.values()]
 
 
 @app.get("/api/modules/{module_id}")

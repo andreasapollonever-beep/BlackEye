@@ -10,7 +10,7 @@ from ..core import Calculation, DesignModule, Field, InputError, register
 from ..core.units import from_base
 from ..design.ec2 import bar_area, design_flexure, section_capacity, shear_no_links
 from ..design.geotech import bearing_factors
-from ..design.annex import APPROACH_CHOICES, get_annex
+from ..design.annex import APPROACH_CHOICES, check_approach, get_annex
 from ..report.scene3d import PALETTE, Scene3D, heat_color
 from ..report.svg import footing_plan
 
@@ -35,6 +35,7 @@ class PadFootingEC7(DesignModule):
     title = "Pad footing"
     category = "Geotechnical"
     has_3d = True
+    uses_annex = True
     standard = "EN 1997-1, EN 1992-1-1, EN 1998-5"
     description = ("Isolated reinforced concrete footing under a column with biaxial moments: "
                    "effective-area bearing (Annex D, shape and inclination factors), sliding, "
@@ -108,6 +109,7 @@ class PadFootingEC7(DesignModule):
         fig_index = len(calc.items)
 
         na = get_annex(calc.project.annex)
+        check_approach(calc, na, inp["approach"])
         gov = {"u": -1.0}
         for name in na.combinations(inp["approach"]):
             gu, gf, gq, gphi, gcf, gRv, gRh = na.combos[name]
@@ -200,7 +202,7 @@ class PadFootingEC7(DesignModule):
             calc.checks[-1].hint = calc.tr(HINT_SHEAR)
 
         punch = cls._punching(calc, Ngov, Mxg, Myg, Bx, By, cx, cy, (dxe + dye) / 2, Asx, Asy,
-                              fck, fcd, na.gamma_c)
+                              fck, fcd, na.gamma_c, na.punch_vmax)
 
         calc.model3d = cls._scene(calc, inp, gov, punch, Wf, Ws)
         calc.figure(footing_plan(Bx / 1e3, By / 1e3, cx / 1e3, cy / 1e3,
@@ -287,7 +289,7 @@ class PadFootingEC7(DesignModule):
     # ------------------------------------------------------------ punching
     @staticmethod
     def _punching(calc, V, Mx, My, Bx, By, cx, cy, d, Asx, Asy, fck, fcd,
-                  gamma_c: float = 1.5) -> dict:
+                  gamma_c: float = 1.5, kmax: float = 0.4) -> dict:
         calc.heading("Punching shear (EN 1992-1-1 6.4.4)")
         calc.input("V_Ed", V, "kN", "Column design axial load (governing STR case)")
         calc.input("d_eff", d, "mm", "Mean effective depth")
@@ -334,8 +336,8 @@ class PadFootingEC7(DesignModule):
                        hint=HINT_PUNCH)
         u0 = 2 * (cx + cy)
         nu = 0.6 * (1 - fck / 250)
-        vmax = calc.formula("v_Rd,max", "0.4 ν f_cd", 0.4 * nu * fcd, "N/mm²", ref="6.4.5(3)",
-                            dp=3)
+        vmax = calc.formula("v_Rd,max", f"{kmax:g} ν f_cd", kmax * nu * fcd, "N/mm²",
+                            ref="6.4.5(3)", dp=3)
         beta0 = best.get("beta", 1.0)
         v0 = calc.formula("v_Ed,0", "β V_Ed / (u_0 d)", beta0 * V / (u0 * d), "N/mm²",
                           "Shear stress at the column face", dp=3)

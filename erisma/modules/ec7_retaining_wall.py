@@ -313,6 +313,6 @@ class RetainingWallEC7(WallModule):
         calc.formula("M_Rd", "A_s f_yd (d − 0.4x)", MRd / b, "kNm/m", "Moment resistance")
         calc.check("Bending: M_Ed ≤ M_Rd", Mt / b, MRd / b, "kNm/m", "6.1", hint=HINT_BARS)
         shear_no_links(calc, b, d, As_prov, fck, gamma_c, abs(V) * b, per_metre=True)
-        calc.check_limit("Bar spacing: s ≤ min(3h, 400)", s, min(3 * h, 400.0), "mm",
-                         "9.3.1.1(3)", hint="Reduce the bar spacing.")
+        calc.check_limit("Bar spacing at max. moment: s ≤ min(2h, 250)", s, min(2 * h, 250.0),
+                         "mm", "9.3.1.1(3)", hint="Reduce the bar spacing.")
 

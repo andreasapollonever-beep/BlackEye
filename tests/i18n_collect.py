@@ -32,11 +32,22 @@ BAD = [("ec3_steel_beam", {"L": -1}), ("ec3_steel_beam", {"L": "abc"}),
 
 
 def collect() -> set[str]:
+    from erisma.design.annex import ANNEXES
+
     i18n.MISSING.clear()
     for m in all_modules():
         m.schema("el")
-        for inp in SCENARIOS.get(m.id, [{}]):
-            render_html(m.calculate(inp, {}, "el"))
+        for code in ANNEXES:
+            for inp in SCENARIOS.get(m.id, [{}]):
+                render_html(m.calculate(inp, {"annex": code}, "el"))
+        render_html(m.calculate({"approach": "DA1"} if any(f.name == "approach" for f in m.fields)
+                                else {}, {"annex": "CY"}, "el"))
+    for a in ANNEXES.values():
+        for z, _ in a.zones:
+            i18n.tr(z, "el")
+        for n in a.notes:
+            i18n.tr(n, "el")
+        i18n.tr(a.label, "el")
     for mid, inp in BAD:
         try:
             get_module(mid).calculate(inp, {}, "el")

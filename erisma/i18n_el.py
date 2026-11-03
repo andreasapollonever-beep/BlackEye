@@ -595,4 +595,24 @@ EL: dict[str, str] = {
         "Παράμετροι σχεδιασμού: tan φ'_d = tan φ'_k / {gp}, c'_d = c'_k / {gc}, επιφόρτιση × {gq}. Το πρανές είναι ευσταθές όταν ο συντελεστής σχεδιασμού F_d ≥ 1.0 (συντελεστής υπερκάλυψης, EN 1997-1 2.4.7.3).",
     "Soil strength with γ_φ' = {gp}, γ_c' = {gc}; surcharge × ψ2 = 0.3; both signs of k_v analysed.":
         "Αντοχή εδάφους με γ_φ' = {gp}, γ_c' = {gc}· επιφόρτιση × ψ2 = 0.3· εξετάζονται και τα δύο πρόσημα του k_v.",
+    # ------------------------------------------------------------ Cyprus NA
+    "Cyprus (CYS National Annexes)": "Κύπρος (Εθνικά Προσαρτήματα CYS)",
+    "Design Approach 2 is mandatory for STR/GEO (NA 2.9).": "Η Προσέγγιση Σχεδιασμού 2 είναι υποχρεωτική για STR/GEO (NA 2.9).",
+    "Seismic zones: Zone 1 0.15 g, Zone 2 0.20 g, Zone 3 0.25 g (NA zonation map, 10 % in 50 years).":
+        "Σεισμικές ζώνες: Ζώνη 1 0.15 g, Ζώνη 2 0.20 g, Ζώνη 3 0.25 g (χάρτης ζωνών του ΕΠ, 10 % σε 50 χρόνια).",
+    "Zone 1": "Ζώνη 1", "Zone 2": "Ζώνη 2", "Zone 3": "Ζώνη 3",
+    "National Annex parameters used": "Παράμετροι Εθνικού Προσαρτήματος που χρησιμοποιήθηκαν",
+    "{label} — {ref}": "{label} — {ref}", "Clause": "Άρθρο", "Parameter": "Παράμετρος", "Value": "Τιμή",
+    "Slopes": "Πρανή", "seismic": "σεισμός", "Anchor design load": "Φορτίο σχεδιασμού αγκυρίου",
+    "Design anchor load": "Φορτίο σχεδιασμού αγκυρίου",
+    "The {annex} requires {da}; the selected {sel} is not in accordance with it.":
+        "Το προσάρτημα «{annex}» απαιτεί {da}· η επιλεγμένη {sel} δεν είναι σύμφωνη με αυτό.",
+    "Anchor force from the ULS design (one anchor per pile)": "Δύναμη αγκυρίου από τον σχεδιασμό ΟΚΑ (ένα αγκύριο ανά πάσσαλο)",
+    "Anchor force from characteristic (SLS) earth pressures": "Δύναμη αγκυρίου από χαρακτηριστικές ωθήσεις (ΟΚΛ)",
+    "Bar spacing at max. moment: s ≤ min(2h, 250)": "Απόσταση ράβδων στη μέγιστη ροπή: s ≤ min(2h, 250)",
+    "Persistent design situation — GEO (Design Approach 2)": "Μόνιμη κατάσταση σχεδιασμού — GEO (Προσέγγιση Σχεδιασμού 2)",
+    "Design Approach 2 (A1 + M1 + R2), factors applied to the effects of actions: E_d = γ_G E_G,k + γ_Q E_Q,k and R_d = R_k / γ_R,e with γ_G = {g}, γ_Q = {q}, γ_R,e = {re}. Characteristic soil strength is used; the surcharge is scaled by γ_Q/γ_G so that F' = R_k/(E_G,k + (γ_Q/γ_G) E_Q,k), and F_d = F' / (γ_G γ_R,e) ≥ 1.0.":
+        "Προσέγγιση Σχεδιασμού 2 (A1 + M1 + R2), με συντελεστές στα αποτελέσματα των δράσεων: E_d = γ_G E_G,k + γ_Q E_Q,k και R_d = R_k / γ_R,e με γ_G = {g}, γ_Q = {q}, γ_R,e = {re}. Χρησιμοποιούνται χαρακτηριστικές αντοχές εδάφους· η επιφόρτιση πολλαπλασιάζεται επί γ_Q/γ_G ώστε F' = R_k/(E_G,k + (γ_Q/γ_G) E_Q,k), και F_d = F' / (γ_G γ_R,e) ≥ 1.0.",
+    "In g (a_gR × γI). Pick a zone with the buttons of the selected National Annex.":
+        "Σε g (a_gR × γI). Επιλέξτε ζώνη με τα κουμπιά του επιλεγμένου Εθνικού Προσαρτήματος.",
 }

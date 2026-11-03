@@ -26,7 +26,7 @@ from ..analysis import UDL, Beam, Support
 from ..core import Calculation, DesignModule, Field, InputError, register
 from ..core.units import from_base
 from ..design.geotech import k_mononobe_okabe, ka_coulomb, kp_coulomb, kp_seismic
-from ..design.annex import APPROACH_CHOICES, get_annex
+from ..design.annex import APPROACH_CHOICES, check_approach, get_annex
 from ..report.scene3d import PALETTE, Scene3D
 from ..report.svg import vertical_diagrams
 from ..sections.steel import get_section, section_names
@@ -47,6 +47,7 @@ class BerlinWallEC7(DesignModule):
     title = "Berlin wall (soldier pile wall)"
     category = "Geotechnical"
     has_3d = True
+    uses_annex = True
     standard = "EN 1997-1, EN 1993-1-1, EN 1995-1-1, EN 1998-5"
     description = ("Steel soldier piles with timber lagging, cantilever or with one anchor row: "
                    "active/passive earth pressure with spatial passive resistance, embedment "
@@ -91,7 +92,9 @@ class BerlinWallEC7(DesignModule):
         Field("seismic", "Include seismic design (EN 1998-5)", kind="bool", default=True,
               group="Seismic"),
         Field("ag", "Design ground acceleration αgR·γI", "", 0.16, min=0, max=0.6,
-              group="Seismic", help="In g. Greece: Zone I 0.16, Zone II 0.24, Zone III 0.36."),
+              group="Seismic",
+              help="In g (a_gR × γI). Pick a zone with the buttons of the selected National "
+                   "Annex."),
         Field("S", "Soil factor S", "", 1.2, min=1.0, max=1.8, group="Seismic"),
         Field("r", "Displacement factor r", kind="choice", choices=["1.0", "1.5", "2.0"],
               default="1.0", group="Seismic",
@@ -145,6 +148,7 @@ class BerlinWallEC7(DesignModule):
                   "excavation level (not modelled here).")
 
         na = get_annex(calc.project.annex)
+        check_approach(calc, na, inp["approach"])
         combos = []
         for name in na.combinations(inp["approach"]):
             gu, gf, gq, gphi, gc, _, _ = na.combos[name]
@@ -209,14 +213,25 @@ class BerlinWallEC7(DesignModule):
         calc.check_min("Embedment: t_prov ≥ t_req", t_prov, gov_t["t_req"], "m",
                        "EN 1997-1 9.7.4", hint=HINT_EMBED)
 
+        char = cls._combination(calc, inp, {"name": "char", "gG": 1.0, "gQ": 1.0, "gphi": 1.0,
+                                            "gc": 1.0, "gRe": 1.0, "seis": None},
+                                anchored, b, b_p, phik, need_beam=True, EI=E_STEEL * sec.Iy)
+
         # ----------------------------------------------------------- anchor
         if anchored:
             calc.heading("Anchor")
+            ca = math.cos(math.radians(inp["alpha"]))
             Ah = max(r["A"] for r in results)
             calc.formula("A_h,d", "Σ E_a,d − Σ E_p,d (per pile)", Ah, "kN",
                          "Horizontal anchor force per pile")
-            Ad = calc.formula("A_d", "A_h,d / cos α", Ah / math.cos(math.radians(inp["alpha"])),
-                              "kN", "Design anchor force (one anchor per pile)")
+            Ad = calc.formula("P_d", "A_h,d / cos α", Ah / ca, "kN",
+                              "Anchor force from the ULS design (one anchor per pile)")
+            if na.anchor_sls_factor:
+                Pk = calc.formula("P_k", "A_h,k / cos α", char["A"] / ca, "kN",
+                                  "Anchor force from characteristic (SLS) earth pressures")
+                Ad = calc.formula("A_d", f"max(P_d, {na.anchor_sls_factor:g} P_k)",
+                                  max(Ad, na.anchor_sls_factor * Pk), "kN",
+                                  "Design anchor load", ref="EN 1997-1 8.6(4) (NA)")
             calc.input("R_a,d", inp["R_ad"], "kN", "Anchor design resistance")
             calc.check("Anchor: A_d ≤ R_a,d", Ad, inp["R_ad"], "kN", "EN 1997-1 8.5",
                        hint=HINT_ANCHOR)
@@ -229,9 +244,6 @@ class BerlinWallEC7(DesignModule):
 
         # -------------------------------------------------------- deflection
         calc.heading("Deflection (indicative)")
-        char = cls._combination(calc, inp, {"name": "char", "gG": 1.0, "gQ": 1.0, "gphi": 1.0,
-                                            "gc": 1.0, "gRe": 1.0, "seis": None},
-                                anchored, b, b_p, phik, need_beam=True, EI=E_STEEL * sec.Iy)
         d_top = calc.formula("δ_top", "beam model, characteristic loads", abs(char["d_top"]), "mm",
                              "Horizontal displacement at the top of the pile")
         calc.note("Limit-equilibrium beam model (pile supported at the anchor and at the "

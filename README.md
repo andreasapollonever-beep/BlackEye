@@ -31,6 +31,9 @@ Platform:
 * **3D viewer** — Three.js (vendored, works offline): wall, soil, groundwater, cumulative pressure
   prisms with arrows (earth / surcharge / water / seismic), base pressure, resultant forces,
   layer toggles, live utilisation panel, PNG export.
+* **National Annexes** — selectable per project: EN recommended values and **Cyprus** (CYS
+  National Annexes to EN 1990, 1992-1-1, 1997-1, 1998-1, 1998-5 — DA2, γR factors, anchor
+  1.35·Pk, v_Rd,max = 0.5νf_cd, seismic zones 0.15/0.20/0.25 g). Reports list every NDP used.
 * **Usability** — Greek / English UI and reports, hints on every failing check, the wrong input is
   highlighted, autosave, project files, module search, keyboard shortcuts (Ctrl+S/O/P/3).
 * **REST API** — every module is available over HTTP (`/docs` for the OpenAPI UI).

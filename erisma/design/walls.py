@@ -17,7 +17,7 @@ import numpy as np
 from ..core import Calculation, DesignModule, Field, InputError
 from ..core.units import from_base
 from ..report.scene3d import PALETTE, Scene3D
-from .annex import APPROACH_CHOICES, EN_APPROACHES, EN_COMBOS, get_annex
+from .annex import APPROACH_CHOICES, EN_APPROACHES, EN_COMBOS, check_approach, get_annex
 from ..report.svg import wall_section
 from .geotech import (bearing_factors, clip_z, k_mononobe_okabe, ka_coulomb, kp_rankine,
                       kp_seismic, linear_resultant, poly_props)
@@ -201,7 +201,9 @@ def soil_fields() -> list[Field]:
         Field("seismic", "Include seismic design (EN 1998-5)", kind="bool", default=True,
               group="Seismic"),
         Field("ag", "Design ground acceleration αgR·γI", "", 0.16, min=0, max=0.6,
-              group="Seismic", help="In g. Greece: Zone I 0.16, Zone II 0.24, Zone III 0.36."),
+              group="Seismic",
+              help="In g (a_gR × γI). Pick a zone with the buttons of the selected National "
+                   "Annex."),
         Field("S", "Soil factor S", "", 1.2, min=1.0, max=1.8, group="Seismic",
               help="EN 1998-1 Table 3.2: ground A 1.0, B 1.2, C 1.15, D 1.35, E 1.4."),
         Field("r", "Displacement factor r", kind="choice", choices=["1.0", "1.5", "2.0"],
@@ -217,6 +219,7 @@ class WallModule(DesignModule):
     """Template for wall modules: subclasses provide geometry + structural design."""
 
     has_3d = True
+    uses_annex = True
 
     @classmethod
     def make_geometry(cls, inp: dict) -> WallGeometry:  # pragma: no cover
@@ -241,6 +244,7 @@ class WallModule(DesignModule):
             raise InputError("Backfill slope is too steep for the design angle of shearing "
                              "resistance (β must be < φ'd)", "beta")
         na = get_annex(calc.project.annex)
+        check_approach(calc, na, inp["approach"])
         cls.record_geometry(calc, g, inp)
         fig_index = len(calc.items)
         cls._soil_section(calc, g, inp)
