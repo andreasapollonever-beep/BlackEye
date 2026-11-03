@@ -10,7 +10,8 @@ class Viewer {
     this.host = host;
     this.hidden = {};
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xeef1f5);
+    this.applyTheme();
+    window.addEventListener("erisma:theme", () => this.applyTheme());
     this.camera = new THREE.PerspectiveCamera(38, 1, 0.05, 1000);
     this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -29,6 +30,11 @@ class Viewer {
     new ResizeObserver(() => this.resize()).observe(host);
     const loop = () => { this.controls.update(); this.render(); requestAnimationFrame(loop); };
     loop();
+  }
+
+  applyTheme() {
+    const bg = getComputedStyle(document.documentElement).getPropertyValue("--v3d-bg").trim() || "#eef1f5";
+    this.scene.background = new THREE.Color(bg);
   }
 
   buildUi() {

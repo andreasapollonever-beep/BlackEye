@@ -41,7 +41,11 @@ def collect() -> set[str]:
             for inp in SCENARIOS.get(m.id, [{}]):
                 render_html(m.calculate(inp, {"annex": code}, "el"))
         render_html(m.calculate({"approach": "DA1"} if any(f.name == "approach" for f in m.fields)
-                                else {}, {"annex": "CY"}, "el"))
+                                else {}, {"annex": "CY", "site": "Λεμεσός", "lat": "34.6841",
+                                          "lon": "33.0379"}, "el"))
+        render_html(m.calculate({}, {"annex": "CY", "lat": "34.0", "lon": "30.0"}, "el"))
+        render_html(m.calculate({}, {"annex": "CY", "lat": "35.1195", "lon": "33.0", "site": "x"},
+                                "el"))
     for a in ANNEXES.values():
         for z, _ in a.zones:
             i18n.tr(z, "el")

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Erisma — Structural Calculations</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem("erisma.theme")||"dark";if(localStorage.getItem("erisma.side")==="collapsed")document.documentElement.classList.add("pre-collapsed")}catch(e){document.documentElement.dataset.theme="dark"}</script>
 <link rel="stylesheet" href="/static/app.css">
 <script type="importmap">
 {"imports": {"three": "/static/vendor/three/three.module.min.js",
@@ -16,6 +17,7 @@
   <a href="#" class="logo" id="go-home" title="Αρχική"><svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M3 11h26" stroke="#7fc4ff" stroke-width="3.2" stroke-linecap="round"/><path d="M7 13l-4.5 9h9z M25 13l-4.5 9h9z" fill="#fff"/><path d="M1.5 25.5h29" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".55"/></svg> Erisma <small data-t="structural calculations">structural calculations</small></a>
   <div class="actions">
     <button id="btn-home" class="calc-only" data-t="Home">Home</button>
+    <button id="btn-theme" data-tt="Dark / light theme" title="Dark / light theme">☾</button>
     <div class="lang" role="group" aria-label="Language">
       <button data-lang="el" title="Ελληνικά">ΕΛ</button><button data-lang="en" title="English">EN</button>
     </div>
@@ -46,10 +48,16 @@
   </div>
 </section>
 <main>
-  <nav aria-label="Calculation library">
-    <input id="search" type="search" autocomplete="off">
+  <nav id="side" aria-label="Calculation library">
+    <div class="side-top">
+      <div class="searchbox">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+        <input id="search" type="search" autocomplete="off"><span class="kbd">Ctrl K</span>
+      </div>
+      <button id="side-toggle" class="icon-btn" type="button" data-tt="Collapse / expand the menu" title="Collapse / expand the menu">«</button>
+    </div>
     <div id="modules"></div>
-    <p id="shortcuts" class="muted pad small"></p>
+    <div id="shortcuts" class="side-foot"></div>
   </nav>
   <section id="editor">
     <details class="project">
@@ -74,6 +82,35 @@
     <div class="pane" data-pane="model"><div id="viewer3d"></div></div>
   </section>
 </main>
+<dialog id="map-dlg">
+  <div class="map-head">
+    <h3 data-t="Project site — seismic zone from the map">Project site</h3>
+    <button class="ghost" id="map-close" type="button">✕</button>
+  </div>
+  <div class="map-body">
+    <div class="map-side">
+      <input id="map-search" type="search" autocomplete="off">
+      <div class="places" id="map-places"></div>
+      <button class="ghost" id="map-gps" type="button" data-t="📍 Use my location">📍 Use my location</button>
+      <div class="latlon">
+        <input id="map-lat" type="number" step="any" placeholder="lat °N">
+        <input id="map-lon" type="number" step="any" placeholder="lon °E">
+      </div>
+      <div class="src" data-t="Click on the map, choose a place or give coordinates.">Click on the map.</div>
+    </div>
+    <div class="map-wrap" id="map-wrap">
+      <img id="map-img" alt="Seismic zoning map" draggable="false">
+      <div class="pin" id="map-pin"><svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z" fill="#e03b3b" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="9" r="2.6" fill="#fff"/></svg></div>
+    </div>
+  </div>
+  <div class="map-foot">
+    <div class="map-result" id="map-result">—</div>
+    <div class="btns">
+      <button class="ghost" id="map-cancel" type="button" data-t="Cancel">Cancel</button>
+      <button class="primary" id="map-apply" type="button" data-t="Use this site" disabled>Use this site</button>
+    </div>
+  </div>
+</dialog>
 <script src="/static/app.js"></script>
 <script type="module" src="/static/viewer3d.js"></script>
 </body>

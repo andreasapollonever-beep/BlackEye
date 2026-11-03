@@ -125,7 +125,31 @@ def record_annex(calc) -> None:
     if na.zones:
         rows.append(["EN 1998-1 3.2.1", "a_gR",
                      ", ".join(f"{calc.tr(z)} {a:g} g" for z, a in na.zones)])
+    site = site_zone_row(calc, na)
+    if site:
+        rows.append(site)
     calc.table(["Clause", "Parameter", "Value"], rows, caption=na.label)
+
+
+def site_zone_row(calc, na: Annex):
+    """Seismic zone of the project site from the annex zonation map (if any)."""
+    from . import sitezones
+
+    p = calc.project
+    try:
+        lat, lon = float(p.lat), float(p.lon)
+    except (TypeError, ValueError):
+        return None
+    if not sitezones.has_map(na.code):
+        return None
+    z = sitezones.zone_at(na.code, lat, lon)
+    if not z["zone"]:
+        return ["EN 1998-1 3.2.1", calc.tr("Site"), calc.tr("outside the zonation map")]
+    txt = calc.tr("{site} ({lat:.4f}° N, {lon:.4f}° E): Zone {z}, a_gR = {ag:g} g",
+                  site=p.site or "—", lat=lat, lon=lon, z=z["zone"], ag=z["ag"])
+    if z["near_boundary"]:
+        txt += " — " + calc.tr("near a zone boundary, the higher zone is used")
+    return ["EN 1998-1 3.2.1", calc.tr("Site"), txt]
 
 
 def check_approach(calc, na: Annex, choice: str) -> None:

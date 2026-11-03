@@ -28,6 +28,9 @@ class ProjectInfo:
     date: str = field(default_factory=lambda: date.today().isoformat())
     company: str = ""
     annex: str = "EN"  # National Annex code (erisma.design.annex)
+    site: str = ""      # site name (optional)
+    lat: str = ""       # site latitude / longitude (WGS84, decimal degrees)
+    lon: str = ""
 
     @classmethod
     def from_dict(cls, data: dict[str, Any] | None) -> "ProjectInfo":

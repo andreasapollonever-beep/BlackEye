@@ -29,6 +29,20 @@ const UI = {
     "Enter your data — the defaults are a realistic worked example": "Συμπληρώστε τα δεδομένα σας — οι προεπιλογές είναι ένα ρεαλιστικό παράδειγμα",
     "Check the results and print the report (PDF)": "Δείτε τα αποτελέσματα και εκτυπώστε το τεύχος (PDF)",
     "last used": "τελευταίος", "National Annex": "Εθνικό Προσάρτημα",
+    "Favourites": "Αγαπημένα", "Recent": "Πρόσφατα", "Add to favourites": "Προσθήκη στα αγαπημένα",
+    "Remove from favourites": "Αφαίρεση από τα αγαπημένα", "Collapse / expand the menu": "Σύμπτυξη / ανάπτυξη μενού",
+    "Dark / light theme": "Σκούρο / ανοιχτό θέμα", "Zone": "Ζώνη", "Project site": "Τοποθεσία έργου",
+    "No site selected": "Δεν έχει επιλεγεί τοποθεσία", "Map": "Χάρτης", "From map": "Από χάρτη",
+    "Project site — seismic zone from the map": "Τοποθεσία έργου — σεισμική ζώνη από τον χάρτη",
+    "📍 Use my location": "📍 Η θέση μου", "Click on the map, choose a place or give coordinates.":
+      "Κάντε κλικ στον χάρτη, επιλέξτε τοποθεσία ή δώστε συντεταγμένες.",
+    "Cancel": "Άκυρο", "Use this site": "Χρήση αυτής της θέσης", "Selected point": "Επιλεγμένο σημείο",
+    "Outside the zonation map": "Εκτός του χάρτη ζωνών", "Coordinates": "Συντεταγμένες", "My location": "Η θέση μου",
+    "Near a zone boundary — the higher zone within 1 km is used (safe side).":
+      "Κοντά σε όριο ζωνών — λαμβάνεται η δυσμενέστερη ζώνη σε ακτίνα 1 km (υπέρ της ασφαλείας).",
+    "NA to CYS EN 1998-1, zonation map": "χάρτης ζωνών ΕΠ CYS EN 1998-1",
+    "Location is not available in this browser.": "Η θέση δεν είναι διαθέσιμη σε αυτόν τον browser.",
+    "Search places…": "Αναζήτηση τοποθεσίας…",
   },
 };
 let LANG = (() => { try { return localStorage.getItem("erisma.lang") || "el"; } catch { return "el"; } })();
@@ -90,25 +104,77 @@ function translateChrome() {
   document.querySelectorAll("[data-tt]").forEach((n) => { n.title = t(n.dataset.tt); });
   $("#search").placeholder = t("Search calculations…");
   $("#home-search").placeholder = t("Search calculations…");
+  $("#map-search").placeholder = t("Search places…");
   document.querySelectorAll(".lang button").forEach((b) => b.classList.toggle("on", b.dataset.lang === LANG));
   $("#shortcuts").textContent = t("Shortcuts: Ctrl+S save · Ctrl+O open · Ctrl+P print · Ctrl+3 3D view");
 }
 
+// ------------------------------------------------------------- sidebar
+const favs = () => store.get("erisma.favs", []);
+const recent = () => store.get("erisma.recent", []);
+function toggleFav(id) {
+  const f = favs();
+  store.set("erisma.favs", f.includes(id) ? f.filter((x) => x !== id) : [...f, id]);
+  renderNav();
+}
+function pushRecent(id) {
+  store.set("erisma.recent", [id, ...recent().filter((x) => x !== id)].slice(0, 4));
+}
+function navItem(m) {
+  const on = favs().includes(m.id);
+  const a = el("a", { href: `#${m.id}`, class: `item${state.schema?.id === m.id ? " active" : ""}`,
+    "data-id": m.id, title: `${m.title} — ${m.standard}`,
+    on: { click: (e) => { e.preventDefault(); openModule(m.id); } } });
+  a.innerHTML = `<span class="ico">${typeof pic === "function" ? pic(m.id) : ""}</span>`;
+  const star = el("button", { class: `star${on ? " on" : ""}`, type: "button",
+    title: t(on ? "Remove from favourites" : "Add to favourites"),
+    on: { click: (e) => { e.preventDefault(); e.stopPropagation(); toggleFav(m.id); } } }, on ? "★" : "☆");
+  a.append(el("span", { class: "t" }, m.title, el("span", { class: "s" }, m.standard)),
+    el("span", { class: "meta" }, m.has_3d ? el("span", { class: "mini3d" }, "3D") : "", star));
+  return a;
+}
+function navSection(key, title, mods) {
+  if (!mods.length) return null;
+  const closed = store.get("erisma.closed", []).includes(key);
+  const sec = el("div", { class: `sec${closed ? " closed" : ""}` });
+  const head = el("button", { class: "sec-h", type: "button", on: { click: () => {
+    const c = store.get("erisma.closed", []);
+    store.set("erisma.closed", c.includes(key) ? c.filter((x) => x !== key) : [...c, key]);
+    sec.classList.toggle("closed");
+  } } }, el("span", { class: "chev" }, "▾"), el("span", {}, title), el("span", { class: "count" }, String(mods.length)));
+  sec.append(head, el("div", { class: "items" }, ...mods.map(navItem)));
+  return sec;
+}
 function renderNav() {
   const nav = $("#modules");
   nav.innerHTML = "";
   const q = $("#search").value.trim().toLowerCase();
-  const cats = {};
-  state.modules.filter((m) => !q || `${m.title} ${m.standard} ${m.category} ${m.description}`.toLowerCase().includes(q))
-    .forEach((m) => (cats[m.category] ||= []).push(m));
-  for (const [cat, mods] of Object.entries(cats)) {
-    nav.append(el("h3", {}, cat));
-    mods.forEach((m) => nav.append(el("a", {
-      href: `#${m.id}`, "data-id": m.id, class: state.schema?.id === m.id ? "active" : null, title: m.description,
-      on: { click: (e) => { e.preventDefault(); openModule(m.id); } },
-    }, m.title, el("small", {}, m.standard))));
+  const match = (m) => !q || `${m.title} ${m.standard} ${m.category} ${m.description}`.toLowerCase().includes(q);
+  const mods = state.modules.filter(match);
+  const byId = (id) => mods.find((m) => m.id === id);
+  if (!q) {
+    for (const sec of [navSection("fav", `★ ${t("Favourites")}`, favs().map(byId).filter(Boolean)),
+      navSection("recent", t("Recent"), recent().map(byId).filter(Boolean))]) if (sec) nav.append(sec);
   }
-  if (!Object.keys(cats).length) nav.append(el("p", { class: "muted pad" }, t("No calculations match")));
+  const cats = {};
+  mods.forEach((m) => (cats[m.category] ||= []).push(m));
+  Object.entries(cats).sort((a, b) => b[1].length - a[1].length)
+    .forEach(([cat, ms]) => nav.append(navSection(`cat:${cat}`, cat, ms)));
+  if (!mods.length) nav.append(el("p", { class: "muted pad" }, t("No calculations match")));
+}
+
+// ----------------------------------------------------------- theme & side
+function setTheme(th) {
+  document.documentElement.dataset.theme = th;
+  try { localStorage.setItem("erisma.theme", th); } catch { /* ignore */ }
+  $("#btn-theme").textContent = th === "dark" ? "☀" : "☾";
+  window.dispatchEvent(new Event("erisma:theme"));
+}
+function setSide(collapsed) {
+  document.body.classList.toggle("side-collapsed", collapsed);
+  $("#side-toggle").textContent = collapsed ? "»" : "«";
+  try { localStorage.setItem("erisma.side", collapsed ? "collapsed" : "open"); } catch { /* ignore */ }
+  window.dispatchEvent(new Event("erisma:show3d"));
 }
 
 function renderProject() {
@@ -124,6 +190,15 @@ function renderProject() {
     const na = state.annexes.find((a) => a.code === sel.value);
     box.append(el("div", { class: "wide" }, el("label", { for: "p-annex" }, t("National Annex")), sel,
       ...(na?.notes || []).map((n) => el("div", { class: "help" }, n))));
+  }
+  const naSel = (state.annexes || []).find((a) => a.code === (state.project.annex || "EN"));
+  if (naSel?.map) {
+    const p = state.project;
+    const txt = p.lat ? `${p.site || "—"} · ${Number(p.lat).toFixed(4)}°N ${Number(p.lon).toFixed(4)}°E` +
+      (p.zone ? ` · ${t("Zone")} ${p.zone} (${p.ag} g)` : "") : t("No site selected");
+    box.append(el("div", { class: "wide" }, el("label", {}, t("Project site")),
+      el("div", { class: "site-row" }, el("span", { class: "site-txt" }, txt),
+        el("button", { class: "ghost", type: "button", on: { click: () => openMap() } }, `📍 ${t("Map")}`))));
   }
   for (const [key, label] of PROJECT_FIELDS) {
     const id = `p-${key}`;
@@ -213,6 +288,10 @@ function zoneChips(input) {
   const na = (state.annexes || []).find((a) => a.code === (state.project.annex || "EN"));
   const box = el("div", { class: "chips" });
   if (!na?.zones?.length) return box;
+  if (na.map) {
+    box.append(el("button", { type: "button", class: "chip map", title: t("Project site — seismic zone from the map"),
+      on: { click: () => openMap(input) } }, `📍 ${t("From map")}`));
+  }
   for (const z of na.zones) {
     box.append(el("button", { type: "button", class: "chip", title: `a_gR = ${z.ag} g`,
       on: { click: () => { input.value = z.ag; state.inputs.ag = z.ag; markChips(box, z.ag); schedule(); } } },
@@ -318,6 +397,8 @@ async function selectModule(id, inputs) {
   $("#restored").hidden = !(saved && !inputs);
   document.title = `${state.schema.title} — Erisma`;
   store.set("erisma.last", id);
+  pushRecent(id);
+  renderNav();
   renderForm();
   run();
 }
@@ -399,6 +480,95 @@ function renderStatus(s) {
   }
 }
 
+// ------------------------------------------------------------ site map
+const mapState = { pick: null, input: null, places: [] };
+async function openMap(input) {
+  const na = (state.annexes || []).find((a) => a.code === (state.project.annex || "EN"));
+  if (!na?.map) return;
+  mapState.input = input || null;
+  const img = $("#map-img");
+  if (!img.src.endsWith(na.map)) img.src = na.map;
+  if (!mapState.places.length) mapState.places = await api(`/api/site/places?annex=${na.code}`).catch(() => []);
+  $("#map-search").value = "";
+  renderPlaces();
+  const p = state.project;
+  if (p.lat && p.lon) await pickSite({ lat: p.lat, lon: p.lon, name: p.site }); else showPick(null);
+  $("#map-dlg").showModal();
+}
+function renderPlaces() {
+  const q = $("#map-search").value.trim().toLowerCase();
+  const box = $("#map-places");
+  box.innerHTML = "";
+  mapState.places.filter((p) => !q || `${p.name_el} ${p.name_en}`.toLowerCase().includes(q)).forEach((p) => {
+    const name = LANG === "el" ? p.name_el : p.name_en;
+    box.append(el("button", { class: "place", type: "button", on: { click: () => pickSite({ lat: p.lat, lon: p.lon, name }) } },
+      el("span", {}, name), el("span", { class: `zb z${p.zone}` }, `${t("Zone")} ${p.zone}`)));
+  });
+}
+async function pickSite(q) {
+  const na = state.project.annex || "EN";
+  const qs = q.x !== undefined ? `x=${q.x}&y=${q.y}` : `lat=${q.lat}&lon=${q.lon}`;
+  const r = await api(`/api/site/zone?annex=${na}&${qs}`).catch(() => null);
+  if (!r) return;
+  r.name = q.name || (q.x !== undefined ? t("Selected point") : q.name) || t("Selected point");
+  showPick(r);
+}
+function showPick(r) {
+  mapState.pick = r;
+  const pin = $("#map-pin"), res = $("#map-result"), apply = $("#map-apply");
+  $("#map-lat").value = r ? r.lat : "";
+  $("#map-lon").value = r ? r.lon : "";
+  if (!r) { pin.style.display = "none"; res.textContent = t("Click on the map, choose a place or give coordinates."); apply.disabled = true; return; }
+  const img = $("#map-img");
+  pin.style.display = "block";
+  pin.style.left = `${img.offsetLeft + (r.x / r.width) * img.clientWidth}px`;
+  pin.style.top = `${img.offsetTop + (r.y / r.height) * img.clientHeight}px`;
+  if (!r.zone) { res.innerHTML = ""; res.append(t("Outside the zonation map")); apply.disabled = true; return; }
+  res.innerHTML = "";
+  res.append(`${r.name}: ${t("Zone")} ${r.zone} · a_gR = ${r.ag} g`,
+    el("small", {}, r.near_boundary ? t("Near a zone boundary — the higher zone within 1 km is used (safe side).")
+      : `${r.lat.toFixed(4)}°N, ${r.lon.toFixed(4)}°E · ${t("NA to CYS EN 1998-1, zonation map")}`));
+  apply.disabled = false;
+}
+$("#map-img").addEventListener("click", (e) => {
+  const img = e.currentTarget, rect = img.getBoundingClientRect();
+  const x = ((e.clientX - rect.left) / rect.width) * img.naturalWidth;
+  const y = ((e.clientY - rect.top) / rect.height) * img.naturalHeight;
+  pickSite({ x: x.toFixed(1), y: y.toFixed(1) });
+});
+$("#map-img").addEventListener("load", () => mapState.pick && showPick(mapState.pick));
+window.addEventListener("resize", () => mapState.pick && $("#map-dlg").open && showPick(mapState.pick));
+$("#map-search").addEventListener("input", renderPlaces);
+for (const id of ["#map-lat", "#map-lon"]) {
+  $(id).addEventListener("change", () => {
+    const lat = Number($("#map-lat").value), lon = Number($("#map-lon").value);
+    if (lat && lon) pickSite({ lat, lon, name: t("Coordinates") });
+  });
+}
+$("#map-gps").onclick = () => {
+  if (!navigator.geolocation) return alert(t("Location is not available in this browser."));
+  navigator.geolocation.getCurrentPosition((p) => pickSite({ lat: p.coords.latitude, lon: p.coords.longitude, name: t("My location") }),
+    () => alert(t("Location is not available in this browser.")), { enableHighAccuracy: true, timeout: 10000 });
+};
+const closeMap = () => $("#map-dlg").close();
+$("#map-close").onclick = closeMap;
+$("#map-cancel").onclick = closeMap;
+$("#map-apply").onclick = () => {
+  const r = mapState.pick;
+  if (!r?.zone) return;
+  Object.assign(state.project, { site: r.name, lat: String(r.lat), lon: String(r.lon), zone: r.zone, ag: r.ag });
+  store.set("erisma.project", state.project);
+  if (state.schema?.fields.some((f) => f.name === "ag")) {
+    state.inputs.ag = r.ag;
+    const inp = document.getElementById("f-ag");
+    if (inp) inp.value = r.ag;
+  }
+  closeMap();
+  renderProject();
+  if (state.schema) renderForm();
+  schedule();
+};
+
 // --------------------------------------------------------------- actions
 function download(name, text, type) {
   const a = el("a", { href: URL.createObjectURL(new Blob([text], { type })), download: name });
@@ -435,7 +605,8 @@ $("#file-open").onchange = async (e) => {
 document.addEventListener("keydown", (e) => {
   if (!(e.ctrlKey || e.metaKey)) return;
   const k = e.key.toLowerCase();
-  const map = { s: actions.save, o: actions.open, p: actions.print, 3: () => showTab(currentTab === "model" ? "report" : "model") };
+  const map = { s: actions.save, o: actions.open, p: actions.print, 3: () => showTab(currentTab === "model" ? "report" : "model"),
+    k: () => { const box = document.body.classList.contains("at-home") ? $("#home-search") : $("#search"); setSide(false); box.focus(); box.select(); } };
   if (map[k]) { e.preventDefault(); map[k](); }
 });
 $("#search").addEventListener("input", renderNav);
@@ -451,7 +622,12 @@ document.querySelectorAll(".lang button").forEach((b) => (b.onclick = async () =
   else selectModule(state.schema.id, state.inputs);
 }));
 
+$("#btn-theme").onclick = () => setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+$("#side-toggle").onclick = () => setSide(!document.body.classList.contains("side-collapsed"));
+
 (async function init() {
+  setTheme(document.documentElement.dataset.theme || "dark");
+  setSide(document.documentElement.classList.contains("pre-collapsed"));
   state.project = store.get("erisma.project", {});
   translateChrome();
   state.annexes = await api("/api/annexes").catch(() => []);

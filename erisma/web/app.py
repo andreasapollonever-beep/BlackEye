@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from .. import __version__
 from ..core import InputError, all_modules, get_module
+from ..design import sitezones
 from ..design.annex import ANNEXES
 from ..i18n import LANGS, tr
 from ..report import render_html
@@ -70,7 +71,24 @@ def list_annexes(lang: str = "en") -> list[dict[str, Any]]:
     lang = _lang(lang)
     return [{"code": a.code, "label": tr(a.label, lang), "reference": a.reference,
              "zones": [{"label": tr(z, lang), "ag": ag} for z, ag in a.zones],
-             "notes": [tr(n, lang) for n in a.notes]} for a in ANNEXES.values()]
+             "notes": [tr(n, lang) for n in a.notes],
+             "map": "/static/maps/cy_zones.png" if sitezones.has_map(a.code) else None}
+            for a in ANNEXES.values()]
+
+
+@app.get("/api/site/places")
+def site_places(annex: str = "CY") -> list[dict[str, Any]]:
+    return sitezones.places(annex)
+
+
+@app.get("/api/site/zone")
+def site_zone(annex: str = "CY", lat: float | None = None, lon: float | None = None,
+              x: float | None = None, y: float | None = None) -> dict[str, Any]:
+    if not sitezones.has_map(annex):
+        raise HTTPException(404, "No zonation map for this National Annex")
+    if (lat is None or lon is None) and (x is None or y is None):
+        raise HTTPException(422, "Give lat/lon or x/y")
+    return sitezones.zone_at(annex, lat, lon, x, y)
 
 
 @app.get("/api/modules/{module_id}")

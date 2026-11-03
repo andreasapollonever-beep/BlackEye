@@ -615,4 +615,7 @@ EL: dict[str, str] = {
         "Προσέγγιση Σχεδιασμού 2 (A1 + M1 + R2), με συντελεστές στα αποτελέσματα των δράσεων: E_d = γ_G E_G,k + γ_Q E_Q,k και R_d = R_k / γ_R,e με γ_G = {g}, γ_Q = {q}, γ_R,e = {re}. Χρησιμοποιούνται χαρακτηριστικές αντοχές εδάφους· η επιφόρτιση πολλαπλασιάζεται επί γ_Q/γ_G ώστε F' = R_k/(E_G,k + (γ_Q/γ_G) E_Q,k), και F_d = F' / (γ_G γ_R,e) ≥ 1.0.",
     "In g (a_gR × γI). Pick a zone with the buttons of the selected National Annex.":
         "Σε g (a_gR × γI). Επιλέξτε ζώνη με τα κουμπιά του επιλεγμένου Εθνικού Προσαρτήματος.",
+    "Site": "Τοποθεσία", "outside the zonation map": "εκτός του χάρτη ζωνών",
+    "{site} ({lat:.4f}° N, {lon:.4f}° E): Zone {z}, a_gR = {ag:g} g": "{site} ({lat:.4f}° Β, {lon:.4f}° Α): Ζώνη {z}, a_gR = {ag:g} g",
+    "near a zone boundary, the higher zone is used": "κοντά σε όριο ζωνών, λαμβάνεται η δυσμενέστερη ζώνη",
 }
