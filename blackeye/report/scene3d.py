@@ -72,6 +72,12 @@ class Scene3D:
                              "p": [[_r(a) for a in p] for p in points], "color": color,
                              "dashed": dashed, "closed": closed})
 
+    def cylinder(self, layer: str, p1: Vec, p2: Vec, radius: float, color: str,
+                 opacity: float = 1.0) -> None:
+        self.objects.append({"t": "cyl", "layer": layer, "a": [_r(v) for v in p1],
+                             "b": [_r(v) for v in p2], "r": _r(radius), "color": color,
+                             "opacity": opacity})
+
     def arrow(self, layer: str, origin: Vec, direction: Vec, length: float, color: str,
               head: float | None = None) -> None:
         if length <= 1e-6:

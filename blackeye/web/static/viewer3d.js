@@ -137,6 +137,16 @@ class Viewer {
       if (o.dashed) l.computeLineDistances();
       return l;
     }
+    if (o.t === "cyl") {
+      const a = new THREE.Vector3(...o.a), b = new THREE.Vector3(...o.b);
+      const dir = b.clone().sub(a);
+      const geo = new THREE.CylinderGeometry(o.r, o.r, dir.length(), 14);
+      const m = new THREE.Mesh(geo, this.material(o.color, o.opacity));
+      m.position.copy(a).add(b).multiplyScalar(0.5);
+      m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+      m.castShadow = true;
+      return m;
+    }
     if (o.t === "arrow") {
       const head = o.head ?? Math.min(0.25, o.len * 0.3);
       return new THREE.ArrowHelper(new THREE.Vector3(...o.d).normalize(), new THREE.Vector3(...o.o),

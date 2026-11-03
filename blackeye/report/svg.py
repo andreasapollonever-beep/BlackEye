@@ -296,3 +296,43 @@ def slope_section(sm, rd: dict, rs: dict | None, grid: list, tr=lambda s, **k: s
     out.append(f'<text x="{X(Ls) + 6:.1f}" y="{Y(H / 2):.1f}" class="t">H = {H:.1f} m</text>')
     out.append("</svg>")
     return "\n".join(out)
+
+
+def vertical_diagrams(z: np.ndarray, H: float, t: float, series: list, z_anchor=None) -> str:
+    """Side-by-side vertical diagrams along a pile (depth in metres, downwards)."""
+    n = len(series)
+    W, top, Hpx = 720.0, 34.0, 420.0
+    zmax = max(float(z[-1]), H + t)
+    pw = (W - 70) / n
+    Y = lambda d: top + d / zmax * (Hpx - top - 20)  # noqa: E731
+    out = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W:.0f} {Hpx:.0f}" '
+           'class="diagram" role="img"><style>.t{font:11px sans-serif;fill:#223}'
+           '.tb{font:600 11px sans-serif;fill:#334}.ax{stroke:#99a}</style>']
+    for d in np.arange(0, zmax + 1e-9, 1.0):
+        out.append(f'<text x="8" y="{Y(d) + 4:.1f}" class="t">{d:.0f}</text>')
+    out.append(f'<text x="8" y="16" class="t">z [m]</text>')
+    for i, (title, vals, col) in enumerate(series):
+        x0 = 50 + i * pw
+        cx = x0 + pw / 2
+        vals = np.asarray(vals, dtype=float)
+        vmax = float(np.max(np.abs(vals))) or 1.0
+        s = (pw / 2 - 12) / vmax
+        out.append(f'<text x="{cx:.1f}" y="16" class="tb" text-anchor="middle">{escape(title)}'
+                   '</text>')
+        out.append(f'<line x1="{cx:.1f}" y1="{Y(0):.1f}" x2="{cx:.1f}" y2="{Y(zmax):.1f}" '
+                   'class="ax"/>')
+        out.append(f'<line x1="{x0 + 4:.1f}" y1="{Y(H):.1f}" x2="{x0 + pw - 4:.1f}" '
+                   f'y2="{Y(H):.1f}" stroke="#8a6d3b" stroke-dasharray="4 3"/>')
+        if z_anchor is not None:
+            out.append(f'<circle cx="{cx:.1f}" cy="{Y(z_anchor):.1f}" r="3" fill="#111"/>')
+        pts = [(cx, Y(0))] + [(cx + v * s, Y(d)) for v, d in zip(vals, z)] + [(cx, Y(z[-1]))]
+        out.append('<polygon points="' + " ".join(f"{x:.1f},{y:.1f}" for x, y in pts) +
+                   f'" fill="{col}" fill-opacity="0.2" stroke="{col}" stroke-width="1.4"/>')
+        k = int(np.argmax(np.abs(vals)))
+        out.append(f'<text x="{cx + vals[k] * s + (4 if vals[k] >= 0 else -4):.1f}" '
+                   f'y="{Y(z[k]) + 4:.1f}" class="t" text-anchor="{"start" if vals[k] >= 0 else "end"}"'
+                   f' fill="{col}">{vals[k]:.1f}</text>')
+    out.append(f'<text x="{W - 6:.1f}" y="{Y(H) - 4:.1f}" class="t" text-anchor="end">'
+               '▽ H</text>')
+    out.append("</svg>")
+    return "\n".join(out)

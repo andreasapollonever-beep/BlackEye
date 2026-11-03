@@ -2,6 +2,7 @@
 
 from . import (  # noqa: F401
     beam_analysis,
+    ec7_berlin_wall,
     ec2_rc_beam,
     ec3_steel_beam,
     ec7_gravity_wall,

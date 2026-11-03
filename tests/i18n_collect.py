@@ -10,6 +10,8 @@ SCENARIOS = {
     "ec3_steel_beam": [{}, {"L": 12, "Lcr": 0}, {"section": "IPE 600", "grade": "S235"},
                        {"Gk_pt": 50, "Qk_pt": 30}, {"section": "HEA 300", "L": 3, "qk": 200}],
     "beam_analysis": [{}],
+    "ec7_berlin_wall": [{}, {"support": "Cantilever"}, {"phi": 20, "support": "Cantilever"},
+                        {"approach": "DA2", "seismic": False}, {"section": "HEB 100"}],
     "ec7_retaining_wall": [{}, {"h_w": 1.5, "beta": 10}, {"approach": "DA2"},
                            {"approach": "DA3", "seismic": False}, {"toe": 0.3, "heel": 1.0}],
     "ec7_gravity_wall": [{}, {"t_footing": 0}, {"h_w": 1.0, "B_body": 1.2}],
@@ -22,7 +24,8 @@ BAD = [("ec3_steel_beam", {"L": -1}), ("ec3_steel_beam", {"L": "abc"}),
        ("ec7_gravity_wall", {"b_top": 3}), ("ec7_pad_footing", {"D": 0.3}),
        ("ec7_pad_footing", {"cx": 5}), ("ec2_rc_beam", {"n_bars": 2.5}),
        ("beam_analysis", {"supports": [{"x": 0, "kind": "pinned"}]}),
-       ("ec7_slope_stability", {"phi": 0, "c": 0})]
+       ("ec7_slope_stability", {"phi": 0, "c": 0}), ("ec7_berlin_wall", {"z_a": 6}),
+       ("ec7_berlin_wall", {"a": 0.1})]
 
 
 def collect() -> set[str]:

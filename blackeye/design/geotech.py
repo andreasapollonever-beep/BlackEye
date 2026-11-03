@@ -85,3 +85,19 @@ def bearing_factors(phi: float) -> tuple[float, float, float]:
     Nc = (Nq - 1) / math.tan(phi)
     Ng = 2 * (Nq - 1) * math.tan(phi)
     return Nq, Nc, Ng
+
+
+def kp_coulomb(phi: float, delta: float) -> float:
+    """Coulomb passive coefficient for a vertical wall and horizontal ground.
+
+    ``delta`` is the magnitude of the (negative) wall friction angle; keep
+    δ ≤ φ/2 because Coulomb overestimates passive resistance for larger δ.
+    """
+    root = math.sqrt(math.sin(phi + delta) * math.sin(phi) / math.cos(delta))
+    return math.cos(phi) ** 2 / (math.cos(delta) * (1 - root) ** 2)
+
+
+def kp_seismic(phi: float, theta: float) -> float:
+    """EN 1998-5 Eq. E.4 passive coefficient (vertical wall, horizontal ground, δ = 0)."""
+    val = math.sin(phi) * math.sin(phi - theta) / math.cos(theta)
+    return math.cos(phi - theta) ** 2 / (math.cos(theta) ** 2 * (1 - math.sqrt(max(val, 0))) ** 2)
