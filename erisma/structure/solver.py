@@ -29,6 +29,7 @@ import numpy as np
 
 from .loads import Segment, fixed_end_forces, integrals, scale_segments, segment, totals
 from .model import DOF_NAMES, Member, Model, StructureError
+from .plate import mitc4_rect, resultants
 
 _HINGE_I = (4, 5)
 _HINGE_J = (10, 11)
@@ -187,7 +188,8 @@ class DofMap:
     """Maps the 6 DOF of every node onto the reduced (independent) unknowns."""
 
     def __init__(self, model: Model) -> None:
-        used = {m.i for m in model.members.values()} | {m.j for m in model.members.values()}
+        used = {m.i for m in model.members.values()} | {m.j for m in model.members.values()} | \
+            {n for p in model.plates.values() for n in p.nodes}
         self.node_ids = [n for n in model.nodes if n in used]
         self.index = {n: k for k, n in enumerate(self.node_ids)}
         self.labels: list[str] = []
@@ -297,6 +299,14 @@ class StaticResult:
             "Mz": -f1[5] + x * f1[1] + Ml[1],
         }
 
+    def plate_forces(self, plate) -> dict:
+        """Mx, My (sagging +), Mxy [Nmm/mm] and Qx, Qy [N/mm] at the plate centre."""
+        an = self.analysis
+        d = an.plates[an.plate_index[str(plate)]]
+        p = d["plate"]
+        u = self.u.reshape(-1)[d["full"]]
+        return resultants(u, d["lx"], d["ly"], p.t, p.material.E, p.material.nu)
+
     def max_abs(self, member, key: str, n: int = 41) -> float:
         return float(np.max(np.abs(self.forces(member, n)[key])))
 
@@ -352,9 +362,28 @@ class Analysis:
         self.member_index = {m: k for k, m in enumerate(model.members)}
         self._gath = [dm.gather([*dm.full_dofs(e.member.i), *dm.full_dofs(e.member.j)])
                       for e in self.elements]
+        # plates: nodes ordered (x−,y−), (x+,y−), (x+,y+), (x−,y+); DOFs uz, rx, ry
+        self.plates = []
+        for p in model.plates.values():
+            xyz = {n: model.nodes[n].xyz for n in p.nodes}
+            x0, x1 = min(v[0] for v in xyz.values()), max(v[0] for v in xyz.values())
+            y0, y1 = min(v[1] for v in xyz.values()), max(v[1] for v in xyz.values())
+            order = []
+            for tx, ty in ((x0, y0), (x1, y0), (x1, y1), (x0, y1)):
+                order.append(next(n for n, v in xyz.items()
+                                  if abs(v[0] - tx) < 1 and abs(v[1] - ty) < 1))
+            full = [6 * dm.index[n] + k for n in order for k in (2, 3, 4)]
+            k12 = mitc4_rect(x1 - x0, y1 - y0, p.t, p.material.E, p.material.nu)
+            self.plates.append({"plate": p, "order": order, "lx": x1 - x0, "ly": y1 - y0,
+                                "k": k12, "full": full, "gath": dm.gather(full),
+                                "centre": ((x0 + x1) / 2, (y0 + y1) / 2)})
+        self.plate_index = {d["plate"].id: n for n, d in enumerate(self.plates)}
         K = np.zeros((dm.n, dm.n))
         for e, (ids, T) in zip(self.elements, self._gath):
             K[np.ix_(ids, ids)] += T.T @ e.kg @ T
+        for d in self.plates:
+            ids, T = d["gath"]
+            K[np.ix_(ids, ids)] += T.T @ d["k"] @ T
         for nid, sup in model.supports.items():
             if nid not in dm.index:
                 continue
@@ -450,6 +479,13 @@ class Analysis:
             P[list(dm.full_dofs(nl.node))] += v
             applied[:3] += v[:3]
             applied[3:] += v[3:] + np.cross(model.nodes[nl.node].xyz, v[:3])
+        for pl in case.plate:                       # lumped: q·A/4 at every corner
+            d = self.plates[self.plate_index[pl.plate]]
+            F = -pl.q * d["lx"] * d["ly"] / 4
+            for nid in d["order"]:
+                P[6 * dm.index[nid] + 2] += F
+                applied[2] += F
+                applied[3:] += np.cross(model.nodes[nid].xyz, [0.0, 0.0, F])
         w = self.member_segments(case)
         fe = np.zeros((len(self.elements), 12))
         Feq = P.copy()
@@ -481,6 +517,8 @@ class Analysis:
             full = [*dm.full_dofs(e.member.i), *dm.full_dofs(e.member.j)]
             ends[k] = e.k @ (e.T @ u_full[full]) + fe[k]
             node_force[full] += e.T.T @ ends[k]
+        for d in self.plates:
+            node_force[d["full"]] += d["k"] @ u_full[d["full"]]
         reactions = {}
         for nid, sup in model.supports.items():
             if nid not in dm.index:

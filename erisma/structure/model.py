@@ -223,11 +223,29 @@ class MemberLoad:
 
 
 @dataclass
+class Plate:
+    """Horizontal rectangular plate (raft / slab on soil), four corner nodes in any order;
+    MITC4 bending element (see :mod:`erisma.structure.plate`)."""
+
+    id: str
+    nodes: tuple[str, str, str, str]
+    t: float
+    material: Material
+
+
+@dataclass
+class PlateLoad:
+    plate: str
+    q: float  # N/mm², downwards positive
+
+
+@dataclass
 class LoadCase:
     name: str
     nodal: list[NodalLoad] = field(default_factory=list)
     member: list[MemberLoad] = field(default_factory=list)
     self_weight: float = 0.0  # multiplier on member self-weight (1.0 = include)
+    plate: list[PlateLoad] = field(default_factory=list)
 
 
 # --------------------------------------------------------------------- model
@@ -241,6 +259,7 @@ class Model:
     diaphragms: list[Diaphragm] = field(default_factory=list)
     cases: dict[str, LoadCase] = field(default_factory=dict)
     masses: dict[str, float] = field(default_factory=dict)  # extra nodal mass, N·s²/mm
+    plates: dict[str, Plate] = field(default_factory=dict)
 
     # ---- building helpers (ids are converted to str so ints work too)
     def node(self, id, x: float, y: float, z: float) -> Node:
@@ -281,6 +300,15 @@ class Model:
     def load_node(self, case: str, node, Fx=0.0, Fy=0.0, Fz=0.0, Mx=0.0, My=0.0, Mz=0.0):
         self.case(case).nodal.append(NodalLoad(str(node), (Fx, Fy, Fz, Mx, My, Mz)))
 
+    def plate(self, id, nodes, t: float, material: Material) -> Plate:
+        p = Plate(str(id), tuple(str(n) for n in nodes), float(t), material)
+        self.plates[p.id] = p
+        return p
+
+    def load_plate(self, case: str, plate, q: float) -> None:
+        """Uniform pressure q (N/mm², downwards positive) on a plate."""
+        self.case(case).plate.append(PlateLoad(str(plate), float(q)))
+
     def load_member(self, case: str, member, wx=0.0, wy=0.0, wz=0.0, axes: str = "global",
                     a: float = 0.0, b: float = 1.0, w2=None):
         """Uniform (``w2=None``) or linearly varying load from ``a`` to ``b`` (fractions of L)."""
@@ -314,8 +342,18 @@ class Model:
     def validate(self) -> list[str]:
         """Raise :class:`StructureError` for fatal problems; return warnings (English)."""
         warnings: list[str] = []
-        if not self.members:
+        if not self.members and not self.plates:
             raise StructureError("The model has no members — add beams or columns")
+        for p in self.plates.values():
+            for n in p.nodes:
+                if n not in self.nodes:
+                    raise StructureError("Plate {p} refers to node {n}, which does not exist",
+                                         ref=f"plate {p.id}", p=p.id, n=n)
+            xyz = np.array([self.nodes[n].xyz for n in p.nodes])
+            if np.ptp(xyz[:, 2]) > 1.0 or len({round(v, 3) for v in xyz[:, 0]}) != 2 or \
+                    len({round(v, 3) for v in xyz[:, 1]}) != 2 or not p.t > 0:
+                raise StructureError("Plate {p} must be a horizontal rectangle with sides along "
+                                     "X and Y and a thickness > 0", ref=f"plate {p.id}", p=p.id)
         for m in self.members.values():
             for end in (m.i, m.j):
                 if end not in self.nodes:
@@ -339,7 +377,8 @@ class Model:
             if nid not in self.nodes:
                 raise StructureError("Support at node {n}, which does not exist",
                                      ref=f"node {nid}", n=nid)
-        used = {m.i for m in self.members.values()} | {m.j for m in self.members.values()}
+        used = {m.i for m in self.members.values()} | {m.j for m in self.members.values()} | \
+            {n for p in self.plates.values() for n in p.nodes}
         for nid in self.nodes:
             if nid not in used:
                 warnings.append(Msg("Node {n} is not connected to any member and is ignored",

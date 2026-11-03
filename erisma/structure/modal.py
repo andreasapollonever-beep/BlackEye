@@ -83,6 +83,10 @@ def nodal_masses(analysis: Analysis, mass_source: dict[str, float]) -> np.ndarra
         for nl in case.nodal:
             if nl.node in dm.index:
                 W[dm.index[nl.node]] -= factor * nl.values[2]
+        for pl in case.plate:
+            d = analysis.plates[analysis.plate_index[pl.plate]]
+            for nid in d["order"]:
+                W[dm.index[nid]] += factor * pl.q * d["lx"] * d["ly"] / 4
         segs = analysis.member_segments(case)
         for k, e in enumerate(analysis.elements):
             if segs[k]:
