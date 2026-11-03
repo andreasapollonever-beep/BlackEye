@@ -16,6 +16,7 @@ from ..core import InputError, all_modules, get_module
 from ..design import sitezones
 from ..design.annex import ANNEXES
 from ..i18n import LANGS, tr
+from ..manual import build_manual
 from ..report import render_html
 
 STATIC = Path(__file__).parent / "static"
@@ -110,6 +111,12 @@ def run_module(module_id: str, req: RunRequest) -> dict[str, Any]:
 @app.post("/api/modules/{module_id}/report", response_class=HTMLResponse)
 def module_report(module_id: str, req: RunRequest) -> HTMLResponse:
     return HTMLResponse(run_module(module_id, req)["html"])
+
+
+@app.get("/manual", response_class=HTMLResponse, include_in_schema=False)
+def manual(lang: str = "el") -> HTMLResponse:
+    """Bilingual user manual, generated from the modules (inputs, checks) and chapters."""
+    return HTMLResponse(build_manual(_lang(lang)))
 
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")

@@ -43,6 +43,8 @@ const UI = {
     "NA to CYS EN 1998-1, zonation map": "χάρτης ζωνών ΕΠ CYS EN 1998-1",
     "Location is not available in this browser.": "Η θέση δεν είναι διαθέσιμη σε αυτόν τον browser.",
     "Search places…": "Αναζήτηση τοποθεσίας…",
+    "Manual": "Εγχειρίδιο", "User manual (F1)": "Εγχειρίδιο χρήσης (F1)",
+    "How this calculation works (F1)": "Πώς λειτουργεί ο υπολογισμός (F1)",
     "Arithmetic allowed, e.g. 2*3,5": "Επιτρέπονται πράξεις, π.χ. 2*3,5", "Not a number": "Δεν είναι αριθμός",
     "Duplicate row": "Αντιγραφή γραμμής", "Tip: paste rows from Excel (Ctrl+V)": "Συμβουλή: επικόλληση γραμμών από Excel (Ctrl+V)",
     "Changed from the example values": "Αλλαγμένα από τις τιμές του παραδείγματος",
@@ -595,6 +597,7 @@ async function selectModule(id, inputs) {
   state.inputs = inputs ? structuredClone(inputs) : saved ? saved : {};
   document.querySelectorAll("nav a").forEach((a) => a.classList.toggle("active", a.dataset.id === id));
   $("#mod-title").textContent = state.schema.title;
+  $("#mod-help").href = `/manual?lang=${LANG}#${id}`;
   $("#mod-desc").textContent = `${state.schema.standard} — ${state.schema.description}`;
   $("#restored").hidden = !(saved && !inputs);
   document.title = `${state.schema.title} — Erisma`;
@@ -788,6 +791,7 @@ const actions = {
   reset: () => { store.del(inputsKey(state.schema.id)); selectModule(state.schema.id, {}); },
 };
 $("#btn-print").onclick = actions.print;
+$("#btn-manual").onclick = () => openManual();
 $("#btn-html").onclick = actions.html;
 $("#btn-save").onclick = actions.save;
 $("#btn-open").onclick = actions.open;
@@ -805,7 +809,10 @@ $("#file-open").onchange = async (e) => {
   } catch (err) { alert(err.message); }
   e.target.value = "";
 };
+const openManual = () => window.open(`/manual?lang=${LANG}` +
+  (document.body.classList.contains("at-home") || !state.schema ? "" : `#${state.schema.id}`), "erisma-manual");
 document.addEventListener("keydown", (e) => {
+  if (e.key === "F1") { e.preventDefault(); openManual(); return; }
   if (!(e.ctrlKey || e.metaKey)) return;
   const k = e.key.toLowerCase();
   if ((k === "z" || k === "y") && state.schema && !document.body.classList.contains("at-home")) {

@@ -62,6 +62,14 @@ Platform:
 * **REST API** — every module is available over HTTP (`/docs` for the OpenAPI UI).
 * **CLI** — batch runs for automation.
 
+## Εγχειρίδιο / Manual
+
+Μέσα στο πρόγραμμα: κουμπί **Εγχειρίδιο** ή **F1** (ανοίγει στον τρέχοντα υπολογισμό).
+PDF: [`docs/Erisma_Egxeiridio.pdf`](docs/Erisma_Egxeiridio.pdf) (ελληνικά),
+[`docs/Erisma_Manual.pdf`](docs/Erisma_Manual.pdf) (English). The reference part is generated
+from the modules themselves (`erisma/manual.py`); rebuild the PDFs with
+`node tools/build_manual_pdf.js http://127.0.0.1:8000 docs`.
+
 ## Εκκίνηση με διπλό κλικ / One-click start
 
 1. Εγκαταστήστε την [Python](https://www.python.org/downloads/) (τσεκάρετε «Add Python to PATH»).
