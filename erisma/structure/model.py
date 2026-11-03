@@ -191,15 +191,20 @@ class NodalLoad:
 
 @dataclass
 class MemberLoad:
-    """Uniform load along the whole member, N/mm.
+    """Distributed load on a member, N/mm per unit member length.
 
-    ``axes="global"`` → (wx, wy, wz) in global axes (gravity: wz < 0);
-    ``axes="local"`` → components along the member local axes.
+    ``w`` = (wx, wy, wz) at the start ``a`` and ``w2`` at the end ``b`` of the
+    loaded part (``a``, ``b`` as fractions of the length, default the whole
+    member; ``w2=None`` → uniform).  ``axes="global"`` → components in global
+    axes (gravity: wz < 0); ``axes="local"`` → along the member local axes.
     """
 
     member: str
     w: tuple[float, float, float]
     axes: str = "global"
+    a: float = 0.0
+    b: float = 1.0
+    w2: tuple[float, float, float] | None = None
 
 
 @dataclass
@@ -261,8 +266,11 @@ class Model:
     def load_node(self, case: str, node, Fx=0.0, Fy=0.0, Fz=0.0, Mx=0.0, My=0.0, Mz=0.0):
         self.case(case).nodal.append(NodalLoad(str(node), (Fx, Fy, Fz, Mx, My, Mz)))
 
-    def load_member(self, case: str, member, wx=0.0, wy=0.0, wz=0.0, axes: str = "global"):
-        self.case(case).member.append(MemberLoad(str(member), (wx, wy, wz), axes))
+    def load_member(self, case: str, member, wx=0.0, wy=0.0, wz=0.0, axes: str = "global",
+                    a: float = 0.0, b: float = 1.0, w2=None):
+        """Uniform (``w2=None``) or linearly varying load from ``a`` to ``b`` (fractions of L)."""
+        self.case(case).member.append(MemberLoad(str(member), (wx, wy, wz), axes, a, b,
+                                                 None if w2 is None else tuple(w2)))
 
     # ---- geometry
     def length(self, m: Member) -> float:
@@ -342,5 +350,9 @@ class Model:
             for ml in case.member:
                 if ml.member not in self.members:
                     raise StructureError("Load case {c}: load on member {m}, which does not exist",
+                                         ref=f"member {ml.member}", c=case.name, m=ml.member)
+                if not 0 <= ml.a < ml.b <= 1:
+                    raise StructureError("Load case {c}, member {m}: the loaded part must satisfy "
+                                         "0 ≤ start < end ≤ 1 (fractions of the length)",
                                          ref=f"member {ml.member}", c=case.name, m=ml.member)
         return warnings

@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from .loads import Segment, fixed_end_forces, integrals, scale_segments, segment, totals
 from .model import DOF_NAMES, Member, Model, StructureError
 
 _HINGE_I = (4, 5)
@@ -67,22 +68,6 @@ def local_stiffness(m: Member, L: float) -> np.ndarray:
     return k
 
 
-def fixed_end_forces(w: np.ndarray, L: float) -> np.ndarray:
-    """End forces on a fixed–fixed member under a uniform local load ``w`` (wx, wy, wz).
-
-    Uniform load: the fixed-end moments wL²/12 are not affected by shear
-    deformation, so these hold for the Timoshenko element too.
-    """
-    wx, wy, wz = w
-    f = np.zeros(12)
-    f[0] = f[6] = -wx * L / 2
-    f[1] = f[7] = -wy * L / 2
-    f[5], f[11] = -wy * L**2 / 12, wy * L**2 / 12
-    f[2] = f[8] = -wz * L / 2
-    f[4], f[10] = wz * L**2 / 12, -wz * L**2 / 12
-    return f
-
-
 @dataclass
 class _Element:
     member: Member
@@ -93,6 +78,12 @@ class _Element:
     released: list[int]
     kept: list[int]
     kr: np.ndarray | None  # k_cr k_rr⁻¹ for load condensation
+
+    @property
+    def rigidities(self) -> tuple[float, float, float, float | None, float | None]:
+        s, mat = self.member.section, self.member.material
+        return (mat.E * s.A, mat.E * s.Iy, mat.E * s.Iz, mat.G * s.Avy if s.Avy else None,
+                mat.G * s.Avz if s.Avz else None)
 
     def condense_f(self, f: np.ndarray) -> np.ndarray:
         if not self.released:
@@ -207,7 +198,7 @@ class StaticResult:
     analysis: "Analysis"
     u: np.ndarray            # (n_nodes, 6) global displacements, mm and rad
     end_forces: np.ndarray   # (n_members, 12) local end forces on the member
-    w_local: np.ndarray      # (n_members, 3) uniform local member load, N/mm
+    loads: list[list[Segment]]  # member load segments in local axes (for the diagrams)
     reactions: dict[str, np.ndarray]
     applied: np.ndarray      # resultant of applied loads (Fx, Fy, Fz, Mx, My, Mz) about origin
     notes: list[str] = field(default_factory=list)
@@ -224,16 +215,19 @@ class StaticResult:
         k = self.analysis.member_index[str(member)]
         L = self.analysis.elements[k].L
         f1 = self.end_forces[k]
-        wx, wy, wz = self.w_local[k]
         x = np.linspace(0.0, L, n)
+        segs = self.loads[k]
+        if segs:  # include the load break points so peaks are not missed
+            x = np.unique(np.concatenate([x, [s[i] for s in segs for i in (0, 1)]]))
+        Q, Ml = integrals(segs, x)
         return {
             "x": x,
-            "N": -f1[0] - wx * x,
-            "Vy": f1[1] + wy * x,
-            "Vz": f1[2] + wz * x,
+            "N": -f1[0] - Q[0],
+            "Vy": f1[1] + Q[1],
+            "Vz": f1[2] + Q[2],
             "T": -f1[3] * np.ones_like(x),
-            "My": f1[4] + x * f1[2] + wz * x**2 / 2,
-            "Mz": -f1[5] + x * f1[1] + wy * x**2 / 2,
+            "My": f1[4] + x * f1[2] + Ml[2],
+            "Mz": -f1[5] + x * f1[1] + Ml[1],
         }
 
     def max_abs(self, member, key: str, n: int = 41) -> float:
@@ -258,13 +252,15 @@ class StaticResult:
     # ---- superposition
     def scaled(self, factor: float, name: str | None = None) -> "StaticResult":
         return StaticResult(name or f"{factor:g}·{self.name}", self.analysis, factor * self.u,
-                            factor * self.end_forces, factor * self.w_local,
+                            factor * self.end_forces,
+                            [scale_segments(sg, factor) for sg in self.loads],
                             {k: factor * v for k, v in self.reactions.items()},
                             factor * self.applied, list(self.notes))
 
     def __add__(self, other: "StaticResult") -> "StaticResult":
         return StaticResult(f"{self.name} + {other.name}", self.analysis, self.u + other.u,
-                            self.end_forces + other.end_forces, self.w_local + other.w_local,
+                            self.end_forces + other.end_forces,
+                            [a + b for a, b in zip(self.loads, other.loads)],
                             {k: self.reactions[k] + other.reactions[k] for k in self.reactions},
                             self.applied + other.applied, list(self.notes))
 
@@ -340,17 +336,23 @@ class Analysis:
         u[a] = z * (d if F.ndim == 1 else d[:, None])
         return u
 
-    def _member_w_local(self, case) -> np.ndarray:
-        w = np.zeros((len(self.elements), 3))
+    def member_segments(self, case) -> list[list[Segment]]:
+        """Load segments (local axes) of every member for a load case."""
+        segs: list[list[Segment]] = [[] for _ in self.elements]
         for ml in case.member:
             k = self.member_index[ml.member]
-            v = np.asarray(ml.w, dtype=float)
-            w[k] += v if ml.axes == "local" else self.elements[k].R @ v
+            e = self.elements[k]
+            w1 = np.asarray(ml.w, dtype=float)
+            w2 = w1 if ml.w2 is None else np.asarray(ml.w2, dtype=float)
+            if ml.axes != "local":
+                w1, w2 = e.R @ w1, e.R @ w2
+            segs[k].append(segment(ml.a * e.L, ml.b * e.L, w1, w2))
         if case.self_weight:
             for k, e in enumerate(self.elements):
                 g = -case.self_weight * e.member.material.weight * e.member.section.A
-                w[k] += e.R @ np.array([0.0, 0.0, g])
-        return w
+                if g:
+                    segs[k].append(segment(0.0, e.L, e.R @ np.array([0.0, 0.0, g])))
+        return segs
 
     def static(self, case_name: str) -> StaticResult:
         if case_name not in self.model.cases:
@@ -367,19 +369,21 @@ class Analysis:
             P[list(dm.full_dofs(nl.node))] += v
             applied[:3] += v[:3]
             applied[3:] += v[3:] + np.cross(model.nodes[nl.node].xyz, v[:3])
-        w = self._member_w_local(case)
+        w = self.member_segments(case)
         fe = np.zeros((len(self.elements), 12))
         Feq = P.copy()
         for k, e in enumerate(self.elements):
-            if not w[k].any():
+            if not w[k]:
                 continue
-            fe[k] = e.condense_f(fixed_end_forces(w[k], e.L))
+            fe[k] = e.condense_f(fixed_end_forces(w[k], e.L, *e.rigidities))
             full = [*dm.full_dofs(e.member.i), *dm.full_dofs(e.member.j)]
             Feq[full] -= e.T.T @ fe[k]
-            wg = e.R.T @ w[k] * e.L
-            mid = (model.nodes[e.member.i].xyz + model.nodes[e.member.j].xyz) / 2
+            Rl, Sl = totals(w[k])
+            pi = model.nodes[e.member.i].xyz
+            wg = e.R.T @ Rl
             applied[:3] += wg
-            applied[3:] += np.cross(mid, wg)
+            # moment about the origin: ∫ (p_i + ξ e_x) × w_g dξ
+            applied[3:] += np.cross(pi, wg) + np.cross(e.R[0], e.R.T @ Sl)
         F = np.zeros(dm.n)
         for f, (ids, cs) in enumerate(dm.rows):
             if len(ids) and Feq[f]:
@@ -410,7 +414,7 @@ class Analysis:
     def static_from_displacements(self, name: str, u_red: np.ndarray) -> StaticResult:
         """Forces caused by a reduced displacement vector alone (no member loads)."""
         z = np.zeros((len(self.elements), 12))
-        return self._result(name, u_red, z, np.zeros((len(self.elements), 3)),
+        return self._result(name, u_red, z, [[] for _ in self.elements],
                             np.zeros(6 * len(self.dofmap.node_ids)), np.zeros(6))
 
     def run_all(self) -> dict[str, StaticResult]:

@@ -18,6 +18,7 @@ from typing import Callable
 
 import numpy as np
 
+from .loads import totals
 from .model import G_ACC, StructureError
 from .solver import Analysis, StaticResult
 
@@ -82,12 +83,13 @@ def nodal_masses(analysis: Analysis, mass_source: dict[str, float]) -> np.ndarra
         for nl in case.nodal:
             if nl.node in dm.index:
                 W[dm.index[nl.node]] -= factor * nl.values[2]
-        w = analysis._member_w_local(case)
+        segs = analysis.member_segments(case)
         for k, e in enumerate(analysis.elements):
-            if w[k].any():
-                wz = (e.R.T @ w[k])[2]
-                for end in (e.member.i, e.member.j):
-                    W[dm.index[end]] -= factor * wz * e.L / 2
+            if segs[k]:
+                Rl, Sl = totals(segs[k])
+                Rz, Sz = (e.R.T @ Rl)[2], (e.R.T @ Sl)[2]
+                W[dm.index[e.member.j]] -= factor * Sz / e.L     # lever rule
+                W[dm.index[e.member.i]] -= factor * (Rz - Sz / e.L)
     m = W / G_ACC
     for nid, extra in model.masses.items():
         if nid in dm.index:

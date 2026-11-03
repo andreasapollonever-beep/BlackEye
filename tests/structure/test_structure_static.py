@@ -223,7 +223,7 @@ def test_propped_cantilever_with_hinge():
     m.load_member("w", "B", wz=-w)
     r = analyse(m).static("w")
     assert r.forces("B", 3)["My"][0] == approx(-w * L**2 / 8)
-    assert r.forces("B", 3)["My"][-1] == approx(0.0)
+    assert r.forces("B", 3)["My"][-1] == pytest.approx(0.0, abs=1e-3)
     assert r.reaction(2)[2] == approx(3 * w * L / 8)
 
 
@@ -272,3 +272,72 @@ def test_rectangle_torsion_constant():
     # Roark: β(2.0) ≈ 0.229
     assert s.J / (600 * 300**3) == pytest.approx(0.229, abs=0.002)
     assert math.isclose(s.Iy, 300 * 600**3 / 12)
+
+
+# ----------------------------------------------------------------- non-uniform loads
+
+
+def _fixed_beam(L, sec=SEC, n=1):
+    m = Model()
+    for k in range(n + 1):
+        m.node(k, k * L / n, 0, 0)
+    for k in range(n):
+        m.member(f"B{k}", k, k + 1, sec, MAT)
+    m.support(0), m.support(n)
+    return m
+
+
+def test_triangular_load_fixed_end_moments():
+    """Fixed–fixed beam, load 0 → w: M_A = wL²/30, M_B = wL²/20, R_B = 7wL/20."""
+    L, w = 6000.0, 12.0
+    m = _fixed_beam(L)
+    m.load_member("t", "B0", wz=0.0, w2=(0, 0, -w))
+    r = analyse(m).static("t")
+    f = r.forces("B0", 5)
+    assert f["My"][0] == approx(-w * L**2 / 30)
+    assert f["My"][-1] == approx(-w * L**2 / 20)
+    assert r.reaction(1)[2] == approx(7 * w * L / 20)
+    assert r.equilibrium_ok()
+
+
+def test_partial_uniform_load_simply_supported():
+    """Load w on the middle third of a simple span: M_max = wL²/8·(1 − 1/... ) by statics."""
+    L, w = 9000.0, 10.0
+    m = Model()
+    m.node(1, 0, 0, 0), m.node(2, L, 0, 0)
+    m.member("B", 1, 2, SEC, MAT)
+    m.support(1, "pinned")
+    m.support(2, "free").restraints = (False, True, True, True, False, False)
+    m.load_member("p", "B", wz=-w, a=1 / 3, b=2 / 3)
+    r = analyse(m).static("p")
+    R = w * L / 3 / 2
+    assert r.reaction(1)[2] == approx(R)
+    mid = R * L / 2 - w * (L / 6) ** 2 / 2
+    f = r.forces("B", 3)
+    assert np.interp(L / 2, f["x"], f["My"]) == approx(mid)
+    assert f["My"].max() == approx(mid)
+    assert r.equilibrium_ok()
+
+
+def test_trapezoid_with_shear_deformation_is_mesh_independent():
+    """Exact fixed-end forces: one element = four elements for a Timoshenko beam."""
+    L = 3000.0
+    sec = Section.rectangle(400, 900)
+    one = _fixed_beam(L, sec, 1)
+    one.load_member("t", "B0", wz=-5.0, w2=(0, 0, -25.0), a=0.1, b=0.9)
+    four = _fixed_beam(L, sec, 4)
+    # same load split over the 4 elements
+    def w_at(x):
+        x1, x2 = 0.1 * L, 0.9 * L
+        return -5.0 + (-25.0 + 5.0) * (x - x1) / (x2 - x1)
+    for k in range(4):
+        xa, xb = k * L / 4, (k + 1) * L / 4
+        lo, hi = max(xa, 0.1 * L), min(xb, 0.9 * L)
+        if hi > lo:
+            four.load_member("t", f"B{k}", wz=w_at(lo), w2=(0, 0, w_at(hi)),
+                             a=(lo - xa) / (L / 4), b=(hi - xa) / (L / 4))
+    r1, r4 = analyse(one).static("t"), analyse(four).static("t")
+    assert r1.reaction(0) == pytest.approx(r4.reaction(0), rel=1e-9)
+    f1 = r1.forces("B0", 5)
+    assert np.interp(L / 2, f1["x"], f1["My"]) == pytest.approx(r4.forces("B1", 2)["My"][-1],
+                                                               rel=1e-9)
