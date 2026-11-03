@@ -107,6 +107,8 @@ legend{font-weight:600;color:var(--accent);padding:0 4px;font-size:12.5px}
 .field.sub{border-left:3px solid var(--accent-soft);padding-left:8px;margin-left:2px}
 .field.invalid{background:var(--fail-bg);border-radius:6px;outline:2px solid var(--fail);padding:2px 4px}
 .field.invalid input,.field.invalid select{border-color:var(--fail)}
+.tblwrap{overflow-x:auto;max-width:100%;min-width:0}
+fieldset{min-width:0}
 .tblwrap.invalid{outline:2px solid var(--fail);border-radius:6px}
 .inp{display:flex;align-items:center;gap:4px}
 .inp span{color:var(--muted);font-size:11px;min-width:30px}
@@ -124,6 +126,7 @@ input:focus,select:focus{outline:2px solid var(--focus);border-color:var(--accen
 table.tbl{width:100%;border-collapse:collapse;font-size:12px}
 table.tbl th{font-weight:600;color:var(--muted);text-align:left;padding:2px}
 table.tbl td{padding:2px}
+table.tbl td input,table.tbl td select{min-width:58px}
 .tbl-title{font-size:12px;font-weight:600;margin:4px 0}
 .tbl-add,.tbl-del{border:1px solid var(--line);color:var(--accent2);background:var(--raised);padding:2px 8px}
 .tbl-del{color:var(--fail)}

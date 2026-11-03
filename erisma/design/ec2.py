@@ -189,3 +189,49 @@ def moment_resistance(b: float, h: float, layers, fcd: float, fyd: float, NEd: f
             lo = mid
     x = 0.5 * (lo + hi)
     return forces(x)[1], x
+
+
+def circular_moment_resistance(D: float, n: int, dia: float, cover_to_bar: float, fcd: float,
+                               fyd: float, NEd: float) -> tuple[float, float]:
+    """M_Rd of a circular section with ``n`` equally spaced bars for axial force NEd (comp. +).
+
+    Same assumptions as :func:`moment_resistance`; the compressed circular segment of
+    depth 0.8x is integrated in thin strips.  Returns ``(M_Rd, x)``.
+    """
+    R = D / 2
+    rs = R - cover_to_bar
+    a1 = math.pi * dia**2 / 4
+    bars = [R - rs * math.cos(2 * math.pi * i / n) for i in range(n)]  # depth from top
+    As = n * a1
+    if NEd >= math.pi * R**2 * fcd + As * fyd or NEd <= -As * fyd:
+        return 0.0, float("nan")
+    ns = 120
+
+    def forces(x):
+        y = min(0.8 * x, D)
+        Fc = Mc = 0.0
+        for k in range(ns):
+            d1, d2 = y * k / ns, y * (k + 1) / ns
+            dm = 0.5 * (d1 + d2)
+            w = 2 * math.sqrt(max(R**2 - (R - dm) ** 2, 0.0))
+            f = w * (d2 - d1) * fcd
+            Fc += f
+            Mc += f * (R - dm)
+        Fs = Ms = 0.0
+        for d in bars:
+            sig = max(min(ES * EPS_CU3 * (x - d) / x, fyd), -fyd)
+            if d < y and sig > 0:
+                sig -= fcd
+            Fs += a1 * sig
+            Ms += a1 * sig * (R - d)
+        return Fc + Fs, Mc + Ms
+
+    lo, hi = 1e-3 * D, 50 * D
+    for _ in range(100):
+        mid = 0.5 * (lo + hi)
+        if forces(mid)[0] > NEd:
+            hi = mid
+        else:
+            lo = mid
+    x = 0.5 * (lo + hi)
+    return forces(x)[1], x

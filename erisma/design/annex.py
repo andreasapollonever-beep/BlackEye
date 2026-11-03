@@ -77,6 +77,26 @@ class Annex:
     CF: dict = field(default_factory=lambda: {"KL1": 1.35, "KL2": 1.20, "KL3": 1.00})
     # EN 1992-3 7.3.1(111): w_k1 = 0.2 mm (h_D/h ≤ 5) … 0.05 mm (h_D/h ≥ 35)
     wk1: tuple = (5.0, 0.2, 35.0, 0.05)
+    # EN 1997-1 Table A.4 (M2): γ_cu (undrained strength) and γ_γ = 1.0
+    gamma_cu_M2: float = 1.4
+    # EN 1997-1 Tables A.6–A.8: pile type -> set -> (γ_b, γ_s, γ_t, γ_s,t)
+    pile_R: dict = field(default_factory=lambda: {
+        "Driven": {"R1": (1.0, 1.0, 1.0, 1.25), "R2": (1.1, 1.1, 1.1, 1.15),
+                   "R3": (1.0, 1.0, 1.0, 1.1), "R4": (1.3, 1.3, 1.3, 1.6)},
+        "Bored": {"R1": (1.25, 1.0, 1.15, 1.25), "R2": (1.1, 1.1, 1.1, 1.15),
+                  "R3": (1.0, 1.0, 1.0, 1.1), "R4": (1.6, 1.3, 1.5, 1.6)},
+        "CFA": {"R1": (1.1, 1.0, 1.1, 1.25), "R2": (1.1, 1.1, 1.1, 1.15),
+                "R3": (1.0, 1.0, 1.0, 1.1), "R4": (1.45, 1.3, 1.4, 1.6)}})
+    # resistance set of each combination for piles (A.3.3, 2.4.7.3.4): DA1-C2 = A2+M1+R4
+    pile_sets: dict = field(default_factory=lambda: {"DA1-C1": "R1", "DA1-C2": "R4",
+                                                     "DA2": "R2", "DA3": "R3"})
+    # Table A.10: correlation factors for n profiles of ground tests
+    xi3: dict = field(default_factory=lambda: {1: 1.40, 2: 1.35, 3: 1.33, 4: 1.31, 5: 1.29,
+                                               7: 1.27, 10: 1.25})
+    xi4: dict = field(default_factory=lambda: {1: 1.40, 2: 1.27, 3: 1.23, 4: 1.20, 5: 1.15,
+                                               7: 1.12, 10: 1.08})
+    # 7.6.2.3(8) "alternative method": minimum model factor on γ_b, γ_s (None = not set)
+    pile_model_min: float | None = None
     notes: tuple = ()
 
     def approach(self, choice: str) -> str:
@@ -109,6 +129,9 @@ CY = Annex(
     "EN 1998-5:2004 (approved 11/06/2010)",
     default_approach="DA2", mandatory_approach="DA2",
     punch_vmax=0.5, anchor_sls_factor=1.35, slope_mode="DA2", slope_gRe=1.1,
+    # NA to CYS EN 1997-1 NA 2.35 Tables A.6–A.8(CYS): R2 γb = γs = γt = 1.1, γs,t = 1.15;
+    # NA 2.36 Tables A.9–A.11(CYS) = EN ξ values; NA 2.19: model factor ≥ 1.25.
+    pile_model_min=1.25,
     # NA to CYS EN 1991-1-3 NA 2.5: Annex C, Mediterranean, Z = 1 everywhere → s_k =
     # 0.289 [1 + (A/452)²]; special study above 1500 m. NA to CYS EN 1991-1-4 NA 2.4:
     # v_b,0 from the isotach map (24/30/40 m/s), c_dir = c_season = 1.0, ρ = 1.25 kg/m³.

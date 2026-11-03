@@ -337,6 +337,10 @@ const PICS = {
   ec1_wind_snow: '<path d="M6 14h40q8 0 8-6M6 24h56q8 0 8 6M6 34h34" stroke="#2f8fd8"/><path d="M70 40l12-14 12 14z" fill="#e3e4e6"/><circle cx="78" cy="10" r="2" fill="#9ab"/><circle cx="88" cy="16" r="2" fill="#9ab"/>',
   ec8_lateral_force: '<path d="M30 44V8h26v36" stroke="#334"/><path d="M30 17h26M30 26h26M30 35h26" stroke="#334" stroke-width="1"/><path d="M58 11h16M58 20h12M58 29h8" stroke="#e03b3b" stroke-width="3"/><path d="M4 44q6-8 10 0t10 0" stroke="#e03b3b"/>',
   en1990_combinations: '<path d="M18 10h60M18 20h60M18 30h60M18 40h60" stroke="#8892a0" stroke-width="1"/><text x="20" y="27" font-size="16" fill="#2a6f97" stroke="none" font-family="sans-serif">γ·ψ</text>',
+  ec7_pile: '<path d="M2 12h92" stroke="#a08060"/><path d="M2 30h92" stroke="#c9b48a" stroke-dasharray="3 3"/><rect x="42" y="4" width="12" height="40" fill="#b4b8bf"/><path d="M36 18h6M36 26h6M36 34h6M60 18h-6M60 26h-6M60 34h-6" stroke="#2e9b5f"/><path d="M48 48v-3" stroke="#2e9b5f" stroke-width="3"/>',
+  ec7_settlement: '<rect x="36" y="6" width="24" height="6" fill="#b4b8bf"/><path d="M28 14q20 44 40 0" fill="#f0c428" fill-opacity="0.35" stroke="#e03b3b"/><path d="M38 14q10 22 20 0" fill="#e03b3b" fill-opacity="0.35" stroke="none"/><path d="M4 12h88" stroke="#a08060"/>',
+  ec7_gabion_wall: '<path d="M2 42h92" stroke="#a08060"/><path d="M58 6h36v36H58z" fill="#e9d8b8" stroke="none"/><rect x="20" y="30" width="38" height="12" fill="#9c9486"/><rect x="30" y="18" width="28" height="12" fill="#9c9486"/><rect x="40" y="6" width="18" height="12" fill="#9c9486"/><path d="M20 36h38M30 24h28M40 12h18" stroke="#666" stroke-width="1"/>',
+  ec7_embedded_wall: '<path d="M2 32h44" stroke="#a08060"/><path d="M50 4h44v42H50z" fill="#e9d8b8" stroke="none"/><rect x="44" y="4" width="6" height="42" fill="#b4b8bf"/><path d="M50 12l24 9M50 22l24 9" stroke="#333"/><path d="M74 21l12 4M74 31l12 4" stroke="#7d8794" stroke-width="4"/>',
 };
 const pic = (id) => `<svg viewBox="0 0 96 48" fill="none" stroke="#334" stroke-width="2" stroke-linejoin="round">${PICS[id] || '<rect x="30" y="8" width="36" height="32" rx="4"/>'}</svg>`;
 

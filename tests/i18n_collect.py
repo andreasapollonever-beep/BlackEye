@@ -27,6 +27,17 @@ SCENARIOS = {
                     {"type": "One-way continuous", "spans": 1}, {"e1": "Simply supported",
                     "e3": "Simply supported"}, {"h": 120, "q": 15},
                     {"punch": True, "pos": "Edge", "VEd": 150}],
+    "ec7_pile": [{}, {"method": "Ground test profiles (ξ3, ξ4)", "n_prof": 3, "stiff": True},
+                 {"ptype": "Driven", "T": 900}, {"L": 6}, {"G": 3000},
+                 {"layers": [{"h": 30, "soil": "Sand", "gamma": 19, "phi": 32, "cu": 0}]}],
+    "ec7_settlement": [{}, {"rigid": False}, {"q": 600}, {"layers": [
+        {"h": 3, "soil": "Clay", "gamma": 19, "Eoed": 5, "Cc": 0.3, "Cr": 0.05, "e0": 0.9,
+         "OCR": 1}]}],
+    "ec7_gabion_wall": [{}, {"seismic": False, "beta": 15}, {"h_w": 1.0}, {"courses": [
+        {"b": 2.0, "h": 1.0, "setback": 0}, {"b": 1.0, "h": 1.0, "setback": 0.5},
+        {"b": 1.0, "h": 1.0, "setback": 0}]}],
+    "ec7_embedded_wall": [{}, {"anchors": []}, {"seismic": True}, {"t": 1.0}, {"zw": 3.0},
+                          {"D": 0.4, "nbar": 6}],
     "ec7_strip_footing": [{}, {"seismic": True}, {"B": 0.6, "MG": 40}, {"tie": False},
                           {"th": 0.3, "tn": 4, "tdia": "10"}],
 }
@@ -41,7 +52,17 @@ BAD = [("ec3_steel_beam", {"L": -1}), ("ec3_steel_beam", {"L": "abc"}),
        ("ec7_retaining_wall", {"step": True, "h_step": 5}),
        ("ec7_retaining_wall", {"key": True, "key_x": 9}), ("en1990_combinations", {"actions": []}),
        ("ec8_lateral_force", {"storeys": []}),
-       ("ec7_strip_footing", {"D": 0.3}), ("ec7_strip_footing", {"bw": 2})]
+       ("ec7_strip_footing", {"D": 0.3}), ("ec7_pile", {"layers": []}),
+       ("ec7_pile", {"L": 40}), ("ec7_pile", {"gRd": 1.1}),
+       ("ec7_pile", {"layers": [{"h": 30, "soil": "Clay", "gamma": 19, "phi": 0, "cu": 0}]}),
+       ("ec7_settlement", {"layers": []}), ("ec7_settlement", {"D": 30}),
+       ("ec7_gabion_wall", {"courses": []}),
+       ("ec7_gabion_wall", {"courses": [{"b": 1, "h": 1, "setback": 0},
+                                        {"b": 1, "h": 1, "setback": 1.5}]}),
+       ("ec7_embedded_wall", {"a": 0.2}),
+       ("ec7_embedded_wall", {"anchors": [{"z": 9, "alpha": 20, "sh": 2, "P0": 100, "Lfr": 6,
+                                           "At": 600, "Rad": 500}]}),
+       ("ec7_embedded_wall", {"anchors": [], "t": 0.5, "H": 10}), ("ec7_strip_footing", {"bw": 2})]
 
 
 def collect() -> set[str]:

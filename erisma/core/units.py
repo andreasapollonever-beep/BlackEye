@@ -36,6 +36,7 @@ UNIT_FACTORS: dict[str, float] = {
     "kPa": 1e-3,
     # density (weight)
     "kN/m³": 1e-6,
+    "MN/m³": 1e-3,  # modulus of subgrade reaction
     # area
     "mm²": 1.0,
     "cm²": 1e2,
