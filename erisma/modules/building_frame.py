@@ -20,7 +20,7 @@ from ..structure.builder import BuildingSpec, build
 from ..structure.builder import grid_label
 from ..structure.design import (MemberDesign, apply_override, capacity_design, capacity_shears,
                                 design_beams, design_columns, design_footings, design_slabs,
-                                design_walls, member_checks)
+                                design_walls, member_results)
 from ..structure.combinations import Case, generate
 from ..structure.modal import ec8_spectrum
 from ..structure.model import Msg
@@ -631,13 +631,19 @@ class BuildingFrame(DesignModule):
         if ovr:
             calc.note("Check mode: {n} member(s) checked with the reinforcement set by the "
                       "engineer instead of the automatic design.",
-                      n=sum(1 for d in dc + db if d.member in ovr))
+                      n=len(ovr))
         walls = {f"W1.{g}": w for g, w in info["wall_spec"].items()}
         dw = design_walls(walls, seis, uls, quasi, inp["concrete"], spec.heights, spec.beam_h,
                           project, inp["fyk"], inp["cover"])
+        for d in dw:
+            if d.member in ovr:
+                apply_override(d, ovr[d.member], project)
         if seis is not None and inp["capacity"]:
             cls._capacity(calc, inp, spec, info, dc, db, quasi, seis, project)
         ds = cls._slabs(inp, spec, info, project) if inp["slabs"] else []
+        for d in ds:
+            if d.member in ovr:
+                apply_override(d, ovr[d.member], project)
         df = []
         if inp["foundations"] and info.get("raft"):
             df = cls._raft(calc, inp, spec, info, calc._res_agg, seis, uls, quasi, dc + dw, psi2)
@@ -1003,7 +1009,7 @@ class BuildingFrame(DesignModule):
                 "rho": d.rho, "reinforcement": BuildingFrame._reinf(calc, d.reinforcement),
                 "governing": calc.tr(d.governing, quiet=True), "module": d.module,
                 "inputs": d.inputs,
-                "checks": member_checks(d, calc.project, calc.lang),
+                **member_results(d, calc.project, calc.lang),
                 "detail": {k: v for k, v in d.detail.items() if k != "combos"},
                 "notes": [n.message(calc.lang) if hasattr(n, "message") else calc.tr(n)
                           for n in d.notes]}

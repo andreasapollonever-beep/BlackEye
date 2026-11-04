@@ -365,6 +365,14 @@ def _continuity_K(analysis, mid: str) -> float:
 # --------------------------------------------------------------------- walls
 
 WALL_BARS = ["14", "16", "18", "20", "22", "25"]
+# web and boundary hoops of the walls (defaults of the EN 1998-1 wall module)
+WALL_WEB = {"dh": "10", "sh": 85.0, "dv": "10", "sv": 200.0, "dhw": "12", "shw": 150.0}
+
+
+def wall_reinf(p: dict, lc: float) -> str:
+    return (f"2×{p['nbe']}Ø{p['dbe']} boundary (l_c = {lc:g} mm), "
+            f"web Ø{p['dv']}/{float(p['sv']):g} + Ø{p['dhw']}/{float(p['shw']):g}, "
+            f"hoops Ø{p['dh']}/{float(p['sh']):g}")
 
 
 def design_walls(walls: dict[str, dict], seis: SeismicResult | None, uls: StaticResult,
@@ -411,12 +419,15 @@ def design_walls(walls: dict[str, dict], seis: SeismicResult | None, uls: Static
             pick = cands[-1]
         else:
             pick = cands[idx]
-        reinf = (f"2×{pick['nbe']}Ø{pick['dbe']} boundary (l_c = {lc:g} mm), "
-                 f"web Ø10/200, hoops Ø10/85")
+        pick = {**WALL_WEB, **pick}
+        reinf = wall_reinf(pick, lc)
         As = 2 * pick["nbe"] * np.pi * float(pick["dbe"]) ** 2 / 4
         gov_inp = {**(dict(combos)[gov] if gov else combos[0][1]), **pick}
         out.append(MemberDesign(mid, "wall", 1, reinf, util, idx >= 0, gov, gov_inp,
-                                "ec8_rc_wall", notes, As / (lw * bw)))
+                                "ec8_rc_wall", notes, As / (lw * bw),
+                                {"combos": [(nm, {k: (float(v) if isinstance(v, np.floating)
+                                                      else v) for k, v in c.items()})
+                                            for nm, c in combos]}))
     return out
 
 
@@ -841,23 +852,37 @@ def _bar_area(n, dia) -> float:
     return float(n) * np.pi * float(dia) ** 2 / 4
 
 
-def _checks_of(module_id: str, inp: dict, project, lang: str, section: str = "") -> list[dict]:
+def _checks_of(module_id: str, inp: dict, project, lang: str, section: str = "",
+               outputs: dict | None = None) -> list[dict]:
+    """Checks of ``module_id`` run with ``inp``; without ``section`` each check is grouped
+    under the heading it was written under in the calculation. ``outputs`` (if given)
+    receives the computed quantities (display units)."""
     try:
         c = get_module(module_id).calculate(inp, project, lang)
     except InputError as exc:
         return [{"section": section, "d": str(exc), "u": 9.99, "ok": False, "ref": "",
                  "demand": None, "capacity": None, "unit": "", "hint": ""}]
-    out = []
-    for ch in c.checks:
+    if outputs is not None:
+        outputs.update({k: {"value": float(v["value"]), "unit": v["unit"],
+                            "d": v.get("description", "")}
+                        for k, v in c.outputs.items() if isinstance(v.get("value"), (int, float))})
+    out, head = [], section
+    for it in c.items:
+        if it.kind == "heading" and not section:
+            head = it.data["text"]
+        if it.kind != "check":
+            continue
+        ch = it.data["check"]
         dd = ch.to_dict()                      # demand / capacity in display units
-        out.append({"section": section, "d": ch.description, "u": float(ch.utilisation),
+        out.append({"section": head, "d": ch.description, "u": float(ch.utilisation),
                     "ok": bool(ch.passed), "ref": ch.ref, "demand": float(dd["demand"]),
                     "capacity": float(dd["capacity"]), "unit": ch.unit, "hint": ch.hint,
                     "min": bool(ch.is_min)})
     return out
 
 
-def member_checks(d: MemberDesign, project=None, lang: str = "en") -> list[dict]:
+def member_checks(d: MemberDesign, project=None, lang: str = "en",
+                  outputs: dict | None = None) -> list[dict]:
     """Every check of a designed member, as listed in its design-results window.
 
     Beams: the span section (sagging, bottom bars in tension) and the support sections
@@ -909,7 +934,25 @@ def member_checks(d: MemberDesign, project=None, lang: str = "en") -> list[dict]
                         "ok": r <= lim, "ref": "EN 1992-1-1 7.4.2", "demand": r,
                         "capacity": lim, "unit": "", "hint": "", "min": False})
         return out + sup
-    return _checks_of(d.module, d.inputs, project, lang)
+    if d.kind == "wall" and d.detail.get("combos"):
+        # show the seismic design situation (largest moment) — it governs a ductile wall
+        pick = {k: d.inputs[k] for k in ("nbe", "dbe", "dh", "sh", "dv", "sv", "dhw", "shw")
+                if k in d.inputs}
+        nm, c = max(d.detail["combos"], key=lambda t: float(t[1]["MEd"]))
+        return _checks_of(d.module, {**c, **pick}, project, lang, outputs=outputs)
+    return _checks_of(d.module, d.inputs, project, lang, outputs=outputs)
+
+
+def member_results(d: MemberDesign, project=None, lang: str = "en") -> dict:
+    """Checks, key computed quantities and (columns, walls) the N–M interaction diagram
+    for the design-results window."""
+    outs: dict = {}
+    checks = member_checks(d, project, lang, outs)
+    res = {"checks": checks, "outputs": outs}
+    nm = interaction(d, project)
+    if nm:
+        res["nm"] = nm
+    return res
 
 
 def apply_override(d: MemberDesign, ov: dict, project=None) -> None:
@@ -956,8 +999,115 @@ def apply_override(d: MemberDesign, ov: dict, project=None) -> None:
         d.rho = (_bar_area(det["bottom"]["n_bars"], det["bottom"]["dia"]) +
                  _bar_area(det["top"]["n_bars"], det["top"]["dia"])) / \
             (d.inputs["b"] * d.inputs["h"])
+    elif d.kind == "wall" and d.detail.get("combos"):
+        keys = ("nbe", "dbe", "dh", "sh", "dv", "sv", "dhw", "shw")
+        pick = {k: d.inputs[k] for k in keys if k in d.inputs}
+        pick.update({k: ov[k] for k in keys if k in ov})
+        pick["nbe"] = int(pick["nbe"])
+        for k in ("sh", "sv", "shw"):
+            pick[k] = float(pick[k])
+        worst, gov, ok = -1.0, d.governing, True
+        for nm, c in d.detail["combos"]:
+            p, u = _passes(get_module("ec8_rc_wall"), {**c, **pick}, project)
+            ok &= p
+            if u > worst:
+                worst, gov = u, nm
+        d.inputs = {**dict(d.detail["combos"]).get(gov, d.inputs), **pick}
+        d.reinforcement = wall_reinf(d.inputs, d.inputs["lc"])
+        d.utilisation, d.ok, d.governing = worst, ok, gov
+        d.rho = 2 * _bar_area(pick["nbe"], pick["dbe"]) / (d.inputs["lw"] * 1000 *
+                                                            d.inputs["bw"])
+    elif d.kind == "slab":
+        keys = ("dia_b", "s_b", "dia_t", "s_t")
+        d.inputs = {**d.inputs, **{k: (float(ov[k]) if k.startswith("s_") else str(ov[k]))
+                                   for k in keys if k in ov}}
+        ok, util = _passes(get_module("ec2_rc_slab"), d.inputs, project)
+        d.ok, d.utilisation = ok, util
+        i = d.inputs
+        d.reinforcement = (f"bottom Ø{i['dia_b']}/{float(i['s_b']):g}, "
+                           f"top Ø{i['dia_t']}/{float(i['s_t']):g}")
+        d.rho = _bar_area(1, i["dia_b"]) * 1000 / float(i["s_b"]) / (1000 * i["h"])
     else:
         return
     d.notes = [n for n in d.notes if "increase" not in str(n).lower()]
     d.notes.append("Reinforcement set by the engineer (check mode)")
     d.detail["override"] = True
+
+
+# ---------------------------------------------------------------- N–M interaction diagram
+def _nm_points(b: float, h: float, bars: list[tuple[float, float]], fcd: float, fyd: float,
+               n: int = 60) -> list[tuple[float, float]]:
+    """Design N–M interaction curve of a rectangular section bent about the axis parallel
+    to ``b`` (depth ``h``) — EN 1992-1-1 6.1: ε_cu = 3.5 ‰, rectangular stress block
+    (λ = 0.8, η = 1), elastic–plastic steel (E_s = 200 GPa).  ``bars`` = (depth from the
+    compressed face, area).  Returns (N [kN], M [kNm]) from pure tension to pure compression
+    (N > 0 compression; M about the centre of the section)."""
+    Es, ecu = 200000.0, 0.0035
+    As_tot = sum(a for _, a in bars)
+    pts = [(-fyd * As_tot / 1e3, 0.0)]
+    xs = [h * 10 ** (k / n * 3 - 2) for k in range(n + 1)]     # 0.01 h … 10 h
+    for x in xs:
+        a = min(0.8 * x, h)
+        N = fcd * b * a
+        M = fcd * b * a * (h / 2 - a / 2)
+        for y, A in bars:
+            es = ecu * (x - y) / x
+            sg = max(-fyd, min(fyd, Es * es))
+            if y < a:                                   # bar inside the stress block
+                sg -= fcd if sg > 0 else 0.0
+            N += sg * A
+            M += sg * A * (h / 2 - y)
+        pts.append((float(N) / 1e3, float(M) / 1e6))
+    Nmax = (fcd * b * h + min(fyd, Es * 0.002) * As_tot) / 1e3
+    pts.append((float(Nmax), 0.0))
+    return pts
+
+
+def interaction(d: MemberDesign, project=None) -> dict | None:
+    """N–M diagram data of a column (both axes) or a wall (strong axis) with the design
+    points of every design situation (first-order actions from the analysis)."""
+    from ..design.annex import get_annex
+    na = get_annex((project or {}).get("annex") if isinstance(project, dict) else
+                   getattr(project, "annex", None))
+    i = d.inputs
+    try:
+        fck = float(str(i["concrete"]).split("/")[0][1:])
+    except (KeyError, ValueError):
+        return None
+    fcd = na.alpha_cc * fck / na.gamma_c
+    fyd = float(i.get("fyk", 500.0)) / na.gamma_s
+    combos = d.detail.get("combos") or [(d.governing, i)]
+    if d.kind == "column":
+        b, h, cov = i["b"], i["h"], i["cover"]
+        dia, n = float(i["dia"]), int(i["nb"])
+        a1 = _bar_area(1, dia)
+        e = cov + float(i.get("link", 8)) + dia / 2
+
+        def rows(depth):
+            ys = [e + (depth - 2 * e) * k / (n - 1) for k in range(n)]
+            return [(y, a1 * (n if k in (0, n - 1) else 2)) for k, y in enumerate(ys)]
+        curve_h = _nm_points(b, h, rows(h), fcd, fyd)
+        curve_b = curve_h if b == h else _nm_points(h, b, rows(b), fcd, fyd)
+        pts = []
+        for nm, c in combos:
+            pts.append({"name": nm, "N": float(c["NEd"]),
+                        "Mh": max(abs(float(c["Mh_top"])), abs(float(c["Mh_bot"]))),
+                        "Mb": max(abs(float(c["Mb_top"])), abs(float(c["Mb_bot"])))})
+        return {"curves": {"h": curve_h, "b": curve_b}, "points": pts}
+    if d.kind == "wall":
+        lw, bw, lc = i["lw"] * 1000, i["bw"], i["lc"]
+        cov, dbe, nbe = i["cover"], float(i["dbe"]), int(i["nbe"])
+        e = cov + float(i.get("dh", 10)) + dbe / 2
+        per = max(nbe // 2, 1)                      # bars per face in a boundary element
+        bars = []
+        for k in range(per):
+            y = e + (lc - 2 * e) * (k / (per - 1) if per > 1 else 0.5)
+            bars += [(y, 2 * _bar_area(1, dbe)), (lw - y, 2 * _bar_area(1, dbe))]
+        sv, dv = float(i.get("sv", 200)), float(i.get("dv", 10))
+        y = lc + sv / 2
+        while y < lw - lc:
+            bars.append((y, 2 * _bar_area(1, dv)))
+            y += sv
+        pts = [{"name": nm, "N": float(c["NEd"]), "M": float(c["MEd"])} for nm, c in combos]
+        return {"curves": {"strong": _nm_points(bw, lw, bars, fcd, fyd)}, "points": pts}
+    return None

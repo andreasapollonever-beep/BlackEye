@@ -24,6 +24,16 @@ Object.assign(UI.el, {
   "Design results of the selected member (double-click a member)": "Αποτελέσματα διαστασιολόγησης του επιλεγμένου μέλους (διπλό κλικ σε μέλος)",
   "Member design": "Διαστασιολόγηση μέλους", "Top": "Άνω", "Bottom": "Κάτω",
   "EN 1998-1 detailing (critical regions)": "Κατασκευαστικές διατάξεις EN 1998-1 (κρίσιμες περιοχές)",
+  "Web": "Κορμός", "compression": "θλίψη", "bottom bars": "κάτω οπλισμός", "top bars": "άνω οπλισμός",
+  "continuous edge": "συνεχής παρειά", "simply supported": "ελεύθερη έδραση", "critical region h_cr": "κρίσιμη περιοχή h_cr",
+  "boundary elements": "άκρα (περισφιγμένα)", "Every design combination": "Όλοι οι συνδυασμοί σχεδιασμού", "Combination": "Συνδυασμός",
+  "blue: bending about h · purple: about b (first-order design actions)": "μπλε: κάμψη κατά h · μωβ: κατά b (εντατικά 1ης τάξης)",
+  "Design interaction curve (EN 1992-1-1 6.1, ε_cu = 3.5 ‰); dots = design actions of every combination — green inside, red outside.":
+    "Καμπύλη αλληλεπίδρασης σχεδιασμού (EN 1992-1-1 6.1, ε_cu = 3.5 ‰)· σημεία = εντατικά κάθε συνδυασμού — πράσινα εντός, κόκκινα εκτός.",
+  "Boundary element bars": "Ράβδοι άκρου (ανά άκρο)", "Boundary hoops": "Συνδετήρες άκρων",
+  "Web vertical (each face)": "Κορμός κατακόρυφοι (ανά παρειά)", "Web horizontal (each face)": "Κορμός οριζόντιοι (ανά παρειά)",
+  "Bottom bars (both directions)": "Κάτω οπλισμός (και στις δύο διευθύνσεις)", "Top bars over supports": "Άνω οπλισμός στις στηρίξεις",
+  "Section in the critical region": "Διατομή στην κρίσιμη περιοχή",
 });
 Object.assign(UI.el, {
   "Erisma Structure": "Erisma Structure", "Member calculations": "Υπολογισμοί μελών",
@@ -1389,15 +1399,16 @@ const Structure = (() => {
     return (r.find((x) => String(x.storey) === st) || [...r].sort((a, b) => b.util - a.util)[0]).id;
   }
   function sectionSVG(kind, inp, det) {
-    const W = 230, Hm = 230;
-    const g = sv("svg", { class: "dr-sec", viewBox: `0 0 ${W} ${Hm}` });
+    const wide = kind === "wall";
+    const W = wide ? 900 : 230, Hm = wide ? 120 : 230;
+    const g = sv("svg", { class: wide ? "dr-sec wide" : "dr-sec", viewBox: `0 0 ${W} ${Hm}` });
     let b, h;
     if (kind === "column") { b = inp.b; h = inp.h; } else if (kind === "beam") { b = inp.b; h = inp.h; } else if (kind === "wall") { b = inp.lw * 1000; h = inp.bw; } else return null;
     const k = Math.min((W - 60) / b, (Hm - 60) / h);
     const x0 = (W - b * k) / 2, y0 = (Hm - h * k) / 2;
     sv("rect", { x: x0, y: y0, width: b * k, height: h * k, class: "conc" }, g);
     const cov = inp.cover ?? inp.cnom ?? 30;
-    const ld = parseFloat(kind === "column" ? (inp.link || "8") : kind === "beam" ? (det.link_dia || inp.link_dia || "8") : "10");
+    const ld = parseFloat(kind === "column" ? (inp.link || "8") : kind === "beam" ? (det.link_dia || inp.link_dia || "8") : (inp.dh || "10"));
     const inset = (cov + ld / 2) * k;
     sv("rect", { x: x0 + inset, y: y0 + inset, width: b * k - 2 * inset, height: h * k - 2 * inset, rx: 3, class: "link" }, g);
     const bar = (x, y, d) => sv("circle", { cx: x, cy: y, r: Math.max(d * k / 2, 2.2), class: "bar" }, g);
@@ -1425,6 +1436,15 @@ const Structure = (() => {
           bar(x, y0 + o, d); bar(x, y0 + h * k - o, d);
         }
       }
+      const dv = parseFloat(inp.dv || "10"), svv = +(inp.sv || 200), ow = off(dv);
+      for (let x = inp.lc + svv / 2; x < b - inp.lc; x += svv) {
+        sv("circle", { cx: x0 + x * k, cy: y0 + ow, r: Math.max(dv * k / 2, 1.8), class: "bar web" }, g);
+        sv("circle", { cx: x0 + x * k, cy: y0 + h * k - ow, r: Math.max(dv * k / 2, 1.8), class: "bar web" }, g);
+      }
+      const tl = (x, y, s_) => { const e = sv("text", { x, y, "text-anchor": "middle", class: "lbl" }, g); e.textContent = s_; };
+      tl(x0 + lc / 2, y0 - 8, `${n}Ø${inp.dbe} · Ø${inp.dh}/${inp.sh}`);
+      tl(x0 + b * k - lc / 2, y0 - 8, `${n}Ø${inp.dbe} · Ø${inp.dh}/${inp.sh}`);
+      tl(x0 + b * k / 2, y0 - 8, `${t("Web")}: Ø${inp.dv}/${inp.sv} + Ø${inp.dhw}/${inp.shw}`);
     }
     const tx = (x, y, s_, a = "middle") => { const e = sv("text", { x, y, "text-anchor": a, class: "dim" }, g); e.textContent = s_; };
     tx(x0 + b * k / 2, y0 + h * k + 16, `${Math.round(b)}`);
@@ -1459,6 +1479,96 @@ const Structure = (() => {
     tx(x0 + L * k / 2, H - 4, `L = ${(L / 1000).toFixed(2)} m`, "dim");
     return g;
   }
+
+  function wallElevationSVG(inp, outs) {
+    const W = 230, H = 300, Hw = inp.Hw * 1000, lw = inp.lw * 1000, n = +inp.storeys || 1;
+    const g = sv("svg", { class: "dr-sec", viewBox: `0 0 ${W} ${H}` });
+    const k = Math.min((W - 70) / lw, (H - 40) / Hw), x0 = (W - lw * k) / 2 + 10, yb = H - 20;
+    const hcr = (outs["h_cr"]?.value || 0) * 1000;
+    sv("rect", { x: x0, y: yb - Hw * k, width: lw * k, height: Hw * k, class: "conc" }, g);
+    if (hcr) sv("rect", { x: x0, y: yb - hcr * k, width: lw * k, height: hcr * k, class: "crit" }, g);
+    const lc = inp.lc * k;
+    for (const xe of [x0, x0 + lw * k - lc]) sv("rect", { x: xe, y: yb - (hcr || Hw) * k, width: lc, height: (hcr || Hw) * k, class: "zone" }, g);
+    for (let i = 1; i < n; i++) sv("line", { x1: x0 - 6, x2: x0 + lw * k + 6, y1: yb - Hw * k * i / n, y2: yb - Hw * k * i / n, class: "fl" }, g);
+    sv("line", { x1: x0 - 14, x2: x0 + lw * k + 14, y1: yb, y2: yb, class: "gr" }, g);
+    const tx = (x, y, s_, cls = "dim", a = "middle") => { const e = sv("text", { x, y, "text-anchor": a, class: cls }, g); e.textContent = s_; };
+    if (hcr) tx(x0 - 4, yb - hcr * k / 2, `h_cr = ${(hcr / 1000).toFixed(2)} m`, "lbl crit", "end");
+    tx(x0 + lw * k / 2, yb + 14, `l_w = ${inp.lw} m`);
+    tx(x0 + lw * k + 4, yb - Hw * k + 10, `H_w = ${inp.Hw} m`, "dim", "start");
+    return g;
+  }
+  function slabPlanSVG(inp, outs) {
+    const W = 230, H = 230, lx = inp.lx * 1000, ly = inp.ly * 1000;
+    const g = sv("svg", { class: "dr-sec", viewBox: `0 0 ${W} ${H}` });
+    const k = Math.min((W - 60) / lx, (H - 60) / ly), x0 = (W - lx * k) / 2, y0 = (H - ly * k) / 2;
+    sv("rect", { x: x0, y: y0, width: lx * k, height: ly * k, class: "conc" }, g);
+    const fixed = (e) => String(inp[e]).startsWith("Fixed");
+    const edges = { e1: [x0, y0, x0, y0 + ly * k], e2: [x0 + lx * k, y0, x0 + lx * k, y0 + ly * k], e3: [x0, y0 + ly * k, x0 + lx * k, y0 + ly * k], e4: [x0, y0, x0 + lx * k, y0] };
+    const band = 0.25;
+    for (const [e, [x1, y1, x2, y2]] of Object.entries(edges)) {
+      sv("line", { x1, y1, x2, y2, class: fixed(e) ? "edge fix" : "edge ss" }, g);
+      if (!fixed(e)) continue;
+      // top bars over the continuous edge (extending ~0.25 l into the panel)
+      const vert = x1 === x2, L = (vert ? lx : ly) * band * k;
+      const inward = vert ? (x1 === x0 ? 1 : -1) : (y1 === y0 ? 1 : -1);
+      for (let tpos = 0.1; tpos < 0.95; tpos += 0.1) {
+        if (vert) { const y = y1 + (y2 - y1) * tpos; sv("line", { x1, x2: x1 + inward * L, y1: y, y2: y, class: "top" }, g); }
+        else { const x = x1 + (x2 - x1) * tpos; sv("line", { x1: x, x2: x, y1, y2: y1 + inward * L, class: "top" }, g); }
+      }
+    }
+    // bottom mesh
+    for (let tpos = 0.2; tpos < 0.85; tpos += 0.15) {
+      sv("line", { x1: x0 + 6, x2: x0 + lx * k - 6, y1: y0 + ly * k * tpos, y2: y0 + ly * k * tpos, class: "bot" }, g);
+      sv("line", { x1: x0 + lx * k * tpos, x2: x0 + lx * k * tpos, y1: y0 + 6, y2: y0 + ly * k - 6, class: "bot" }, g);
+    }
+    const tx = (x, y, s_, cls = "dim", a = "middle") => { const e = sv("text", { x, y, "text-anchor": a, class: cls }, g); e.textContent = s_; };
+    tx(x0 + lx * k / 2, y0 + ly * k + 16, `l_x = ${inp.lx} m`);
+    tx(x0 - 6, y0 + ly * k / 2, `l_y = ${inp.ly} m`, "dim", "end");
+    const mv = (key) => outs[key] ? outs[key].value.toFixed(1) : null;
+    if (mv("m_x,span")) tx(x0 + lx * k / 2, y0 + ly * k / 2 - 4, `m_x = ${mv("m_x,span")}`, "lbl");
+    if (mv("m_y,span")) tx(x0 + lx * k / 2, y0 + ly * k / 2 + 12, `m_y = ${mv("m_y,span")}`, "lbl");
+    return g;
+  }
+  function nmSVG(nm, kind) {
+    const W = 520, H = 330, padL = 60, padB = 36, padT = 14, padR = 16;
+    const g = sv("svg", { class: "dr-nm", viewBox: `0 0 ${W} ${H}` });
+    const curves = Object.entries(nm.curves);
+    const pts = [];
+    for (const p of nm.points) {
+      if (kind === "wall") pts.push({ N: p.N, M: p.M, name: p.name, ax: "strong" });
+      else { pts.push({ N: p.N, M: p.Mh, name: p.name, ax: "h" }); pts.push({ N: p.N, M: p.Mb, name: p.name, ax: "b" }); }
+    }
+    const allN = curves.flatMap(([, c]) => c.map((q) => q[0])).concat(pts.map((p) => p.N));
+    const allM = curves.flatMap(([, c]) => c.map((q) => q[1])).concat(pts.map((p) => p.M));
+    const Nmin = Math.min(...allN), Nmax = Math.max(...allN), Mmax = Math.max(...allM) * 1.08;
+    const X = (M) => padL + (M + Mmax) / (2 * Mmax) * (W - padL - padR);
+    const Y = (N) => H - padB - (N - Nmin) / (Nmax - Nmin) * (H - padB - padT);
+    sv("line", { x1: X(0), x2: X(0), y1: padT, y2: H - padB, class: "ax" }, g);
+    sv("line", { x1: padL, x2: W - padR, y1: Y(0), y2: Y(0), class: "ax" }, g);
+    const colours = { h: "#1f6fb2", b: "#7c3aed", strong: "#1f6fb2" };
+    const cap = {};
+    for (const [ax, c] of curves) {
+      if (kind === "column" && ax === "b" && nm.curves.b === nm.curves.h) continue;
+      const half = c.map((q) => `${X(q[1])},${Y(q[0])}`).join(" ");
+      const mirror = [...c].reverse().map((q) => `${X(-q[1])},${Y(q[0])}`).join(" ");
+      sv("polygon", { points: `${half} ${mirror}`, class: "curve", stroke: colours[ax] }, g);
+      const sorted = [...c].sort((a, b) => a[0] - b[0]);
+      cap[ax] = (N) => { for (let i = 1; i < sorted.length; i++) if (N <= sorted[i][0]) { const [n1, m1] = sorted[i - 1], [n2, m2] = sorted[i]; return m1 + (m2 - m1) * (N - n1) / ((n2 - n1) || 1); } return 0; };
+    }
+    for (const p of pts) {
+      const f = cap[p.ax] || cap.h;
+      const ok = f && p.N <= Nmax && p.M <= f(p.N) + 1e-9;
+      const c = sv("circle", { cx: X(p.M), cy: Y(p.N), r: 3.6, class: ok ? "pt ok" : "pt bad" }, g);
+      sv("title", {}, c).textContent = `${p.name} — N = ${p.N.toFixed(0)} kN, M = ${p.M.toFixed(0)} kNm${kind === "column" ? ` (${p.ax})` : ""}`;
+    }
+    const tx = (x, y, s_, cls = "dim", a = "middle") => { const e = sv("text", { x, y, "text-anchor": a, class: cls }, g); e.textContent = s_; };
+    tx(W - padR, Y(0) - 5, "M [kNm]", "dim", "end");
+    tx(X(0) + 5, padT + 10, `N [kN] (${t("compression")} +)`, "dim", "start");
+    for (const v of [-Mmax / 1.08, Mmax / 1.08]) tx(X(v), H - padB + 14, v.toFixed(0));
+    for (const v of [Nmin, Nmax]) tx(padL - 4, Y(v) + 4, v.toFixed(0), "dim", "end");
+    if (kind === "column") tx(W - padR, H - 6, t("blue: bending about h · purple: about b (first-order design actions)"), "dim", "end");
+    return g;
+  }
   function designDialog(key) {
     const m = S.res?.structure?.members?.[key];
     if (!m) return;
@@ -1475,13 +1585,20 @@ const Structure = (() => {
         el("div", { class: `dr-status ${m.ok ? "pass" : "fail"}` }, m.ok ? t("Pass") : t("Fail"), el("small", {}, `η = ${m.util.toFixed(2)}`)),
         det.override ? el("div", { class: "dr-mode" }, t("Check mode")) : el("div", { class: "dr-mode auto" }, t("Design mode"))));
       const left = el("div", { class: "dr-left" });
-      const sx = sectionSVG(kind, inp, det);
+      const outs = m.outputs || {};
+      const sx = kind === "wall" ? wallElevationSVG(inp, outs) : kind === "slab" ? slabPlanSVG(inp, outs) : sectionSVG(kind, inp, det);
       if (sx) left.append(sx);
+      if (kind === "slab") left.append(el("div", { class: "dr-legend" },
+        el("span", {}, el("i", { style: "background:#1f6fb2" }), t("bottom bars")), el("span", {}, el("i", { style: "background:#b3261e" }), t("top bars")),
+        el("span", {}, el("i", { style: "background:#374151;height:5px" }), t("continuous edge")), el("span", {}, el("i", { style: "background:repeating-linear-gradient(90deg,#6b7280 0 5px,transparent 5px 8px)" }), t("simply supported"))));
+      if (kind === "wall") left.append(el("div", { class: "dr-legend" },
+        el("span", {}, el("i", { style: "background:#d97706" }), t("critical region h_cr")), el("span", {}, el("i", { style: "background:#1f6fb2" }), t("boundary elements"))));
       left.append(el("div", { class: "dr-reinf" }, m.reinforcement));
       if (m.notes.length) left.append(el("ul", { class: "st-notes" }, ...m.notes.map((n) => el("li", {}, n))));
       const right = el("div", { class: "dr-right" });
       const tabs = [["checks", t("Checks")], ["forces", t("Design forces")]];
-      if (kind === "beam" || kind === "column") tabs.push(["edit", t("Reinforcement")]);
+      if (m.nm) tabs.push(["nm", "N–M"]);
+      if (["beam", "column", "wall", "slab"].includes(kind)) tabs.push(["edit", t("Reinforcement")]);
       right.append(el("div", { class: "dr-tabs" }, ...tabs.map(([k, l]) => el("button", { type: "button", class: tab === k ? "on" : "", on: { click: () => { tab = k; draw(); } } }, l))));
       if (tab === "checks") {
         const tb = el("table", { class: "st-res dr-checks" }, el("tr", {}, el("th", {}, t("Check")), el("th", {}, t("Demand")), el("th", {}, t("Resistance")), el("th", {}, "η"), el("th", {}, ""), el("th", {}, t("Clause"))));
@@ -1505,11 +1622,23 @@ const Structure = (() => {
         } else if (kind === "column") {
           rows.push(["N", "N_Ed", `${(+inp.NEd).toFixed(1)} kN`, m.governing], ["M (h)", "M_top / M_bot", `${(+inp.Mh_top).toFixed(1)} / ${(+inp.Mh_bot).toFixed(1)} kNm`, m.governing],
             ["M (b)", "M_top / M_bot", `${(+inp.Mb_top).toFixed(1)} / ${(+inp.Mb_bot).toFixed(1)} kNm`, m.governing], [t("Shear"), "V_Ed", `${(+inp.VEd).toFixed(1)} kN`, m.governing]);
+        } else if (kind === "slab") {
+          const o = m.outputs || {};
+          for (const k of ["g_k", "q_k", "p_d", "m_x,span", "m_y,span", "m_x,sup", "m_y,sup"]) if (o[k]) rows.push([o[k].d || k, k, `${o[k].value.toFixed(2)} ${o[k].unit}`, k === "p_d" || k.startsWith("m_") ? "1.35G + 1.5Q" : ""]);
         } else {
-          for (const [k, u] of [["NEd", "kN"], ["MEd", "kNm"], ["VEd", "kN"], ["g", "kN/m²"], ["q", "kN/m²"]]) if (inp[k] != null) rows.push([k, k, `${(+inp[k]).toFixed(1)} ${u}`, m.governing]);
+          for (const [k, u] of [["NEd", "kN"], ["MEd", "kNm"], ["VEd", "kN"]]) if (inp[k] != null) rows.push([k, k, `${(+inp[k]).toFixed(1)} ${u}`, m.governing]);
         }
         right.append(el("table", { class: "st-res" }, el("tr", {}, el("th", {}, ""), el("th", {}, ""), el("th", {}, t("Value")), el("th", {}, t("Governing"))),
           ...rows.map((r) => el("tr", {}, ...r.map((v) => el("td", {}, v || ""))))));
+        if (m.nm?.points?.length) {
+          const P = m.nm.points;
+          right.append(el("h4", {}, t("Every design combination")), el("table", { class: "st-res" },
+            el("tr", {}, el("th", {}, t("Combination")), el("th", {}, "N_Ed [kN]"), ...(kind === "wall" ? [el("th", {}, "M_Ed [kNm]")] : [el("th", {}, "M_h [kNm]"), el("th", {}, "M_b [kNm]")])),
+            ...P.map((p) => el("tr", { class: p.name === m.governing ? "gov" : "" }, el("td", {}, p.name), el("td", { class: "num" }, p.N.toFixed(1)),
+              ...(kind === "wall" ? [el("td", { class: "num" }, p.M.toFixed(1))] : [el("td", { class: "num" }, p.Mh.toFixed(1)), el("td", { class: "num" }, p.Mb.toFixed(1))])))));
+        }
+      } else if (tab === "nm") {
+        right.append(nmSVG(m.nm, kind), el("p", { class: "muted" }, t("Design interaction curve (EN 1992-1-1 6.1, ε_cu = 3.5 ‰); dots = design actions of every combination — green inside, red outside.")));
       } else if (tab === "edit") {
         const ov = structuredClone(lay().reinf?.[key] || {});
         const selB = (val, on, opts = BARS) => { const s_ = el("select", { on: { change: (e) => on(e.target.value) } }, ...opts.map((o) => el("option", { value: o }, `Ø${o}`))); s_.value = String(val); return s_; };
@@ -1521,6 +1650,14 @@ const Structure = (() => {
           box.append(row(t("Top bars"), num(top.n, (v) => { ov.top_n = v; ov.top_dia ??= top.d; }, 2, 10), selB(top.d, (v) => { ov.top_dia = v; ov.top_n ??= top.n; })),
             row(t("Bottom bars"), num(bot.n, (v) => { ov.bottom_n = v; ov.bottom_dia ??= bot.d; }, 2, 10), selB(bot.d, (v) => { ov.bottom_dia = v; ov.bottom_n ??= bot.n; })),
             row(t("Links (span)"), selB(ov.link_dia ?? det.link_dia, (v) => { ov.link_dia = v; }, ["8", "10", "12"]), num(ov.s ?? det.s, (v) => { ov.s = v; }, 50, 300, 25)));
+        } else if (kind === "wall") {
+          box.append(row(t("Boundary element bars"), num(ov.nbe ?? inp.nbe, (v) => { ov.nbe = v; }, 4, 30, 2), selB(ov.dbe ?? inp.dbe, (v) => { ov.dbe = v; })),
+            row(t("Boundary hoops"), selB(ov.dh ?? inp.dh, (v) => { ov.dh = v; }, ["8", "10", "12"]), num(ov.sh ?? inp.sh, (v) => { ov.sh = v; }, 50, 250, 5)),
+            row(t("Web vertical (each face)"), selB(ov.dv ?? inp.dv, (v) => { ov.dv = v; }, ["8", "10", "12", "14", "16"]), num(ov.sv ?? inp.sv, (v) => { ov.sv = v; }, 75, 400, 25)),
+            row(t("Web horizontal (each face)"), selB(ov.dhw ?? inp.dhw, (v) => { ov.dhw = v; }, ["8", "10", "12", "14", "16"]), num(ov.shw ?? inp.shw, (v) => { ov.shw = v; }, 75, 400, 25)));
+        } else if (kind === "slab") {
+          box.append(row(t("Bottom bars (both directions)"), selB(ov.dia_b ?? inp.dia_b, (v) => { ov.dia_b = v; }, ["8", "10", "12", "14", "16"]), num(ov.s_b ?? inp.s_b, (v) => { ov.s_b = v; }, 75, 300, 25)),
+            row(t("Top bars over supports"), selB(ov.dia_t ?? inp.dia_t, (v) => { ov.dia_t = v; }, ["8", "10", "12", "14", "16"]), num(ov.s_t ?? inp.s_t, (v) => { ov.s_t = v; }, 75, 300, 25)));
         } else {
           box.append(row(t("Bars per side"), num(ov.nb ?? inp.nb, (v) => { ov.nb = v; }, 2, 6), selB(ov.dia ?? inp.dia, (v) => { ov.dia = v; })),
             row(t("Links"), selB(ov.link ?? inp.link ?? "8", (v) => { ov.link = v; }, ["8", "10", "12"]), num(ov.s ?? inp.s, (v) => { ov.s = v; }, 50, 300, 5)));
@@ -1534,6 +1671,7 @@ const Structure = (() => {
       const body = el("div", { class: "dr-body" }, left, right);
       dlg.append(body);
       if (kind === "beam" && det.top) dlg.append(el("h4", {}, t("Elevation")), elevationSVG(inp, det));
+      if (kind === "wall") dlg.append(el("h4", {}, t("Section in the critical region")), sectionSVG(kind, inp, det));
       dlg.append(el("div", { class: "btns" }, m.module ? el("button", { type: "button", class: "ghost", on: { click: () => { dlg.close(); openModule(m.module, m.inputs); } } }, `↗ ${t("Full calculation")}`) : "",
         el("button", { type: "button", class: "primary", on: { click: () => dlg.close() } }, t("Close"))));
     };
