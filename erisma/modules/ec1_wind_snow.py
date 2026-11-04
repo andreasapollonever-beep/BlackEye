@@ -28,6 +28,66 @@ def cpe_walls(h_d: float) -> tuple[float, float]:
     return pts[-1][1], pts[-1][2]  # pragma: no cover
 
 
+def site_qp(calc: Calculation, inp: dict, z_mm: float) -> float:
+    """Peak velocity pressure q_p(z) [N/mm²] at height z (EN 1991-1-4 Section 4),
+    v_b,0 from the National Annex map of the project site when available.
+
+    Uses the inputs use_site, vb0, terrain and co; writes the steps to the report."""
+    na = get_annex(calc.project.annex)
+    p = calc.project
+    site = None
+    if inp["use_site"] and na.wind_map:
+        try:
+            site = (float(p.lat), float(p.lon))
+        except (TypeError, ValueError):
+            calc.note("No project site selected — manual v_b,0 is used (pick the site with "
+                      "📍 Map in the project details).")
+    calc.heading("Basic wind velocity")
+    if site:
+        w = sitezones.wind_at(na.code, *site)
+        if w["special"]:
+            raise InputError("The site lies in the Troodos summit area of the wind map, for "
+                             "which the National Annex gives no value — a special study is "
+                             "required.", "use_site")
+        if not w["vb0"]:
+            raise InputError("The project site is outside the wind map", "use_site")
+        vb0 = calc.formula("v_b,0", "NA wind map at the site", w["vb0"], "",
+                           "Fundamental basic wind velocity [m/s]",
+                           ref="NA to CYS EN 1991-1-4, NA 2.4 Fig. 1", dp=1)
+        if w["near_boundary"]:
+            calc.note("The site is near an isotach — the higher value within 1 km is used.")
+    else:
+        vb0 = calc.input("v_b,0", inp["vb0"], "", "Fundamental basic wind velocity [m/s]",
+                         dp=1)
+    cdir = cseason = 1.0
+    vb = calc.formula("v_b", "c_dir c_season v_b,0", cdir * cseason * vb0, "",
+                      "Basic wind velocity [m/s] (c_dir = c_season = 1.0)", ref="Eq. 4.1",
+                      dp=2)
+
+    calc.heading("Mean wind and turbulence")
+    z0, zmin = TERRAIN[inp["terrain"]]
+    z = z_mm / 1000
+    calc.label("Terrain category", inp["terrain"])
+    calc.input("z_0", z0 * 1000, "m", "Roughness length", dp=3)
+    kr = calc.formula("k_r", "0.19 (z_0 / 0.05)^0.07", 0.19 * (z0 / 0.05) ** 0.07, "",
+                      ref="Eq. 4.5", dp=4)
+    ze = max(z, zmin)
+    cr = calc.formula("c_r(z)", "k_r ln(max(z, z_min) / z_0)", kr * math.log(ze / z0), "",
+                      ref="Eq. 4.4", dp=4)
+    co = inp["co"]
+    vm = calc.formula("v_m(z)", "c_r c_o v_b", cr * co * vb, "", "Mean wind velocity [m/s]",
+                      ref="Eq. 4.3", dp=2)
+    Iv = calc.formula("I_v(z)", "k_I / (c_o ln(z / z_0)), k_I = 1.0",
+                      1.0 / (co * math.log(ze / z0)), "", ref="Eq. 4.7", dp=4)
+    rho = na.air_density
+    qb = 0.5 * rho * vb**2 / 1000  # kN/m²
+    qp = calc.formula("q_p(z)", "[1 + 7 I_v] ½ ρ v_m²", (1 + 7 * Iv) * 0.5 * rho * vm**2 / 1e6,
+                      "kN/m²", calc.tr("Peak velocity pressure (ρ = {r:g} kg/m³)", r=rho), ref="Eq. 4.8",
+                      dp=3)
+    calc.formula("c_e(z)", "q_p / q_b", qp * 1e3 / qb, "", "Exposure factor", dp=3)
+    return qp
+
+
 @register
 class WindSnowEC1(DesignModule):
     id = "ec1_wind_snow"
@@ -66,57 +126,7 @@ class WindSnowEC1(DesignModule):
     @classmethod
     def run(cls, calc: Calculation, inp: dict) -> None:
         na = get_annex(calc.project.annex)
-        p = calc.project
-        site = None
-        if inp["use_site"] and na.wind_map:
-            try:
-                site = (float(p.lat), float(p.lon))
-            except (TypeError, ValueError):
-                calc.note("No project site selected — manual v_b,0 is used (pick the site with "
-                          "📍 Map in the project details).")
-        calc.heading("Basic wind velocity")
-        if site:
-            w = sitezones.wind_at(na.code, *site)
-            if w["special"]:
-                raise InputError("The site lies in the Troodos summit area of the wind map, for "
-                                 "which the National Annex gives no value — a special study is "
-                                 "required.", "use_site")
-            if not w["vb0"]:
-                raise InputError("The project site is outside the wind map", "use_site")
-            vb0 = calc.formula("v_b,0", "NA wind map at the site", w["vb0"], "",
-                               "Fundamental basic wind velocity [m/s]",
-                               ref="NA to CYS EN 1991-1-4, NA 2.4 Fig. 1", dp=1)
-            if w["near_boundary"]:
-                calc.note("The site is near an isotach — the higher value within 1 km is used.")
-        else:
-            vb0 = calc.input("v_b,0", inp["vb0"], "", "Fundamental basic wind velocity [m/s]",
-                             dp=1)
-        cdir = cseason = 1.0
-        vb = calc.formula("v_b", "c_dir c_season v_b,0", cdir * cseason * vb0, "",
-                          "Basic wind velocity [m/s] (c_dir = c_season = 1.0)", ref="Eq. 4.1",
-                          dp=2)
-
-        calc.heading("Mean wind and turbulence")
-        z0, zmin = TERRAIN[inp["terrain"]]
-        z = inp["z"] / 1000
-        calc.label("Terrain category", inp["terrain"])
-        calc.input("z_0", z0 * 1000, "m", "Roughness length", dp=3)
-        kr = calc.formula("k_r", "0.19 (z_0 / 0.05)^0.07", 0.19 * (z0 / 0.05) ** 0.07, "",
-                          ref="Eq. 4.5", dp=4)
-        ze = max(z, zmin)
-        cr = calc.formula("c_r(z)", "k_r ln(max(z, z_min) / z_0)", kr * math.log(ze / z0), "",
-                          ref="Eq. 4.4", dp=4)
-        co = inp["co"]
-        vm = calc.formula("v_m(z)", "c_r c_o v_b", cr * co * vb, "", "Mean wind velocity [m/s]",
-                          ref="Eq. 4.3", dp=2)
-        Iv = calc.formula("I_v(z)", "k_I / (c_o ln(z / z_0)), k_I = 1.0",
-                          1.0 / (co * math.log(ze / z0)), "", ref="Eq. 4.7", dp=4)
-        rho = na.air_density
-        qb = 0.5 * rho * vb**2 / 1000  # kN/m²
-        qp = calc.formula("q_p(z)", "[1 + 7 I_v] ½ ρ v_m²", (1 + 7 * Iv) * 0.5 * rho * vm**2 / 1e6,
-                          "kN/m²", calc.tr("Peak velocity pressure (ρ = {r:g} kg/m³)", r=rho), ref="Eq. 4.8",
-                          dp=3)
-        calc.formula("c_e(z)", "q_p / q_b", qp * 1e3 / qb, "", "Exposure factor", dp=3)
+        qp = site_qp(calc, inp, inp["z"])
 
         calc.heading("Pressures on vertical walls (rectangular building)")
         h_d = inp["z"] / inp["d"]

@@ -1,0 +1,86 @@
+"""EN 1991-1-4 §7.2–7.3 pressures — hand calculations with the tables of prEN 1991-1-4:2004."""
+
+import pytest
+
+from erisma.core import InputError, get_module
+from erisma.design import wind_cpe as W
+
+M = get_module("ec1_wind_pressures")
+CY = {"annex": "CY"}
+
+
+def out(c, k):
+    return c.outputs[k]["value"]
+
+
+def qp(c):
+    return out(c, "q_p(z)")
+
+
+def test_tables_and_interpolation():
+    # Table 7.1 at h/d = 7/12: D 0.7 → 0.8 between h/d 0.25 and 1
+    w = W.walls(7 / 12)
+    assert w["D"][0] == pytest.approx(0.7 + 0.1 * (7 / 12 - 0.25) / 0.75)
+    assert w["A"] == (-1.2, -1.4)
+    # Figure 7.2: c_pe for A = 5 m² between c_pe,1 and c_pe,10
+    assert W.cpe_area((-1.2, -1.4), 5) == pytest.approx(-1.4 + 0.2 * 0.69897, abs=1e-4)
+    assert W.cpe_area((-1.2, -1.4), 0.5) == -1.4 and W.cpe_area((-1.2, -1.4), 20) == -1.2
+    # same-sign interpolation in Table 7.4a: α = 20° between 15° and 30°
+    c = W.interp_signed(W.DUO_0, 20)
+    assert c["F"]["neg"][0] == pytest.approx(-0.9 + 0.4 / 3)
+    assert c["F"]["pos"][0] == pytest.approx(0.2 + 0.5 / 3)
+    # parapet h_p/h = 0.05 → Table 7.2 row
+    assert W.flat_roof("parapet", 0.05)["F"] == (-1.4, -2.0)
+    # Figure 7.13
+    assert W.internal_mu(0.2, 0.5) == 0.35 and W.internal_mu(1.0, 0.2) == -0.3
+    assert W.internal_mu(1.0, 2.0) == -0.5
+    assert W.lack_of_correlation(0.5) == 0.85 and W.lack_of_correlation(5) == 1.0
+
+
+def test_duopitch_default_hand_calc():
+    c = M.calculate({}, CY)  # L 20, W 12, h 7, α 20°, A = 10 m², c_pi +0.2/−0.3
+    q = qp(c)
+    g90 = -1.3 + (-1.4 + 1.3) / 3          # Table 7.4b, zone G, α = 20°
+    assert out(c, "w_roof,min") == pytest.approx(q * (g90 - 0.2))
+    f_pos = 0.2 + 0.5 / 3                  # Table 7.4a, zone F (+), α = 20°
+    assert out(c, "w_roof,max") == pytest.approx(q * (f_pos + 0.3))
+    d = 0.7 + 0.1 * (7 / 12 - 0.25) / 0.75  # Table 7.1, zone D
+    e = -0.3 - 0.2 * (7 / 12 - 0.25) / 0.75
+    assert out(c, "w_wall,max") == pytest.approx(q * (d + 0.3))
+    assert out(c, "w_wall,min") == pytest.approx(q * (-1.2 - 0.2))
+    assert out(c, "w_h,0") == pytest.approx(0.85 * q * (d - e))
+    assert any("Provisional" in w for w in c.warnings)
+
+
+def test_monopitch_three_directions_and_flat_roofs():
+    c = M.calculate({"roof": "Monopitch", "alpha": 15}, CY)
+    assert "w_h,180" in c.outputs
+    # worst roof suction: θ = 180°, zone F −2.5 (Table 7.3a, α = 15°; F_up at 90° is −2.4)
+    assert out(c, "w_roof,min") == pytest.approx(qp(c) * (-2.5 - 0.2))
+    c = M.calculate({"roof": "Flat (α < 5°)"}, CY)
+    assert out(c, "w_roof,min") == pytest.approx(qp(c) * (-1.8 - 0.2))  # zone F sharp eaves
+    c = M.calculate({"roof": "Flat (α < 5°)", "eave": "Parapets", "hp": 0.35}, CY)
+    assert out(c, "w_roof,min") == pytest.approx(qp(c) * (-1.4 - 0.2))  # h_p/h = 0.05
+
+
+def test_loaded_area_hipped_and_internal_options():
+    c1 = M.calculate({"A": 1}, CY)
+    assert out(c1, "w_wall,min") == pytest.approx(qp(c1) * (-1.4 - 0.2))  # c_pe,1 of zone A
+    c = M.calculate({"roof": "Hipped", "alpha": 25, "alpha90": 40}, CY)
+    assert out(c, "w_roof,min") < 0
+    c = M.calculate({"internal": "None (no openings)"}, CY)
+    assert out(c, "w_wall,min") == pytest.approx(qp(c) * -1.2)
+
+
+def test_canopies():
+    c = M.calculate({"kind": "Canopy roof (no walls)", "alpha": 10, "phi": 0.5}, CY)
+    q = qp(c)
+    assert out(c, "w_f,max") == pytest.approx(0.5 * q)                 # Table 7.6, α = 10°
+    assert out(c, "w_f,min") == pytest.approx((-0.9 - 0.25) * q)       # φ = 0.5: −0.9 ↔ −1.4
+    assert out(c, "F_w,max") == pytest.approx(0.5 * q * 20 * 12)
+    assert out(c, "w_net,min") == pytest.approx((-2.1 - 0.3) * q)      # zone C
+    c = M.calculate({"kind": "Canopy roof (no walls)", "canopy": "Duopitch canopy",
+                     "alpha": -10, "phi": 0}, CY)
+    assert out(c, "w_f,min") == pytest.approx(-0.6 * qp(c))            # Table 7.7, α = −10°
+    with pytest.raises(InputError):
+        M.calculate({"kind": "Canopy roof (no walls)", "alpha": 40}, CY)

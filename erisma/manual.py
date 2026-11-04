@@ -930,6 +930,22 @@ NOTES: dict[str, dict[str, list[str]]] = {
                "(2 + (n − 2) ψ0)/n για υποστυλώματα (Εξ. 6.2)· μετακινούμενα χωρίσματα 0,5 / 0,8 / "
                "1,2 kN/m² (6.3.1.2(8)) προστίθενται χωρίς μείωση· στηθαία Πίνακας 6.12, "
                "κιγκλιδώματα χώρων στάθμευσης Παράρτημα B."]},
+    "ec1_wind_pressures": {
+        "en": ["q_p(z_e) as in 'Wind and snow loads at the site' with z_e = h (h + h_p for "
+               "parapets); zones with e = min(b, 2h) for θ = 0°, 90° (and 180° for monopitch).",
+               "c_pe from Tables 7.1–7.5 (interpolation in h/d, pitch and h_p/h, r/h; same-sign "
+               "only), c_pe,1 → c_pe,10 by log10 A (Figure 7.2); net w = q_p (c_pe − c_pi) with "
+               "the more onerous c_pi; canopies c_f and c_p,net of Tables 7.6/7.7 linear in φ.",
+               "PROVISIONAL: coefficients entered from prEN 1991-1-4:2004; to be verified "
+               "against EN 1991-1-4:2005 + A1:2010."],
+        "el": ["q_p(z_e) όπως στον υπολογισμό «Άνεμος και χιόνι» με z_e = h (h + h_p με "
+               "στηθαίο)· ζώνες με e = min(b, 2h) για θ = 0°, 90° (και 180° για μονόριχτη).",
+               "c_pe από τους Πίνακες 7.1–7.5 (παρεμβολή σε h/d, κλίση, h_p/h, r/h· μόνο μεταξύ "
+               "τιμών ίδιου προσήμου), c_pe,1 → c_pe,10 με log10 A (Σχήμα 7.2)· καθαρή w = q_p "
+               "(c_pe − c_pi) με το δυσμενέστερο c_pi· στέγαστρα c_f και c_p,net των Πινάκων "
+               "7.6/7.7 γραμμικά ως προς φ.",
+               "ΠΡΟΣΩΡΙΝΟ: οι συντελεστές προέρχονται από το prEN 1991-1-4:2004· να επαληθευτούν "
+               "με το EN 1991-1-4:2005 + A1:2010."]},
     "ec1_wind_snow": {
         "en": ["q_p(z) by Eq. 4.8 with c_dir = c_season = 1; walls by Table 7.1; roof snow "
                "μ_1 C_e C_t s_k."],

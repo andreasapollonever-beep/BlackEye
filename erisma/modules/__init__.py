@@ -11,6 +11,7 @@ from . import (  # noqa: F401
     ec3_steel_column,
     ec1_wind_snow,
     ec1_imposed_loads,
+    ec1_wind_pressures,
     ec8_3_assessment,
     ec8_rc_wall,
     en1990_combinations,
