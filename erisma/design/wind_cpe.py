@@ -1,8 +1,10 @@
 """Pressure coefficients of EN 1991-1-4 Section 7 for buildings and canopy roofs.
 
-PROVISIONAL: every value below was entered from the final draft prEN 1991-1-4:2004 (January
-2004), pages 37–60, and must be checked against the published EN 1991-1-4:2005 + A1:2010
-(and AC:2010) before release.  ``SOURCE`` is printed in every report that uses these tables.
+Entered from the final draft prEN 1991-1-4:2004 and verified value by value against
+EN 1991-1-4:2005 + A1:2010 (incorporating corrigendum January 2010), Section 7, pages 33–64:
+Table 7.6 corrected to AC (α = 10°, φ = 1, zone A: −1.6); Table 7.9 without ± for φ = 0.8.
+Values read from figures (7.11, 7.13, 7.20) carry the reading accuracy of the figure.
+These are the EN recommended values; a National Annex may set others.
 
 Cells are ``(c_pe,10, c_pe,1)``.  Where a table gives a positive and a negative value for the
 same zone (NOTE 1 of Tables 7.3a–7.5) a row holds ``{"neg": (...), "pos": (...)}``.
@@ -12,9 +14,9 @@ from __future__ import annotations
 
 import math
 
-SOURCE = ("prEN 1991-1-4:2004 (final draft, January 2004) — provisional values, to be verified "
-          "against EN 1991-1-4:2005 + A1:2010")
-VERIFIED = False
+SOURCE = ("EN 1991-1-4:2005 + A1:2010 (incorporating corrigendum January 2010), "
+          "recommended values")
+VERIFIED = True
 
 Cell = tuple[float, float]
 
@@ -168,7 +170,7 @@ HIPPED = {
 CANOPY_MONO = {
     0.0: ((0.2, 0.5, 1.8, 1.1), (-0.5, -0.6, -1.3, -1.4), (-1.3, -1.5, -1.8, -2.2)),
     5.0: ((0.4, 0.8, 2.1, 1.3), (-0.7, -1.1, -1.7, -1.8), (-1.4, -1.6, -2.2, -2.5)),
-    10.0: ((0.5, 1.2, 2.4, 1.6), (-0.9, -1.5, -2.0, -2.1), (-1.4, -2.1, -2.6, -2.7)),
+    10.0: ((0.5, 1.2, 2.4, 1.6), (-0.9, -1.5, -2.0, -2.1), (-1.4, -1.6, -2.6, -2.7)),  # AC2
     15.0: ((0.7, 1.4, 2.7, 1.8), (-1.1, -1.8, -2.4, -2.5), (-1.4, -1.6, -2.9, -3.0)),
     20.0: ((0.8, 1.7, 2.9, 2.1), (-1.3, -2.2, -2.8, -2.9), (-1.4, -1.6, -2.9, -3.0)),
     25.0: ((1.0, 2.0, 3.1, 2.3), (-1.6, -2.6, -3.2, -3.2), (-1.4, -1.5, -2.5, -2.8)),
@@ -369,7 +371,7 @@ def vaulted(f_d: float, h_d: float) -> dict[str, list[float]]:
 
 # ------------------------------------------------------ 7.2.9 dominant openings
 def dominant_factor(ratio: float) -> float:
-    """Eq. 7.2 / 7.3: c_pi = f·c_pe with f = 0.75 (ratio 2) … 0.90 (ratio ≥ 3)."""
+    """Eq. 7.1 / 7.2: c_pi = f·c_pe with f = 0.75 (ratio 2) … 0.90 (ratio ≥ 3)."""
     if ratio <= 2:
         return 0.75
     if ratio >= 3:
@@ -380,8 +382,8 @@ def dominant_factor(ratio: float) -> float:
 # ------------------------------------- 7.4.1 free-standing walls (Table 7.9)
 FREE_WALL_SOLID = {3.0: (2.3, 1.4, 1.2, 1.2), 5.0: (2.9, 1.8, 1.4, 1.2),
                    10.0: (3.4, 2.1, 1.7, 1.2)}   # φ = 1, without return corners, l/h
-FREE_WALL_RETURN = (2.1, 1.8, 1.4, 1.2)          # φ = 1, return corners ≥ h (±)
-FREE_WALL_POROUS = (1.2, 1.2, 1.2, 1.2)          # φ = 0.8 (±)
+FREE_WALL_RETURN = (2.1, 1.8, 1.4, 1.2)          # φ = 1, return corners ≥ h (both directions)
+FREE_WALL_POROUS = (1.2, 1.2, 1.2, 1.2)          # φ = 0.8
 
 
 def free_wall(l_h: float, phi: float, ret_h: float) -> tuple[float, ...]:
@@ -406,5 +408,5 @@ def shelter(x_h: float, phi: float) -> float:
 
 
 # ------------------------------------------------------- 7.4.3 signboards, 7.5 friction
-SIGN_CF = 1.80  # Eq. 7.8
+SIGN_CF = 1.80  # Eq. 7.7
 FRICTION = {"smooth": 0.01, "rough": 0.02, "very_rough": 0.04}  # Table 7.10

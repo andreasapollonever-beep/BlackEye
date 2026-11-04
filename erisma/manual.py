@@ -951,12 +951,13 @@ NOTES: dict[str, dict[str, list[str]]] = {
                "the more onerous c_pi; canopies c_f and c_p,net of Tables 7.6/7.7 linear in φ.",
                "Multispan roofs by Figure 7.10 (span 1 full zones, following spans H/I × 0.8, 0.6 "
                "or −0.4); vaulted roofs by Figure 7.11 (A, B, C = ¼, ½, ¼ of the arc); dominant "
-               "openings c_pi = 0.75 … 0.90 c_pe at the opening (Eq. 7.2/7.3); friction "
+               "openings c_pi = 0.75 … 0.90 c_pe at the opening (Eq. 7.1/7.2); friction "
                "c_fr q_p A_fr beyond min(2b, 4h) (7.5).",
                "Free-standing walls and parapets c_p,net of Table 7.9 (l/h, φ, return corners) "
                "with shelter ψ_s (Figure 7.20); signboards c_f = 1.8 at z_g + h/2, e = ±0.25 b.",
-               "PROVISIONAL: coefficients entered from prEN 1991-1-4:2004; to be verified "
-               "against EN 1991-1-4:2005 + A1:2010."],
+               "Coefficients: EN 1991-1-4:2005 + A1:2010 (incorporating corrigendum January "
+               "2010), recommended values; the minimum horizontal force 0.05 q_p A_shed of "
+               "7.2.7(4) is given for multispan roofs."],
         "el": ["q_p(z_e) όπως στον υπολογισμό «Άνεμος και χιόνι» με z_e = h (h + h_p με "
                "στηθαίο)· ζώνες με e = min(b, 2h) για θ = 0°, 90° (και 180° για μονόριχτη).",
                "c_pe από τους Πίνακες 7.1–7.5 (παρεμβολή σε h/d, κλίση, h_p/h, r/h· μόνο μεταξύ "
@@ -965,13 +966,14 @@ NOTES: dict[str, dict[str, list[str]]] = {
                "7.6/7.7 γραμμικά ως προς φ.",
                "Πολλαπλές στέγες κατά Σχήμα 7.10 (1ο άνοιγμα όλες οι ζώνες, επόμενα H/I × 0,8, "
                "0,6 ή −0,4)· θολωτές κατά Σχήμα 7.11 (A, B, C = ¼, ½, ¼ του τόξου)· κυρίαρχα "
-               "ανοίγματα c_pi = 0,75 … 0,90 c_pe στο άνοιγμα (Εξ. 7.2/7.3)· τριβή c_fr q_p A_fr "
+               "ανοίγματα c_pi = 0,75 … 0,90 c_pe στο άνοιγμα (Εξ. 7.1/7.2)· τριβή c_fr q_p A_fr "
                "πέρα από min(2b, 4h) (7.5).",
                "Ελεύθεροι τοίχοι και στηθαία c_p,net του Πίνακα 7.9 (l/h, φ, γωνιακές επιστροφές) "
                "με συντελεστή προφύλαξης ψ_s (Σχήμα 7.20)· πινακίδες c_f = 1,8 σε z_g + h/2, "
                "e = ±0,25 b.",
-               "ΠΡΟΣΩΡΙΝΟ: οι συντελεστές προέρχονται από το prEN 1991-1-4:2004· να επαληθευτούν "
-               "με το EN 1991-1-4:2005 + A1:2010."]},
+               "Συντελεστές: EN 1991-1-4:2005 + A1:2010 (με τη διόρθωση Ιανουαρίου 2010), "
+               "προτεινόμενες τιμές· για πολλαπλές στέγες δίνεται και η ελάχιστη οριζόντια "
+               "δύναμη 0,05 q_p A_shed του 7.2.7(4)."]},
     "ec1_wind_snow": {
         "en": ["q_p(z) by Eq. 4.8 with c_dir = c_season = 1; walls by Table 7.1; roof snow "
                "μ_1 C_e C_t s_k."],

@@ -49,7 +49,7 @@ def test_duopitch_default_hand_calc():
     assert out(c, "w_wall,max") == pytest.approx(q * (d + 0.3))
     assert out(c, "w_wall,min") == pytest.approx(q * (-1.2 - 0.2))
     assert out(c, "w_h,0") == pytest.approx(0.85 * q * (d - e))
-    assert any("Provisional" in w for w in c.warnings)
+    assert not c.warnings and W.VERIFIED  # coefficients verified against EN 1991-1-4:2005+A1
 
 
 def test_monopitch_three_directions_and_flat_roofs():
@@ -129,3 +129,13 @@ def test_friction_free_walls_and_signboards():
     c = M.calculate({"kind": "Canopy roof (no walls)", "canopy": "Duopitch canopy",
                      "alpha": 10, "bays": 4}, CY)
     assert out(c, "F_fr") == pytest.approx(0.02 * qp(c) * 2 * 12 * 20)
+
+
+def test_values_of_the_final_standard():
+    """Corrections of EN 1991-1-4:2005 + A1:2010 (with AC:2010) over the 2004 draft."""
+    mx, mn = W.canopy(W.CANOPY_MONO, 10, 1.0)
+    assert mn[1] == pytest.approx(-1.6)                     # Table 7.6 AC2: α 10°, φ 1, zone A
+    c = M.calculate({"roof": "Monopitch", "alpha": 15, "spans": 3}, CY)
+    assert out(c, "F_w,min") == pytest.approx(0.05 * qp(c) * 20 * 12)  # 7.2.7(4) A1
+    assert W.dominant_factor(2) == 0.75 and W.dominant_factor(3) == 0.90  # Eq. 7.1, 7.2
+    assert "2005" in W.SOURCE and W.VERIFIED

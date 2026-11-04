@@ -6,7 +6,7 @@ pressure coefficients c_pe are read from Tables 7.1–7.5 (c_pe,1 → c_pe,10 by
 Figure 7.2), and the net pressures w = q_p (c_pe − c_pi) are formed with the most onerous
 internal pressure.  Canopies use c_f and c_p,net of Tables 7.6 / 7.7 with the blockage φ.
 
-The coefficients come from :mod:`erisma.design.wind_cpe` (provisional, see its ``SOURCE``).
+The coefficients come from :mod:`erisma.design.wind_cpe` (EN 1991-1-4:2005 + A1:2010).
 """
 
 from __future__ import annotations
@@ -132,7 +132,7 @@ class WindPressuresEC1(DesignModule):
               help="7.2.9(6) NOTE 2. A dominant opening must be treated separately (7.2.9(3)–(5))."),
         Field("mu", "Opening ratio μ", "", 0.5, min=0, max=1, group="Pressures",
               show_if="internal=From the opening ratio μ (Figure 7.13)",
-              help="Area of openings where c_pe ≤ 0 / area of all openings (Eq. 7.4)."),
+              help="Area of openings where c_pe ≤ 0 / area of all openings (Eq. 7.3)."),
         Field("dom_face", "Face with the dominant opening", kind="choice", choices=DOM_FACES,
               default=DOM_FACES[0], group="Pressures",
               show_if="internal=Dominant opening (7.2.9(5))",
@@ -154,6 +154,9 @@ class WindPressuresEC1(DesignModule):
     def run(cls, calc: Calculation, inp: dict) -> None:
         if not W.VERIFIED:
             calc.warn("Provisional pressure coefficients: {s}.", s=W.SOURCE)
+        else:
+            calc.note("Pressure and force coefficients: {s}; a National Annex may give other "
+                      "values.", s=calc.tr(W.SOURCE))
         L, Wd, h = inp["L"] / 1000, inp["Wd"] / 1000, inp["h"] / 1000
         A = inp["A"] / 1e6
         kind = inp["kind"]
@@ -203,13 +206,18 @@ class WindPressuresEC1(DesignModule):
         if n > 1:
             calc.text("Multispan roof: {n} spans of {s:.2f} m (7.2.7, Figure 7.10).", n=n,
                       s=Wd / n)
+            calc.formula("F_w,min", "0.05 · q_p · A_shed, A_shed = L·W", 0.05 * qp * L * Wd * 1e6,
+                         "kN", "Minimum resulting horizontal force on the multispan roof",
+                         ref="7.2.7(4)", dp=2)
 
         # internal pressure
         calc.heading("Internal pressure")
+        calc.note("If in at least two faces the openings exceed 30 % of the face, use the rules "
+                  "for canopies and free-standing walls (7.3, 7.4) instead (7.2.9(2)).")
         mode = inp["internal"]
         dom = None
         if mode == INTERNAL[3]:
-            fdom = calc.formula("f_dom", f"Eq. 7.2/7.3, ratio {inp['dom_ratio']:g}",
+            fdom = calc.formula("f_dom", f"Eq. 7.1/7.2, ratio {inp['dom_ratio']:g}",
                                 W.dominant_factor(inp["dom_ratio"]), "",
                                 "c_pi / c_pe at the dominant opening", ref="7.2.9(5)", dp=3)
             dom = (fdom, inp["dom_face"])
@@ -386,6 +394,9 @@ class WindPressuresEC1(DesignModule):
                          "curved": f"r/h = {ratio:.3f}", "mansard": f"α = {ratio:g}°"}[kind]
                 calc.text("Flat roof, {k} {l} (Table 7.2)", k=calc.tr(inp["eave"]).lower(),
                           l=label)
+                if kind == "mansard":
+                    calc.note("Mansard eaves with a horizontal dimension less than e/10: use the "
+                              "values for sharp eaves (Table 7.2 NOTE 6).")
             c = W.flat_roof(kind, ratio)
             z = cls._expand("F", c["F"], corner, sz(corner[0]) + " ×2")
             z += cls._expand("G", c["G"], [g_rect], sz(g_rect))
@@ -537,6 +548,8 @@ class WindPressuresEC1(DesignModule):
                      "Local net pressure, downward (roofing, fixings)", dp=3)
         calc.formula("w_net,min", "min c_p,net · q_p", min(mn[1:]) * qp, "kN/m²",
                      "Local net pressure, upward (roofing, fixings)", dp=3)
+        calc.note("Double-skin canopies: the impermeable skin and its fixings with c_p,net, the "
+                  "permeable skin with 1/3 c_p,net (7.3(6)).")
         calc.formula("F_fr", f"c_fr·q_p·2·d·b = {fr:g}·q_p·2·{d:.2f}·{b:.2f}",
                      fr * qp * 2 * d * b * 1e6, "kN", "Friction force (wind along the roof)",
                      ref="7.5, Figure 7.22", dp=2)
@@ -562,11 +575,12 @@ class WindPressuresEC1(DesignModule):
         calc.formula("z_e", "h_b + h" if inp["on_building"] else "h", ze * 1000, "m",
                      "Reference height", ref="7.4.1(2)", dp=2)
         cp = W.free_wall(l / h, phi, ret / h)
-        both = phi < 1 or ret > 0
+        both = ret > 0
         calc.text("l/h = {lh:.2f}, φ = {p:g}, return corner {r:.2f} m (r/h = {rh:.2f}). {s}",
                   lh=l / h, p=phi, r=ret, rh=ret / h,
-                  s=calc.tr("Both signs (±) must be considered." if both else
-                            "Pressure on the windward face (no return corners, φ = 1)."))
+                  s=calc.tr("With a return corner the values apply in both opposite directions (±)."
+                            if both else "Oblique wind on a wall without return corner "
+                                         "(Table 7.9 NOTE)."))
         parts = [("A", 0, 0.3 * h), ("B", 0.3 * h, 2 * h), ("C", 2 * h, 4 * h), ("D", 4 * h, l)]
         psi = 1.0
         if inp["sheltered"]:
@@ -574,7 +588,7 @@ class WindPressuresEC1(DesignModule):
                                f"φ = {inp['phi_up']:g}", W.shelter(inp["xs"] / inp["h"],
                                                                      inp["phi_up"]), "",
                                "Shelter factor (not within h of the free end)",
-                               ref="7.4.2, Eq. 7.7", dp=3)
+                               ref="7.4.2, Eq. 7.6", dp=3)
         rows, total, zones = [], 0.0, []
         for (zn, u0, u1), c in zip(parts, cp):
             u1 = min(u1, l)
@@ -631,12 +645,12 @@ class WindPressuresEC1(DesignModule):
         calc.input("z_g", inp["zg"], "m", "Clearance above ground")
         calc.formula("z_e", "z_g + h/2", ze * 1000, "m", "Reference height", ref="Figure 7.21",
                      dp=2)
-        calc.formula("c_f", "Eq. 7.8", W.SIGN_CF, "", "Force coefficient", ref="7.4.3(1)", dp=2)
+        calc.formula("c_f", "Eq. 7.7", W.SIGN_CF, "", "Force coefficient", ref="7.4.3(1)", dp=2)
         F = calc.formula("F_w", "c_s c_d · c_f · q_p · b · h, c_s c_d = 1",
                          W.SIGN_CF * qp * b * h * 1e6, "kN", "Wind force on the signboard",
                          ref="Eq. 5.3", dp=2)
         ecc = calc.formula("e", "±0.25 b", 0.25 * b * 1000, "m", "Horizontal eccentricity",
-                           ref="Eq. 7.9", dp=2)
+                           ref="Eq. 7.8", dp=2)
         calc.formula("M_t", "F_w · e", F * ecc, "kNm", "Torsion about the vertical axis", dp=2)
         calc.formula("M_base", "F_w · z_e", F * ze * 1000, "kNm",
                      "Overturning moment at ground level", dp=2)

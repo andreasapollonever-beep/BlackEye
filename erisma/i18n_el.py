@@ -2958,4 +2958,13 @@ EL: dict[str, str] = {
     'wind': 'άνεμος',
     'γ_Q V_W,X [kN]': 'γ_Q V_W,X [kN]',
     'γ_Q V_W,Y [kN]': 'γ_Q V_W,Y [kN]',
+    'Area of openings where c_pe ≤ 0 / area of all openings (Eq. 7.3).': 'Εμβαδόν ανοιγμάτων με c_pe ≤ 0 / εμβαδόν όλων των ανοιγμάτων (Εξ. 7.3).',
+    'Double-skin canopies: the impermeable skin and its fixings with c_p,net, the permeable skin with 1/3 c_p,net (7.3(6)).': 'Στέγαστρα με διπλό κέλυφος: το μη διαπερατό κέλυφος και οι στερεώσεις του με c_p,net, το διαπερατό με 1/3 c_p,net (7.3(6)).',
+    'EN 1991-1-4:2005 + A1:2010 (incorporating corrigendum January 2010), recommended values': 'EN 1991-1-4:2005 + A1:2010 (με τη διόρθωση Ιανουαρίου 2010), προτεινόμενες τιμές',
+    'If in at least two faces the openings exceed 30 % of the face, use the rules for canopies and free-standing walls (7.3, 7.4) instead (7.2.9(2)).': 'Αν σε τουλάχιστον δύο όψεις τα ανοίγματα υπερβαίνουν το 30 % της όψης, εφαρμόζονται οι κανόνες για στέγαστρα και ελεύθερους τοίχους (7.3, 7.4) (7.2.9(2)).',
+    'Mansard eaves with a horizontal dimension less than e/10: use the values for sharp eaves (Table 7.2 NOTE 6).': 'Γείσα mansard με οριζόντια διάσταση μικρότερη από e/10: χρησιμοποιούνται οι τιμές για αιχμηρό γείσο (Πίνακας 7.2 ΣΗΜΕΙΩΣΗ 6).',
+    'Minimum resulting horizontal force on the multispan roof': 'Ελάχιστη συνισταμένη οριζόντια δύναμη στην πολλαπλή στέγη',
+    'Oblique wind on a wall without return corner (Table 7.9 NOTE).': 'Λοξός άνεμος σε τοίχο χωρίς γωνιακή επιστροφή (Πίνακας 7.9 ΣΗΜΕΙΩΣΗ).',
+    'Pressure and force coefficients: {s}; a National Annex may give other values.': 'Συντελεστές πίεσης και δύναμης: {s}· το Εθνικό Προσάρτημα μπορεί να ορίζει άλλες τιμές.',
+    'With a return corner the values apply in both opposite directions (±).': 'Με γωνιακή επιστροφή οι τιμές ισχύουν και στις δύο αντίθετες διευθύνσεις (±).',
 }
