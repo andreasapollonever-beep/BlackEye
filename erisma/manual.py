@@ -914,6 +914,22 @@ NOTES: dict[str, dict[str, list[str]]] = {
                "ενεργητικής και παθητικής· αγκύρια ως ελατήρια με προένταση P_0.",
                "Συντελεστές στα αποτελέσματα (DA2: χαρακτηριστικό έδαφος, × γ_G) ή στις αντοχές "
                "(DA1-C2, DA3)."]},
+    "ec1_imposed_loads": {
+        "en": ["Self-weight g_k = Σ γ t of the build-up with the nominal densities of EN 1991-1-1 "
+               "Annex A (upper value of a range); imposed q_k, Q_k by category (Tables 6.2, 6.4, "
+               "6.8, 6.10, National Annex value or the recommended one).",
+               "α_A = 5/7 ψ0 + A0/A ≤ 1.0 (≥ 0.6 for C, D; Eq. 6.1) for floors, α_n = "
+               "(2 + (n − 2) ψ0)/n for columns (Eq. 6.2); movable partitions 0.5 / 0.8 / "
+               "1.2 kN/m² (6.3.1.2(8)) added unreduced; parapets Table 6.12, car-park barriers "
+               "Annex B."],
+        "el": ["Ίδιο βάρος g_k = Σ γ t της διαστρωμάτωσης με τις ονομαστικές πυκνότητες του "
+               "Παραρτήματος A του EN 1991-1-1 (άνω τιμή εύρους)· επιβαλλόμενα q_k, Q_k ανά "
+               "κατηγορία (Πίνακες 6.2, 6.4, 6.8, 6.10, τιμή Εθνικού Προσαρτήματος ή η "
+               "προτεινόμενη).",
+               "α_A = 5/7 ψ0 + A0/A ≤ 1,0 (≥ 0,6 για C, D· Εξ. 6.1) για δάπεδα, α_n = "
+               "(2 + (n − 2) ψ0)/n για υποστυλώματα (Εξ. 6.2)· μετακινούμενα χωρίσματα 0,5 / 0,8 / "
+               "1,2 kN/m² (6.3.1.2(8)) προστίθενται χωρίς μείωση· στηθαία Πίνακας 6.12, "
+               "κιγκλιδώματα χώρων στάθμευσης Παράρτημα B."]},
     "ec1_wind_snow": {
         "en": ["q_p(z) by Eq. 4.8 with c_dir = c_season = 1; walls by Table 7.1; roof snow "
                "μ_1 C_e C_t s_k."],

@@ -122,6 +122,21 @@ class Annex:
     # EN 1995-1-1 Table 2.3 (no Cyprus annex available: EN recommended values)
     timber_gM: dict = field(default_factory=lambda: {"Solid timber": 1.3, "Glulam": 1.25})
     timber_na: bool = False
+    # EN 1991-1-1:2002 — recommended values (underlined in Tables 6.2, 6.4, 6.8, 6.10, 6.12),
+    # checked against the Greek translation of EN 1991-1-1:2002 (April 2002).
+    # category -> (q_k [kN/m²], Q_k [kN]); the National Annex may choose other values.
+    imposed: dict = field(default_factory=lambda: {
+        "A_floor": (2.0, 2.0), "A_stairs": (2.0, 2.0), "A_balcony": (2.5, 2.0),
+        "B": (3.0, 4.5), "C1": (3.0, 4.0), "C2": (4.0, 4.0), "C3": (5.0, 4.0),
+        "C4": (5.0, 7.0), "C5": (5.0, 4.5), "D1": (4.0, 4.0), "D2": (5.0, 7.0),
+        "E1": (7.5, 7.0), "F": (2.5, 20.0), "G": (5.0, 90.0), "H": (0.4, 1.0)})
+    # Table 6.12 — horizontal line load on partition walls and parapets q_k [kN/m]
+    parapet: dict = field(default_factory=lambda: {
+        "A": 0.5, "B": 0.5, "C1": 0.5, "C2": 1.0, "C3": 1.0, "C4": 1.0, "D": 1.0,
+        "C5": 3.0, "E": 2.0})
+    imposed_A0: float = 10.0  # Eq. 6.1, A0 [m²]
+    imposed_alphaA_min_CD: float = 0.6  # Eq. 6.1, categories C and D
+    imposed_na: bool = False  # True once a National Annex to EN 1991-1-1 has been entered
     notes: tuple = ()
 
     def approach(self, choice: str) -> str:
