@@ -92,6 +92,8 @@ def test_inverse_numeric_choice_and_int():
     assert r["kind"] == "int" and r["min_pass"] is not None
     with pytest.raises(ValueError):
         R.reserve("ec1_imposed_loads", {}, CY, ["G"])
+    with pytest.raises(ValueError, match="no checks"):
+        R.inverse("ec1_wind_members", {}, CY, "b")
 
 
 def test_reserve_api_and_licence(monkeypatch):

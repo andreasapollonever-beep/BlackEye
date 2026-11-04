@@ -1059,6 +1059,29 @@ NOTES: dict[str, dict[str, list[str]]] = {
                "Συντελεστές: EN 1991-1-4:2005 + A1:2010 (με τη διόρθωση Ιανουαρίου 2010), "
                "προτεινόμενες τιμές· για πολλαπλές στέγες δίνεται και η ελάχιστη οριζόντια "
                "δύναμη 0,05 q_p A_shed του 7.2.7(4)."]},
+    "ec1_wind_members": {
+        "en": ["F_w = c_s c_d c_f q_p(z_e) A_ref (Eq. 5.3), z_e = top of the element; c_f = c_f,0 "
+               "ψ_r ψ_λ with c_f,0 from Figure 7.23 (rectangular), 7.7 (sharp-edged, 2.0), Table "
+               "7.11 (polygons), Figure 7.28 (circular, Re with the peak velocity), Figure 7.33 "
+               "(plane lattice of angles), 1.2 (cables); λ by Table 7.16, ψ_λ = 1 unless given.",
+               "c_s c_d by Eq. 6.1 with Annex B (B², R², k_p, ν); n1 by beam theory for a "
+               "uniform cantilever or Eq. F.3 for chimneys; δ = δ_s (Table F.2) + δ_a (Eq. F.18).",
+               "Vortex shedding: v_crit = b n1/St (E.2); if v_crit ≤ 1.25 v_m, approach 1 "
+               "(E.1.5.2) for cantilevers: Sc, c_lat (Figure E.2, Table E.3), L_j iterated with "
+               "y_F (Table E.4), K_w and K = 0.13 (Table E.5), y_F (E.7), inertia forces (E.6) and "
+               "load cycles (E.10). Coefficients verified against EN 1991-1-4:2005 + A1:2010."],
+        "el": ["F_w = c_s c_d c_f q_p(z_e) A_ref (Εξ. 5.3), z_e = κορυφή του στοιχείου· c_f = "
+               "c_f,0 ψ_r ψ_λ με c_f,0 από το Σχήμα 7.23 (ορθογωνικές), 7.7 (με ακμές, 2,0), "
+               "Πίνακα 7.11 (πολύγωνα), Σχήμα 7.28 (κυκλικές, Re με τη μέγιστη ταχύτητα), Σχήμα "
+               "7.33 (επίπεδο δικτύωμα από γωνιακά), 1,2 (συρματόσχοινα)· λ από τον Πίνακα 7.16, "
+               "ψ_λ = 1 εκτός αν δοθεί.",
+               "c_s c_d κατά Εξ. 6.1 με το Παράρτημα B (B², R², k_p, ν)· n1 με θεωρία δοκού για "
+               "ομοιόμορφο πρόβολο ή Εξ. F.3 για καμινάδες· δ = δ_s (Πίνακας F.2) + δ_a (Εξ. F.18).",
+               "Αποκόλληση στροβίλων: v_crit = b n1/St (E.2)· αν v_crit ≤ 1,25 v_m, προσέγγιση 1 "
+               "(E.1.5.2) για προβόλους: Sc, c_lat (Σχήμα E.2, Πίνακας E.3), L_j επαναληπτικά με "
+               "το y_F (Πίνακας E.4), K_w και K = 0,13 (Πίνακας E.5), y_F (E.7), αδρανειακές "
+               "δυνάμεις (E.6) και κύκλοι φόρτισης (E.10). Συντελεστές επαληθευμένοι με το "
+               "EN 1991-1-4:2005 + A1:2010."]},
     "ec1_wind_snow": {
         "en": ["q_p(z) by Eq. 4.8 with c_dir = c_season = 1; walls by Table 7.1; roof snow "
                "μ_1 C_e C_t s_k."],

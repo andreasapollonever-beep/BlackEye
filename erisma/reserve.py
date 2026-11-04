@@ -233,6 +233,9 @@ def inverse(module_id: str, inputs: dict, project: dict, field: str,
     if f is None:
         raise ValueError("Unknown input")
     cur = ev.base.get(field)
+    first = ev.run(ev.base)
+    if not first["error"] and not first["checks"]:
+        raise ValueError("This calculation has no checks — there is nothing to solve for")
 
     def summary(v):
         r = ev.run({**ev.base, field: v})
