@@ -597,6 +597,10 @@ EL: dict[str, str] = {
         "Αντοχή εδάφους με γ_φ' = {gp}, γ_c' = {gc}· επιφόρτιση × ψ2 = 0.3· εξετάζονται και τα δύο πρόσημα του k_v.",
     # ------------------------------------------------------------ Cyprus NA
     "Cyprus (CYS National Annexes)": "Κύπρος (Εθνικά Προσαρτήματα CYS)",
+    "Greece (ELOT National Annexes)": "Ελλάδα (Εθνικά Προσαρτήματα ΕΛΟΤ)",
+    "EN 1991-1-1 Table 6.9: accessible roof (category I) as the floors below (2.0 kN/m² dwellings); non-accessible roof (category H) 0.4 kN/m² (Table 6.10).": "EN 1991-1-1 Πίνακας 6.9: βατή στέγη (κατηγορία I) όπως οι όροφοι από κάτω (2.0 kN/m² κατοικίες)· μη βατή στέγη (κατηγορία H) 0.4 kN/m² (Πίνακας 6.10).",
+    "EN 1992-1-1: the Greek National Annex adopts the recommended values.": "EN 1992-1-1: το Ελληνικό Εθνικό Προσάρτημα υιοθετεί τις προτεινόμενες τιμές.",
+    "EN 1990, EN 1997-1, EN 1998-1: Greek National Annex not yet verified — EN recommended values are used; enter a_g from the seismic zone of the site.": "EN 1990, EN 1997-1, EN 1998-1: το Ελληνικό Εθνικό Προσάρτημα δεν έχει ακόμη επαληθευτεί — χρησιμοποιούνται οι προτεινόμενες τιμές EN· δώστε το a_g από τη σεισμική ζώνη του οικοπέδου.",
     "Design Approach 2 is mandatory for STR/GEO (NA 2.9).": "Η Προσέγγιση Σχεδιασμού 2 είναι υποχρεωτική για STR/GEO (NA 2.9).",
     "Seismic zones: Zone 1 0.15 g, Zone 2 0.20 g, Zone 3 0.25 g (NA zonation map, 10 % in 50 years).":
         "Σεισμικές ζώνες: Ζώνη 1 0.15 g, Ζώνη 2 0.20 g, Ζώνη 3 0.25 g (χάρτης ζωνών του ΕΠ, 10 % σε 50 χρόνια).",

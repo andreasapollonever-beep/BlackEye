@@ -86,7 +86,10 @@ class BuildingFrame(DesignModule):
               group="Loads", help="Floor finishes, screed, light partitions."),
         Field("q", "Imposed load q", "kN/m²", 2.0, min=0, max=20, group="Loads",
               help="EN 1991-1-1: dwellings 2.0, offices 3.0, assembly 4.0–5.0 kN/m²."),
-        Field("q_roof", "Roof imposed load", "kN/m²", 2.0, min=0, max=20, group="Loads"),
+        Field("q_roof", "Roof imposed load", "kN/m²", 2.0, min=0, max=20, group="Loads",
+              help="EN 1991-1-1 Table 6.9: accessible roof (category I) as the floors below "
+                   "(2.0 kN/m² dwellings); non-accessible roof (category H) 0.4 kN/m² "
+                   "(Table 6.10)."),
         Field("g_wall", "Facade walls on perimeter beams", "kN/m", 8.0, min=0, max=40,
               group="Loads", help="e.g. 3.6 kN/m² brick wall × 2.2 m = 8 kN/m. Not on the roof."),
         Field("category", "Use category (ψ factors)", kind="choice", choices=CATEGORY,

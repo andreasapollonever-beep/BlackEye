@@ -191,7 +191,24 @@ CY = Annex(
            "10 % in 50 years)."),
 )
 
-ANNEXES: dict[str, Annex] = {"EN": EN, "CY": CY}
+# Greece — verified against the Greek National Annex to EN 1992-1-1 (ELOT, one page):
+# "for the nationally determined parameters the values recommended in the notes of
+# EN 1992-1-1 are adopted" → γc 1.5, γs 1.15, αcc 1.0, αcc,pl 0.8, v_Rd,max 0.4 ν f_cd
+# (recommended value after EN 1992-1-1/AC:2010 — the lower, safe-side value).
+# EN 1990 Table A1.1 / A1.2(B) and EN 1991-1-1 (Greek translation, Apr 2002) were checked
+# against the texts; their Greek National Annexes (and those of EN 1997-1, EN 1998-1) were
+# not provided: EN recommended values are used, no seismic zones are entered (a_g is a user
+# input) and the report says so.
+GR = replace(
+    EN, code="GR", label="Greece (ELOT National Annexes)",
+    reference="Greek NA to EN 1992-1-1 (recommended values adopted); EN 1990, EN 1991-1-1, "
+              "EN 1997-1, EN 1998-1: EN recommended values (Greek NA not yet verified)",
+    notes=("EN 1992-1-1: the Greek National Annex adopts the recommended values.",
+           "EN 1990, EN 1997-1, EN 1998-1: Greek National Annex not yet verified — EN "
+           "recommended values are used; enter a_g from the seismic zone of the site."),
+)
+
+ANNEXES: dict[str, Annex] = {"EN": EN, "CY": CY, "GR": GR}
 
 
 def ground_snow(na: Annex, A: float) -> float | None:
@@ -237,6 +254,9 @@ def record_annex(calc) -> None:
     if site:
         rows.append(site)
     calc.table(["Clause", "Parameter", "Value"], rows, caption=na.label)
+    if na.code == "GR":
+        for n in na.notes:
+            calc.note(n)
 
 
 def site_zone_row(calc, na: Annex):
@@ -267,5 +287,5 @@ def check_approach(calc, na: Annex, choice: str) -> None:
                   annex=calc.tr(na.label), da=na.mandatory_approach, sel=na.approach(choice))
 
 
-__all__ = ["Annex", "ANNEXES", "APPROACH_CHOICES", "CY", "EN", "check_approach", "get_annex",
+__all__ = ["Annex", "ANNEXES", "APPROACH_CHOICES", "CY", "EN", "GR", "check_approach", "get_annex",
            "replace"]
