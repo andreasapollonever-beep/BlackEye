@@ -105,6 +105,7 @@ Object.assign(UI.el, {
   "torsionally flexible": "στρεπτικά εύκαμπτο", "torsionally stiff": "στρεπτικά δύσκαμπτο",
   "q used": "q που χρησιμοποιήθηκε", "Mode": "Ιδιομορφή", "torsion": "στρέψη",
   "Drift d_r·ν / (α·h) per storey": "Σχετική μετακίνηση d_r·ν / (α·h) ανά όροφο",
+  "National Annex": "Εθνικό Προσάρτημα", "Code": "Κανονισμός", "Seismic zone": "Σεισμική ζώνη",
   "Load case": "Φόρτιση", "New case": "Νέα φόρτιση", "Rename": "Μετονομασία", "Delete case": "Διαγραφή φόρτισης",
   "Permanent G": "Μόνιμα G", "Imposed Q": "Κινητά Q", "Snow S": "Χιόνι S", "Apply loads": "Εφαρμογή φορτίων",
   "Area load": "Επιφανειακό", "Line load": "Γραμμικό", "Point load": "Σημειακό", "Value": "Τιμή",
@@ -349,6 +350,7 @@ const Structure = (() => {
     const nStorey = S.inp.storeys.length;
     return [
       ["file", t("File"), [
+        group(t("Code"), col(annexSelect())),
         group(t("Project"), btn("new", t("New"), t("Start a new building from the example? The current one will be replaced."), newBuilding, { big: true }),
           btn("open", t("Open"), `${t("Open")} (Ctrl+O)`, () => $("#file-open").click(), { big: true }),
           btn("save", t("Save"), `${t("Save")} (Ctrl+S)`, save, { big: true })),
@@ -424,7 +426,9 @@ const Structure = (() => {
       ]],
       ["seismic", t("Seismic"), [
         group(t("Seismic design"), col(tog("seismic", "EN 1998-1"))),
-        group(t("Site"), col(ctl("ag"), ctl("ground", { width: 56 })), col(ctl("importance", { width: 56 }))),
+        group(t("Site"), col(ctl("ag"), ctl("ground", { width: 56 })), col(ctl("importance", { width: 56 }), annexSelect())),
+        ...(curAnnex()?.zones?.length ? [group(t("Seismic zone"), ...curAnnex().zones.map((z) =>
+          btn("grid", `${z.label}`, `a_gR = ${z.ag} g`, () => { S.inp.ag = z.ag; renderRibbon(); commit(); }, { on: Math.abs(S.inp.ag - z.ag) < 1e-9 })))] : []),
         group(t("Structure"), col(ctl("q_factor"), ctl("cracked")), col(ctl("drift", { width: 190 }))),
         group(t("Analysis options"), col(ctl("n_modes"), ctl("phi_E")), col(tog("pdelta", t("P-Δ")))),
       ]],
@@ -499,7 +503,7 @@ const Structure = (() => {
         on: { click: () => { S.tab = id; if (S.opt.ribbonMin) { S.opt.ribbonMin = false; saveView(); } renderRibbon(); drawPlan(); },
           dblclick: () => { S.opt.ribbonMin = !S.opt.ribbonMin; saveView(); renderRibbon(); } } }, label)),
       el("span", { class: "grow" }),
-      el("span", { class: "rb-title" }, "Erisma Structure"),
+      el("span", { class: "rb-title" }, `Erisma Structure · ${curAnnex()?.label || "EN"}`),
       (() => { const b = el("button", { type: "button", class: "rb-min", title: t("Collapse ribbon"), on: { click: () => { S.opt.ribbonMin = !S.opt.ribbonMin; saveView(); renderRibbon(); } } }); b.innerHTML = icon("min"); return b; })());
     box.append(tabsRow);
     const body = el("div", { class: "rb-body" }, ...all.find(([id]) => id === S.tab)[2]);
@@ -1276,6 +1280,20 @@ const Structure = (() => {
     const text = [head.join(";"), ...rows.map((r) => [r.member, r.type, r.storey, r.section, r.reinforcement, r.rho.toFixed(2),
       r.util.toFixed(3), r.status, r.notes].map(q).join(";"))].join("\r\n");
     download(`${fileName()}_members.csv`, "﻿" + text, "text/csv");
+  }
+
+  // ------------------------------------------------------------ National Annex (project-wide)
+  const curAnnex = () => (state.annexes || []).find((a) => a.code === (state.project.annex || "EN"));
+  function annexSelect() {
+    const sel = el("select", { title: t("National Annex"), on: { change: (e) => {
+      state.project.annex = e.target.value;
+      store.set("erisma.project", state.project);
+      if (typeof renderProject === "function") renderProject();
+      renderRibbon(); changed();
+    } } }, ...(state.annexes || []).map((a) => el("option", { value: a.code, title: a.reference }, a.label)));
+    sel.value = state.project.annex || "EN";
+    sel.style.width = "220px";
+    return el("label", { class: "rb-ctl" }, el("span", {}, t("National Annex")), sel, el("small", {}, ""));
   }
 
   // ------------------------------------------------------------ load cases
