@@ -7,6 +7,25 @@
 // (File · Home · Model · Loads · Seismic · Design · Results · View · Help).
 
 Object.assign(UI.el, {
+  // design results window (Tekla-style)
+  "Span (sagging)": "Άνοιγμα (θετική ροπή)", "Supports (hogging)": "Στηρίξεις (αρνητική ροπή)",
+  "Pass": "Επαρκεί", "Fail": "Ανεπαρκές", "Check mode": "Λειτουργία ελέγχου", "Design mode": "Αυτόματη διαστασιολόγηση",
+  "Checks": "Έλεγχοι", "Design forces": "Εντατικά σχεδιασμού", "Check": "Έλεγχος", "Demand": "Δράση",
+  "Resistance": "Αντοχή", "Clause": "Άρθρο", "Open the full calculation for the checks.": "Ανοίξτε τον πλήρη υπολογισμό για τους ελέγχους.",
+  "Shear": "Τέμνουσα", "Value": "Τιμή", "Governing": "Κρίσιμος συνδυασμός", "Top bars": "Άνω ράβδοι",
+  "Bottom bars": "Κάτω ράβδοι", "Links (span)": "Συνδετήρες (άνοιγμα)", "Bars per side": "Ράβδοι ανά πλευρά",
+  "Links": "Συνδετήρες",
+  "Check mode: the member is checked with these bars instead of the automatic design; the whole building is re-analysed.":
+    "Λειτουργία ελέγχου: το μέλος ελέγχεται με αυτούς τους οπλισμούς αντί για την αυτόματη διαστασιολόγηση· όλο το κτίριο ξαναϋπολογίζεται.",
+  "Back to automatic design": "Επιστροφή στην αυτόματη διαστασιολόγηση", "Elevation": "Όψη",
+  "Full calculation": "Πλήρης υπολογισμός", "Close": "Κλείσιμο",
+  "Select a designed member (after the analysis) to see its design results.": "Επιλέξτε ένα διαστασιολογημένο μέλος (μετά την ανάλυση) για να δείτε τα αποτελέσματά του.",
+  "Design results": "Αποτελέσματα διαστασιολόγησης",
+  "Design results of the selected member (double-click a member)": "Αποτελέσματα διαστασιολόγησης του επιλεγμένου μέλους (διπλό κλικ σε μέλος)",
+  "Member design": "Διαστασιολόγηση μέλους", "Top": "Άνω", "Bottom": "Κάτω",
+  "EN 1998-1 detailing (critical regions)": "Κατασκευαστικές διατάξεις EN 1998-1 (κρίσιμες περιοχές)",
+});
+Object.assign(UI.el, {
   "Erisma Structure": "Erisma Structure", "Member calculations": "Υπολογισμοί μελών",
   "Single members, foundations, retaining walls… — one calculation at a time.":
     "Μεμονωμένα μέλη, θεμελιώσεις, τοίχοι αντιστήριξης… — ένας υπολογισμός τη φορά.",
@@ -506,6 +525,7 @@ const Structure = (() => {
       ["design", t("Design"), [
         group(t("Options"), btn("design", t("Members"), t("Design members"), () => { S.inp.design = !S.inp.design; renderRibbon(); commit(); }, { big: true, on: !!S.inp.design }),
           col(tog("capacity", t("Capacity design")), tog("slabs", t("Design slabs")), tog("foundations", t("Design foundation")))),
+        group(t("Member design"), btn("design", t("Design results"), t("Design results of the selected member (double-click a member)"), openDesignForSel, { big: true, disabled: !S.sel.length || !S.res })),
         group(t("Auto-size"), btn("autosize", t("Auto-size"), t("Enlarge members and adjust options until every Eurocode check passes"), autoSize, { big: true })),
         group(t("Member tables"), btn("table", t("Table"), "", () => setView("table"), { big: true, on: v("table") }),
           btn("selfail", t("Failing members"), "", selectFailing, { big: true }), btn("csv", t("Table CSV"), "", csv, { big: true })),
@@ -665,6 +685,13 @@ const Structure = (() => {
     if (e.detail.host !== "st-3d" || !document.body.classList.contains("in-structure")) return;
     if (!e.detail.pick) { if (S.tool === "select" && !e.detail.shift) setSel([]); return; }
     const [kind, id] = e.detail.pick.split(":");
+    const now = Date.now();
+    if (S.lastPick && S.lastPick.p === e.detail.pick && now - S.lastPick.t < 400 && S.tool === "select") {
+      const key = memberKeyOf(kind, id);     // double-click in 3D → design results
+      S.lastPick = null;
+      if (key) { designDialog(key); return; }
+    }
+    S.lastPick = { p: e.detail.pick, t: now };
     act(kind, id, e.detail.shift);
   });
   function setSel(list) {
@@ -1156,6 +1183,13 @@ const Structure = (() => {
       if (S.swallowClick) { S.swallowClick = false; return; }
       const target = e.target.closest("[data-kind]");
       if (!target) { if (S.tool === "select" && !e.shiftKey) setSel([]); return; }
+      const pk = `${target.dataset.kind}:${target.dataset.id}`, now = Date.now();
+      if (S.tool === "select" && S.lastPlanClick?.p === pk && now - S.lastPlanClick.t < 400) {
+        S.lastPlanClick = null;                 // as in Tekla: double-click → design results
+        const key = memberKeyOf(target.dataset.kind, target.dataset.id);
+        if (key) { designDialog(key); return; }
+      }
+      S.lastPlanClick = { p: pk, t: now };
       act(target.dataset.kind, target.dataset.id, e.shiftKey || e.ctrlKey || e.metaKey);
     });
     svg.addEventListener("wheel", (e) => {
@@ -1205,6 +1239,8 @@ const Structure = (() => {
     item(`⚙ ${t("Properties")}`, () => { setView("plan"); renderProps(); $("#st-props").scrollIntoView({ block: "nearest" }); });
     item(`⬚ ${t("Select all of this type")}`, () => selectAll(kind === "panel" ? "beam" : kind));
     const r = kind === "panel" ? [] : resultsFor(kind, id);
+    const rk = memberKeyOf(kind, id);
+    if (rk) item(`🔍 ${t("Design results")}`, () => designDialog(rk));
     if (r.length) {
       const worst = [...r].sort((a, b) => (a.ok - b.ok) || (b.util - a.util))[0];
       item(`↗ ${t("Open in the member calculation")}`, () => openModule(worst.module, worst.inputs));
@@ -1330,7 +1366,8 @@ const Structure = (() => {
         const tb = el("table", { class: "st-res" }, el("tr", {}, el("th", {}, t("Storey")), el("th", {}, t("Reinforcement")), el("th", {}, "η"), el("th", {}, "")));
         for (const r of res) {
           tb.append(el("tr", { class: r.ok ? "" : "bad", title: r.notes.join("\n") }, el("td", {}, String(r.storey)), el("td", {}, r.reinforcement),
-            el("td", {}, r.util.toFixed(2)), el("td", {}, el("button", { type: "button", class: "mini", title: t("Open in the member calculation"),
+            el("td", {}, r.util.toFixed(2)), el("td", {}, el("button", { type: "button", class: "mini", title: t("Design results"),
+              on: { click: () => designDialog(r.id) } }, "🔍"), el("button", { type: "button", class: "mini", title: t("Open in the member calculation"),
               on: { click: () => openModule(r.module, r.inputs) } }, "↗"))));
         }
         box.append(el("h4", {}, t("Results")), tb);
@@ -1338,6 +1375,178 @@ const Structure = (() => {
         if (notes.length) box.append(el("ul", { class: "st-notes" }, ...notes.map((n) => el("li", {}, n))));
       }
     }
+  }
+
+  // ------------------------------------------------------------ design results (Tekla-style)
+  // One window per member, as the member design dialogs of Tekla Structural Designer: status,
+  // section sketch with the bars, beam elevation with the link zones, every check with its
+  // ratio and clause, the design forces, and a check mode in which the engineer sets the bars.
+  const BARS = ["10", "12", "14", "16", "18", "20", "22", "25", "28", "32"];
+  function memberKeyOf(kind, id) {
+    const r = resultsFor(kind, id);
+    if (!r.length) return null;
+    const st = S.opt.storey;
+    return (r.find((x) => String(x.storey) === st) || [...r].sort((a, b) => b.util - a.util)[0]).id;
+  }
+  function sectionSVG(kind, inp, det) {
+    const W = 230, Hm = 230;
+    const g = sv("svg", { class: "dr-sec", viewBox: `0 0 ${W} ${Hm}` });
+    let b, h;
+    if (kind === "column") { b = inp.b; h = inp.h; } else if (kind === "beam") { b = inp.b; h = inp.h; } else if (kind === "wall") { b = inp.lw * 1000; h = inp.bw; } else return null;
+    const k = Math.min((W - 60) / b, (Hm - 60) / h);
+    const x0 = (W - b * k) / 2, y0 = (Hm - h * k) / 2;
+    sv("rect", { x: x0, y: y0, width: b * k, height: h * k, class: "conc" }, g);
+    const cov = inp.cover ?? inp.cnom ?? 30;
+    const ld = parseFloat(kind === "column" ? (inp.link || "8") : kind === "beam" ? (det.link_dia || inp.link_dia || "8") : "10");
+    const inset = (cov + ld / 2) * k;
+    sv("rect", { x: x0 + inset, y: y0 + inset, width: b * k - 2 * inset, height: h * k - 2 * inset, rx: 3, class: "link" }, g);
+    const bar = (x, y, d) => sv("circle", { cx: x, cy: y, r: Math.max(d * k / 2, 2.2), class: "bar" }, g);
+    const off = (d) => (cov + ld + d / 2) * k;
+    if (kind === "column") {
+      const d = parseFloat(inp.dia), n = +inp.nb, o = off(d);
+      for (let i = 0; i < n; i++) {
+        const x = x0 + o + (b * k - 2 * o) * i / (n - 1), y = y0 + o + (h * k - 2 * o) * i / (n - 1);
+        bar(x, y0 + o, d); bar(x, y0 + h * k - o, d);
+        if (i > 0 && i < n - 1) { bar(x0 + o, y, d); bar(x0 + b * k - o, y, d); }
+      }
+    } else if (kind === "beam") {
+      for (const [face, row] of [["top", det.top], ["bottom", det.bottom]]) {
+        const d = parseFloat(row.dia), n = row.n_bars, o = off(d);
+        const y = face === "top" ? y0 + o : y0 + h * k - o;
+        for (let i = 0; i < n; i++) bar(n === 1 ? x0 + b * k / 2 : x0 + o + (b * k - 2 * o) * i / (n - 1), y, d);
+      }
+    } else if (kind === "wall") {
+      const d = parseFloat(inp.dbe), n = +inp.nbe, lc = inp.lc * k, o = off(d);
+      for (const xe of [x0, x0 + b * k - lc]) {
+        sv("rect", { x: xe + 2, y: y0 + 2, width: lc - 4, height: h * k - 4, class: "zone" }, g);
+        const per = Math.ceil(n / 2);
+        for (let i = 0; i < per; i++) {
+          const x = xe + o + (lc - 2 * o) * (per === 1 ? 0.5 : i / (per - 1));
+          bar(x, y0 + o, d); bar(x, y0 + h * k - o, d);
+        }
+      }
+    }
+    const tx = (x, y, s_, a = "middle") => { const e = sv("text", { x, y, "text-anchor": a, class: "dim" }, g); e.textContent = s_; };
+    tx(x0 + b * k / 2, y0 + h * k + 16, `${Math.round(b)}`);
+    tx(x0 - 6, y0 + h * k / 2 + 4, `${Math.round(h)}`, "end");
+    return g;
+  }
+  function elevationSVG(inp, det) {
+    const W = 900, H = 168, L = det.L || 4000, h = inp.h;
+    const g = sv("svg", { class: "dr-elev", viewBox: `0 0 ${W} ${H}` });
+    const k = (W - 40) / L, kh = Math.min(56 / h, 0.2);
+    const x0 = 20, y0 = 30, hh = h * kh;
+    sv("rect", { x: x0, y: y0, width: L * k, height: hh, class: "conc" }, g);
+    sv("rect", { x: x0 - 10, y: y0 - 10, width: 10, height: hh + 40, class: "sup" }, g);
+    sv("rect", { x: x0 + L * k, y: y0 - 10, width: 10, height: hh + 40, class: "sup" }, g);
+    const lcr = det.l_cr || 0, scr = det.s_cr || det.s, s = det.s;
+    for (let x = 50; x < L - 25; ) {
+      const crit = x < lcr || x > L - lcr;
+      sv("line", { x1: x0 + x * k, x2: x0 + x * k, y1: y0 + 3, y2: y0 + hh - 3, class: crit ? "lnk crit" : "lnk" }, g);
+      x += crit ? scr : s;
+    }
+    sv("line", { x1: x0 + 4, x2: x0 + L * k - 4, y1: y0 + 6, y2: y0 + 6, class: "rb" }, g);
+    sv("line", { x1: x0 + 4, x2: x0 + L * k - 4, y1: y0 + hh - 6, y2: y0 + hh - 6, class: "rb" }, g);
+    const tx = (x, y, s_, cls = "dim", a = "middle") => { const e = sv("text", { x, y, "text-anchor": a, class: cls }, g); e.textContent = s_; };
+    tx(x0 + L * k / 2, y0 - 6, `${t("Top")}: ${det.top.n_bars}Ø${det.top.dia}`, "lbl");
+    tx(x0 + L * k / 2, y0 + hh + 16, `${t("Bottom")}: ${det.bottom.n_bars}Ø${det.bottom.dia}`, "lbl");
+    if (lcr) {
+      tx(x0 + lcr * k / 2, y0 + hh + 34, `Ø${det.link_dia}/${scr}`, "lbl crit");
+      tx(x0 + (L - lcr / 2) * k, y0 + hh + 34, `Ø${det.link_dia}/${scr}`, "lbl crit");
+      tx(x0 + L * k / 2, y0 + hh + 34, `Ø${det.link_dia}/${s}`, "lbl");
+      tx(x0 + lcr * k / 2, y0 + hh + 48, `l_cr = ${lcr}`, "dim");
+    } else tx(x0 + L * k / 2, y0 + hh + 34, `Ø${det.link_dia}/${s}`, "lbl");
+    tx(x0 + L * k / 2, H - 4, `L = ${(L / 1000).toFixed(2)} m`, "dim");
+    return g;
+  }
+  function designDialog(key) {
+    const m = S.res?.structure?.members?.[key];
+    if (!m) return;
+    const kind = m.kind, inp = m.inputs || {}, det = m.detail || {};
+    const dlg = el("dialog", { class: "st-dlg wide dr" });
+    let tab = "checks";
+    const sec = { span: t("Span (sagging)"), support: t("Supports (hogging)"), ec8: t("EN 1998-1 detailing (critical regions)"), "": "" };
+    const draw = () => {
+      dlg.innerHTML = "";
+      const size = kind === "wall" ? `${inp.lw} m × ${inp.bw} mm` : kind === "slab" ? `h = ${inp.h} mm` : inp.b ? `${inp.b}×${inp.h}` : "";
+      dlg.append(el("div", { class: "dr-head" },
+        el("div", {}, el("h3", {}, `${KIND()[kind] || kind} ${key}`),
+          el("div", { class: "muted" }, [`${t("Storey")} ${m.storey}`, size, inp.concrete, inp.fyk ? `B${inp.fyk}` : ""].filter(Boolean).join(" · "))),
+        el("div", { class: `dr-status ${m.ok ? "pass" : "fail"}` }, m.ok ? t("Pass") : t("Fail"), el("small", {}, `η = ${m.util.toFixed(2)}`)),
+        det.override ? el("div", { class: "dr-mode" }, t("Check mode")) : el("div", { class: "dr-mode auto" }, t("Design mode"))));
+      const left = el("div", { class: "dr-left" });
+      const sx = sectionSVG(kind, inp, det);
+      if (sx) left.append(sx);
+      left.append(el("div", { class: "dr-reinf" }, m.reinforcement));
+      if (m.notes.length) left.append(el("ul", { class: "st-notes" }, ...m.notes.map((n) => el("li", {}, n))));
+      const right = el("div", { class: "dr-right" });
+      const tabs = [["checks", t("Checks")], ["forces", t("Design forces")]];
+      if (kind === "beam" || kind === "column") tabs.push(["edit", t("Reinforcement")]);
+      right.append(el("div", { class: "dr-tabs" }, ...tabs.map(([k, l]) => el("button", { type: "button", class: tab === k ? "on" : "", on: { click: () => { tab = k; draw(); } } }, l))));
+      if (tab === "checks") {
+        const tb = el("table", { class: "st-res dr-checks" }, el("tr", {}, el("th", {}, t("Check")), el("th", {}, t("Demand")), el("th", {}, t("Resistance")), el("th", {}, "η"), el("th", {}, ""), el("th", {}, t("Clause"))));
+        let last = null;
+        for (const c of m.checks || []) {
+          if (c.section !== last && c.section) tb.append(el("tr", { class: "grp" }, el("td", { colspan: 6 }, sec[c.section] || c.section)));
+          last = c.section;
+          const u = Math.min(c.u, 1.5);
+          const f = (v) => (v == null ? "" : Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toFixed(3));
+          tb.append(el("tr", { class: c.ok ? "" : "bad", title: c.hint || "" }, el("td", {}, c.d), el("td", { class: "num" }, `${f(c.demand)} ${c.unit || ""}`), el("td", { class: "num" }, `${f(c.capacity)} ${c.unit || ""}`),
+            el("td", { class: "util" }, el("span", { class: "ubar" }, el("i", { style: `width:${(u / 1.5) * 100}%;background:${c.ok ? (c.u > 0.9 ? "#e0a020" : "#2e9b5f") : "#e03b3b"}` })), el("b", {}, c.u.toFixed(2))),
+            el("td", {}, c.ok ? "✓" : "✗"), el("td", { class: "muted" }, c.ref)));
+        }
+        if (!(m.checks || []).length) tb.append(el("tr", {}, el("td", { colspan: 6, class: "muted" }, t("Open the full calculation for the checks."))));
+        right.append(tb);
+      } else if (tab === "forces") {
+        const rows = [];
+        if (kind === "beam") {
+          rows.push([t("Span (sagging)"), "M_Ed", `${det.M_sag.toFixed(1)} kNm`, det.gov_sag], [t("Supports (hogging)"), "M_Ed", `${det.M_hog.toFixed(1)} kNm`, det.gov_hog],
+            [t("Shear"), "V_Ed", `${det.V.toFixed(1)} kN`, det.gov_V]);
+        } else if (kind === "column") {
+          rows.push(["N", "N_Ed", `${(+inp.NEd).toFixed(1)} kN`, m.governing], ["M (h)", "M_top / M_bot", `${(+inp.Mh_top).toFixed(1)} / ${(+inp.Mh_bot).toFixed(1)} kNm`, m.governing],
+            ["M (b)", "M_top / M_bot", `${(+inp.Mb_top).toFixed(1)} / ${(+inp.Mb_bot).toFixed(1)} kNm`, m.governing], [t("Shear"), "V_Ed", `${(+inp.VEd).toFixed(1)} kN`, m.governing]);
+        } else {
+          for (const [k, u] of [["NEd", "kN"], ["MEd", "kNm"], ["VEd", "kN"], ["g", "kN/m²"], ["q", "kN/m²"]]) if (inp[k] != null) rows.push([k, k, `${(+inp[k]).toFixed(1)} ${u}`, m.governing]);
+        }
+        right.append(el("table", { class: "st-res" }, el("tr", {}, el("th", {}, ""), el("th", {}, ""), el("th", {}, t("Value")), el("th", {}, t("Governing"))),
+          ...rows.map((r) => el("tr", {}, ...r.map((v) => el("td", {}, v || ""))))));
+      } else if (tab === "edit") {
+        const ov = structuredClone(lay().reinf?.[key] || {});
+        const selB = (val, on, opts = BARS) => { const s_ = el("select", { on: { change: (e) => on(e.target.value) } }, ...opts.map((o) => el("option", { value: o }, `Ø${o}`))); s_.value = String(val); return s_; };
+        const num = (val, on, mn, mx, st = 1) => el("input", { type: "number", min: mn, max: mx, step: st, value: val, style: "width:64px", on: { change: (e) => on(+e.target.value) } });
+        const row = (lab, ...c) => el("label", { class: "st-f" }, el("span", {}, lab), el("span", { class: "inp" }, ...c));
+        const box = el("div", { class: "dr-edit" });
+        if (kind === "beam") {
+          const top = { n: ov.top_n ?? det.top.n_bars, d: ov.top_dia ?? det.top.dia }, bot = { n: ov.bottom_n ?? det.bottom.n_bars, d: ov.bottom_dia ?? det.bottom.dia };
+          box.append(row(t("Top bars"), num(top.n, (v) => { ov.top_n = v; ov.top_dia ??= top.d; }, 2, 10), selB(top.d, (v) => { ov.top_dia = v; ov.top_n ??= top.n; })),
+            row(t("Bottom bars"), num(bot.n, (v) => { ov.bottom_n = v; ov.bottom_dia ??= bot.d; }, 2, 10), selB(bot.d, (v) => { ov.bottom_dia = v; ov.bottom_n ??= bot.n; })),
+            row(t("Links (span)"), selB(ov.link_dia ?? det.link_dia, (v) => { ov.link_dia = v; }, ["8", "10", "12"]), num(ov.s ?? det.s, (v) => { ov.s = v; }, 50, 300, 25)));
+        } else {
+          box.append(row(t("Bars per side"), num(ov.nb ?? inp.nb, (v) => { ov.nb = v; }, 2, 6), selB(ov.dia ?? inp.dia, (v) => { ov.dia = v; })),
+            row(t("Links"), selB(ov.link ?? inp.link ?? "8", (v) => { ov.link = v; }, ["8", "10", "12"]), num(ov.s ?? inp.s, (v) => { ov.s = v; }, 50, 300, 5)));
+        }
+        box.append(el("p", { class: "muted" }, t("Check mode: the member is checked with these bars instead of the automatic design; the whole building is re-analysed.")));
+        box.append(el("div", { class: "btns" },
+          det.override ? el("button", { type: "button", class: "ghost", on: { click: async () => { delete lay().reinf[key]; commit(false); await run(); dlg.close(); designDialog(key); } } }, t("Back to automatic design")) : "",
+          el("button", { type: "button", class: "primary", on: { click: async () => { (lay().reinf ||= {})[key] = ov; commit(false); await run(); dlg.close(); designDialog(key); } } }, t("Check"))));
+        right.append(box);
+      }
+      const body = el("div", { class: "dr-body" }, left, right);
+      dlg.append(body);
+      if (kind === "beam" && det.top) dlg.append(el("h4", {}, t("Elevation")), elevationSVG(inp, det));
+      dlg.append(el("div", { class: "btns" }, m.module ? el("button", { type: "button", class: "ghost", on: { click: () => { dlg.close(); openModule(m.module, m.inputs); } } }, `↗ ${t("Full calculation")}`) : "",
+        el("button", { type: "button", class: "primary", on: { click: () => dlg.close() } }, t("Close"))));
+    };
+    draw();
+    document.body.append(dlg);
+    dlg.addEventListener("close", () => dlg.remove());
+    dlg.showModal();
+  }
+  function openDesignForSel() {
+    const s0 = S.sel[0];
+    const key = s0 && memberKeyOf(s0.kind, s0.id);
+    if (key) designDialog(key);
+    else $("#sb-msg").textContent = t("Select a designed member (after the analysis) to see its design results.");
   }
 
   // ------------------------------------------------------------ table view

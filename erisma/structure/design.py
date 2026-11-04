@@ -45,6 +45,9 @@ class MemberDesign:
     module: str
     notes: list[str] = field(default_factory=list)
     rho: float = 0.0
+    # data for the design-results window (sketches, design forces, re-checks): e.g. the
+    # design combinations of a column, or the sagging/hogging moments and links of a beam
+    detail: dict = field(default_factory=dict)
 
 
 def _passes(module, inp: dict, project: dict | None) -> tuple[bool, float]:
@@ -151,7 +154,10 @@ def design_columns(res: dict[str, StaticResult], seis: SeismicResult | None, uls
         gov_inp = {**(dict(combos)[gov] if gov else combos[0][1]), **pick}
         rho = n_bars * np.pi * float(pick["dia"]) ** 2 / 4 / (b * h)
         out.append(MemberDesign(mid, "column", k, reinf, util, idx >= 0, gov, gov_inp,
-                                "ec2_rc_column", notes, rho))
+                                "ec2_rc_column", notes, rho,
+                                {"combos": [(nm, {kk: (float(v) if isinstance(v, np.floating)
+                                                       else v) for kk, v in c.items()})
+                                            for nm, c in combos]}))
     return out
 
 
@@ -298,9 +304,18 @@ def design_beams(beams: dict[str, int], seis: SeismicResult | None, uls: StaticR
             s_cr = 5 * int(s_cr // 5)
             reinf += f" (ends Ø8/{s_cr:g} over {h:g} mm)"
         As = sum(p["n_bars"] * np.pi * float(p["dia"]) ** 2 / 4 for p in picks.values())
+        ms, mh = max(sag, key=lambda t: t[1]), max(hog, key=lambda t: t[1])
+        detail = {"M_sag": float(ms[1]) / 1e6, "gov_sag": ms[0], "M_hog": float(mh[1]) / 1e6,
+                  "gov_hog": mh[0], "V": float(Vmax) / 1e3,
+                  "gov_V": max(V, key=lambda t: t[1])[0], "L": float(Lspan),
+                  "bottom": dict(picks["bottom"]), "top": dict(picks["top"]),
+                  "link_dia": inp_v["link_dia"], "s": float(s_ok),
+                  "K": float(K), "sls": sls}
+        if seis is not None and dissipative:
+            detail.update({"s_cr": float(s_cr), "l_cr": float(h)})
         out.append(MemberDesign(mid, "beam", k, reinf, max(utils + [uv]), ok, gov_all,
                                 {**inp_v, "link_s": s_ok}, "ec2_rc_beam",
-                                list(dict.fromkeys(notes)), As / (b * h)))
+                                list(dict.fromkeys(notes)), As / (b * h), detail))
     return out
 
 
@@ -819,3 +834,130 @@ def soil_pressures(res: dict[str, StaticResult], quasi: StaticResult, seis: Seis
         rows.append({"combo": "G+ψ2Q+ΩE", "p": best[0], "node": best[1], "qRd": qRd,
                      "p_min": low[0], "node_min": low[1]})
     return rows
+
+
+# ---------------------------------------------------------------- design-results window
+def _bar_area(n, dia) -> float:
+    return float(n) * np.pi * float(dia) ** 2 / 4
+
+
+def _checks_of(module_id: str, inp: dict, project, lang: str, section: str = "") -> list[dict]:
+    try:
+        c = get_module(module_id).calculate(inp, project, lang)
+    except InputError as exc:
+        return [{"section": section, "d": str(exc), "u": 9.99, "ok": False, "ref": "",
+                 "demand": None, "capacity": None, "unit": "", "hint": ""}]
+    out = []
+    for ch in c.checks:
+        dd = ch.to_dict()                      # demand / capacity in display units
+        out.append({"section": section, "d": ch.description, "u": float(ch.utilisation),
+                    "ok": bool(ch.passed), "ref": ch.ref, "demand": float(dd["demand"]),
+                    "capacity": float(dd["capacity"]), "unit": ch.unit, "hint": ch.hint,
+                    "min": bool(ch.is_min)})
+    return out
+
+
+def member_checks(d: MemberDesign, project=None, lang: str = "en") -> list[dict]:
+    """Every check of a designed member, as listed in its design-results window.
+
+    Beams: the span section (sagging, bottom bars in tension) and the support sections
+    (hogging, top bars in tension) plus the span/depth check; columns: the governing design
+    combination; other members: the module run with their design inputs."""
+    if not d.module:
+        return []
+    if d.kind == "beam" and d.detail:
+        t, bt = d.detail["top"], d.detail["bottom"]
+        sag = {**d.inputs, "MEd": max(d.detail["M_sag"], 1.0), "n_bars": bt["n_bars"],
+               "dia": bt["dia"], "n_comp": t["n_bars"], "dia_comp": t["dia"]}
+        hog = {**sag, "MEd": max(d.detail["M_hog"], 1.0), "n_bars": t["n_bars"],
+               "dia": t["dia"], "n_comp": bt["n_bars"], "dia_comp": bt["dia"]}
+        from ..i18n import tr
+        out = _checks_of(d.module, sag, project, lang, "span")
+        sup = [c for c in _checks_of(d.module, hog, project, lang, "support")
+               if not str(c["ref"]).startswith(("6.2", "9.2.2"))]   # shear: once (span)
+        if d.detail.get("s_cr"):               # EN 1998-1 5.4.3.1.2 (DCM beams)
+            fck = float(str(d.inputs["concrete"]).split("/")[0][1:])
+            fyk = float(d.inputs["fyk"])
+            dd = d.inputs["h"] - d.inputs["cnom"] - 18
+            As_min = 0.5 * 0.30 * fck ** (2 / 3) / fyk * d.inputs["b"] * dd
+            A_t, A_b = _bar_area(t["n_bars"], t["dia"]), _bar_area(bt["n_bars"], bt["dia"])
+            for face, A in (("top", A_t), ("bottom", A_b)):
+                sup.append({"section": "ec8", "d": tr("ρ ≥ ρ_min = 0.5 f_ctm/f_yk ({f})", lang,
+                                                       f=tr(f"{face} bars", lang)),
+                            "u": As_min / A, "ok": A >= As_min, "ref": "EN 1998-1 5.4.3.1.2(5)",
+                            "demand": As_min, "capacity": A, "unit": "mm²", "hint": "",
+                            "min": True})
+            for comp, A_c, A_tn in (("bottom", A_b, A_t), ("top", A_t, A_b)):
+                need = 0.5 * A_tn
+                sup.append({"section": "ec8", "d": tr("Compression steel ≥ 0.5 × tension steel "
+                                                       "in the critical region ({f})", lang,
+                                                       f=tr(f"{comp} bars", lang)),
+                            "u": need / A_c, "ok": A_c >= need, "ref": "EN 1998-1 5.4.3.1.2(4)",
+                            "demand": need, "capacity": A_c, "unit": "mm²", "hint": "",
+                            "min": True})
+        if d.detail.get("sls"):
+            fck = float(str(d.inputs["concrete"]).split("/")[0][1:])
+            h, b, cov = d.inputs["h"], d.inputs["b"], d.inputs["cnom"]
+            d_b = h - cov - float(d.detail["link_dia"]) - float(bt["dia"]) / 2
+            fyk = float(d.inputs["fyk"])
+            M = d.detail["M_sag"] * 1e6
+            As_req = M / (0.9 * d_b * fyk / 1.15) if M > 0 else 0.0
+            r, lim = span_depth(d.detail["L"], d_b, b, _bar_area(bt["n_bars"], bt["dia"]),
+                                _bar_area(t["n_bars"], t["dia"]), As_req, fck, d.detail["K"])
+            out.append({"section": "span", "d": tr("Deflection: l/d ≤ (l/d)_lim", lang),
+                        "u": r / lim,
+                        "ok": r <= lim, "ref": "EN 1992-1-1 7.4.2", "demand": r,
+                        "capacity": lim, "unit": "", "hint": "", "min": False})
+        return out + sup
+    return _checks_of(d.module, d.inputs, project, lang)
+
+
+def apply_override(d: MemberDesign, ov: dict, project=None) -> None:
+    """Check mode: replace the automatic reinforcement of ``d`` by the engineer's ``ov`` and
+    re-check it for every design situation that was used to design it."""
+    if d.kind == "column" and d.detail.get("combos"):
+        pick = {k: d.inputs[k] for k in ("dia", "nb", "nh", "link", "s") if k in d.inputs}
+        pick.update({k: ov[k] for k in ("dia", "nb", "s", "link") if k in ov})
+        pick["nb"] = int(pick["nb"])
+        pick["nh"] = pick["nb"]
+        pick["s"] = float(pick["s"])
+        worst, gov, ok = -1.0, d.governing, True
+        for nm, c in d.detail["combos"]:
+            p, u = _passes(get_module("ec2_rc_column"), {**c, **pick}, project)
+            ok &= p
+            if u > worst:
+                worst, gov = u, nm
+        d.inputs = {**dict(d.detail["combos"]).get(gov, d.inputs), **pick}
+        n_bars = 4 * int(d.inputs["nb"]) - 4
+        d.reinforcement = f"{n_bars}Ø{d.inputs['dia']}, Ø{d.inputs.get('link', '8')}/{float(d.inputs['s']):g}"
+        d.utilisation, d.ok, d.governing = worst, ok, gov
+        d.rho = _bar_area(n_bars, d.inputs["dia"]) / (d.inputs["b"] * d.inputs["h"])
+    elif d.kind == "beam" and d.detail:
+        det = d.detail
+        for face in ("bottom", "top"):
+            if f"{face}_n" in ov:
+                det[face] = {"n_bars": int(ov[f"{face}_n"]), "dia": str(ov[f"{face}_dia"])}
+        if "s" in ov:
+            det["s"] = float(ov["s"])
+        if "link_dia" in ov:
+            det["link_dia"] = str(ov["link_dia"])
+        d.inputs = {**d.inputs, **det["bottom"], "n_comp": det["top"]["n_bars"],
+                    "dia_comp": det["top"]["dia"], "link_s": det["s"],
+                    "link_dia": det["link_dia"]}
+        chk = [c for c in member_checks(d, project) if not c.get("min")]
+        allc = member_checks(d, project)
+        d.utilisation = max([c["u"] for c in chk] + [0.0])
+        d.ok = all(c["ok"] for c in allc)
+        d.reinforcement = (f"bottom {det['bottom']['n_bars']}Ø{det['bottom']['dia']}, "
+                           f"top {det['top']['n_bars']}Ø{det['top']['dia']}, "
+                           f"Ø{det['link_dia']}/{det['s']:g}")
+        if det.get("s_cr"):
+            d.reinforcement += f" (ends Ø{det['link_dia']}/{det['s_cr']:g} over {det['l_cr']:g} mm)"
+        d.rho = (_bar_area(det["bottom"]["n_bars"], det["bottom"]["dia"]) +
+                 _bar_area(det["top"]["n_bars"], det["top"]["dia"])) / \
+            (d.inputs["b"] * d.inputs["h"])
+    else:
+        return
+    d.notes = [n for n in d.notes if "increase" not in str(n).lower()]
+    d.notes.append("Reinforcement set by the engineer (check mode)")
+    d.detail["override"] = True

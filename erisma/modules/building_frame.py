@@ -18,8 +18,9 @@ from ..structure import (StructureError, analyse, analyse_pdelta, critical_load_
                          modal)
 from ..structure.builder import BuildingSpec, build
 from ..structure.builder import grid_label
-from ..structure.design import (MemberDesign, capacity_design, capacity_shears, design_beams,
-                                design_columns, design_footings, design_slabs, design_walls)
+from ..structure.design import (MemberDesign, apply_override, capacity_design, capacity_shears,
+                                design_beams, design_columns, design_footings, design_slabs,
+                                design_walls, member_checks)
 from ..structure.combinations import Case, generate
 from ..structure.modal import ec8_spectrum
 from ..structure.model import Msg
@@ -623,6 +624,14 @@ class BuildingFrame(DesignModule):
         beams = {b: int(b[1:b.index(".")]) for b in info["beams_x"] + info["beams_y"]}
         db = design_beams(beams, seis, uls, quasi, spec.beam_b, spec.beam_h, inp["concrete"],
                           project, inp["fyk"], inp["cover"], sizes=info["sizes"])
+        ovr = (spec.layout or {}).get("reinf", {}) or {}
+        for d in dc + db:                      # check mode: the engineer's reinforcement
+            if d.member in ovr:
+                apply_override(d, ovr[d.member], project)
+        if ovr:
+            calc.note("Check mode: {n} member(s) checked with the reinforcement set by the "
+                      "engineer instead of the automatic design.",
+                      n=sum(1 for d in dc + db if d.member in ovr))
         walls = {f"W1.{g}": w for g, w in info["wall_spec"].items()}
         dw = design_walls(walls, seis, uls, quasi, inp["concrete"], spec.heights, spec.beam_h,
                           project, inp["fyk"], inp["cover"])
@@ -994,6 +1003,8 @@ class BuildingFrame(DesignModule):
                 "rho": d.rho, "reinforcement": BuildingFrame._reinf(calc, d.reinforcement),
                 "governing": calc.tr(d.governing, quiet=True), "module": d.module,
                 "inputs": d.inputs,
+                "checks": member_checks(d, calc.project, calc.lang),
+                "detail": {k: v for k, v in d.detail.items() if k != "combos"},
                 "notes": [n.message(calc.lang) if hasattr(n, "message") else calc.tr(n)
                           for n in d.notes]}
         r = getattr(calc, "raft", None)

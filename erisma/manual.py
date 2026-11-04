@@ -368,6 +368,13 @@ site (or typed in), terrain category and c_o give q_p(z_e) (Fig. 7.4); the windw
 coefficients c_pe,10 with the lack-of-correlation factor give the storey forces, applied as load
 cases W_X and W_Y in both senses and combined with ψ0 = 0.6. The report compares the wind and
 seismic storey shears; members are designed for the envelope.</p>
+<p><b>Design results (as in Tekla Structural Designer).</b> Double-click a member in the plan or
+the 3D view (or 🔍 in its properties, or Design → Design results) to open its design window:
+pass/fail status and utilisation, a section sketch with the bars, the beam elevation with the
+critical-region link zones, every check with demand, resistance, ratio and clause (span,
+supports, EN 1998-1 detailing, deflection) and the design forces with their combination. In
+the <b>Reinforcement</b> tab you can set the bars yourself (<b>check mode</b>): the building is
+re-analysed and the member is checked with your bars; <b>Back to automatic design</b> undoes it.</p>
 <p><b>Plan + 3D</b> shows both windows at once; elements can be selected in the 3D view too
 (empty positions are drawn faintly so that the tools can add columns and beams there). The
 <b>Results</b> tab switches the 3D bending-moment, shear, axial-force and deformed-shape
@@ -444,6 +451,14 @@ EN 1991-1-4 στην ανάλυση όταν το θέλετε: η v_b,0 από 
 δίνουν τις δυνάμεις ορόφων, ως φορτίσεις W_X και W_Y με τις δύο φορές, συνδυασμένες με ψ0 = 0.6.
 Το τεύχος συγκρίνει τις τέμνουσες ορόφων ανέμου και σεισμού· τα μέλη διαστασιολογούνται για την
 περιβάλλουσα.</p>
+<p><b>Αποτελέσματα διαστασιολόγησης (όπως στο Tekla Structural Designer).</b> Διπλό κλικ σε μέλος
+στην κάτοψη ή στο 3D (ή 🔍 στις ιδιότητες, ή Σχεδιασμός → Αποτελέσματα διαστασιολόγησης) ανοίγει
+το παράθυρο του μέλους: κατάσταση και αξιοποίηση, σκαρίφημα διατομής με τις ράβδους, όψη δοκού με
+τις ζώνες συνδετήρων των κρίσιμων περιοχών, κάθε έλεγχος με δράση, αντοχή, λόγο και άρθρο
+(άνοιγμα, στηρίξεις, διατάξεις EN 1998-1, βέλος) και τα εντατικά σχεδιασμού με τον συνδυασμό τους.
+Στην καρτέλα <b>Οπλισμός</b> ορίζετε εσείς τις ράβδους (<b>λειτουργία ελέγχου</b>): το κτίριο
+ξαναϋπολογίζεται και το μέλος ελέγχεται με τον δικό σας οπλισμό· η <b>Επιστροφή στην αυτόματη
+διαστασιολόγηση</b> το αναιρεί.</p>
 <p>Η <b>Κάτοψη + 3D</b> δείχνει και τα δύο παράθυρα μαζί· τα στοιχεία επιλέγονται και στο 3D (οι
 κενές θέσεις εμφανίζονται αχνά ώστε τα εργαλεία να προσθέτουν εκεί υποστυλώματα και δοκούς). Η
 καρτέλα <b>Αποτελέσματα</b> ανάβει/σβήνει στο 3D τα διαγράμματα ροπών, τεμνουσών, αξονικών, τον

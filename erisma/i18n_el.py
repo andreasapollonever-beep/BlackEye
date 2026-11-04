@@ -2979,4 +2979,11 @@ EL: dict[str, str] = {
     'Unknown input': 'Άγνωστο δεδομένο',
     'Only numeric or choice inputs can be solved for': 'Αντίστροφη λύση γίνεται μόνο για αριθμητικά δεδομένα ή επιλογές',
     'No value in the range of this input makes every check pass': 'Καμία τιμή στο εύρος αυτού του δεδομένου δεν ικανοποιεί όλους τους ελέγχους',
+    'Deflection: l/d ≤ (l/d)_lim': 'Βέλος: l/d ≤ (l/d)_lim',
+    'Reinforcement set by the engineer (check mode)': 'Οπλισμός από τον μηχανικό (λειτουργία ελέγχου)',
+    'Check mode: {n} member(s) checked with the reinforcement set by the engineer instead of the automatic design.': 'Λειτουργία ελέγχου: {n} μέλος(η) ελέγχθηκαν με τον οπλισμό του μηχανικού αντί για την αυτόματη διαστασιολόγηση.',
+    'ρ ≥ ρ_min = 0.5 f_ctm/f_yk ({f})': 'ρ ≥ ρ_min = 0.5 f_ctm/f_yk ({f})',
+    'Compression steel ≥ 0.5 × tension steel in the critical region ({f})': 'Θλιβόμενος οπλισμός ≥ 0.5 × εφελκυόμενος στην κρίσιμη περιοχή ({f})',
+    'top bars': 'άνω οπλισμός',
+    'bottom bars': 'κάτω οπλισμός',
 }

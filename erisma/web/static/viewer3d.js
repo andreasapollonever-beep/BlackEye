@@ -4,6 +4,10 @@ import { OrbitControls } from "three/addons/OrbitControls.js";
 import { CSS2DObject, CSS2DRenderer } from "three/addons/CSS2DRenderer.js";
 
 const T = (k) => (window.ErismaI18n ? window.ErismaI18n(k) : k);
+const ACTIVE = { t: performance.now() };
+const kick = () => { ACTIVE.t = performance.now(); };
+for (const ev of ["pointermove", "pointerdown", "pointerup", "wheel", "keydown", "resize"]) window.addEventListener(ev, kick, { capture: true, passive: true });
+for (const ev of ["erisma:model3d", "erisma:show3d", "erisma:layers", "erisma:anim", "erisma:highlight", "erisma:theme"]) window.addEventListener(ev, kick);
 
 class Viewer {
   constructor(host) {
@@ -29,7 +33,15 @@ class Viewer {
     this.buildUi();
     this.enablePicking();
     new ResizeObserver(() => this.resize()).observe(host);
-    const loop = () => { this.controls.update(); this.stepAnimation(); this.render(); requestAnimationFrame(loop); };
+    // render on demand: only while the view is visible and something changes (camera moving,
+    // animation, recent user input or scene update) — an idle hidden view costs no CPU/GPU
+    const loop = () => {
+      requestAnimationFrame(loop);
+      if (document.hidden || !host.isConnected || host.offsetParent === null) return;
+      const moved = this.controls.update();
+      const anim = this.animOn && this.anims?.length;
+      if (moved || anim || performance.now() - ACTIVE.t < 1500) { this.stepAnimation(); this.render(); }
+    };
     loop();
   }
 
