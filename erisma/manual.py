@@ -936,6 +936,12 @@ NOTES: dict[str, dict[str, list[str]]] = {
                "c_pe from Tables 7.1–7.5 (interpolation in h/d, pitch and h_p/h, r/h; same-sign "
                "only), c_pe,1 → c_pe,10 by log10 A (Figure 7.2); net w = q_p (c_pe − c_pi) with "
                "the more onerous c_pi; canopies c_f and c_p,net of Tables 7.6/7.7 linear in φ.",
+               "Multispan roofs by Figure 7.10 (span 1 full zones, following spans H/I × 0.8, 0.6 "
+               "or −0.4); vaulted roofs by Figure 7.11 (A, B, C = ¼, ½, ¼ of the arc); dominant "
+               "openings c_pi = 0.75 … 0.90 c_pe at the opening (Eq. 7.2/7.3); friction "
+               "c_fr q_p A_fr beyond min(2b, 4h) (7.5).",
+               "Free-standing walls and parapets c_p,net of Table 7.9 (l/h, φ, return corners) "
+               "with shelter ψ_s (Figure 7.20); signboards c_f = 1.8 at z_g + h/2, e = ±0.25 b.",
                "PROVISIONAL: coefficients entered from prEN 1991-1-4:2004; to be verified "
                "against EN 1991-1-4:2005 + A1:2010."],
         "el": ["q_p(z_e) όπως στον υπολογισμό «Άνεμος και χιόνι» με z_e = h (h + h_p με "
@@ -944,6 +950,13 @@ NOTES: dict[str, dict[str, list[str]]] = {
                "τιμών ίδιου προσήμου), c_pe,1 → c_pe,10 με log10 A (Σχήμα 7.2)· καθαρή w = q_p "
                "(c_pe − c_pi) με το δυσμενέστερο c_pi· στέγαστρα c_f και c_p,net των Πινάκων "
                "7.6/7.7 γραμμικά ως προς φ.",
+               "Πολλαπλές στέγες κατά Σχήμα 7.10 (1ο άνοιγμα όλες οι ζώνες, επόμενα H/I × 0,8, "
+               "0,6 ή −0,4)· θολωτές κατά Σχήμα 7.11 (A, B, C = ¼, ½, ¼ του τόξου)· κυρίαρχα "
+               "ανοίγματα c_pi = 0,75 … 0,90 c_pe στο άνοιγμα (Εξ. 7.2/7.3)· τριβή c_fr q_p A_fr "
+               "πέρα από min(2b, 4h) (7.5).",
+               "Ελεύθεροι τοίχοι και στηθαία c_p,net του Πίνακα 7.9 (l/h, φ, γωνιακές επιστροφές) "
+               "με συντελεστή προφύλαξης ψ_s (Σχήμα 7.20)· πινακίδες c_f = 1,8 σε z_g + h/2, "
+               "e = ±0,25 b.",
                "ΠΡΟΣΩΡΙΝΟ: οι συντελεστές προέρχονται από το prEN 1991-1-4:2004· να επαληθευτούν "
                "με το EN 1991-1-4:2005 + A1:2010."]},
     "ec1_wind_snow": {

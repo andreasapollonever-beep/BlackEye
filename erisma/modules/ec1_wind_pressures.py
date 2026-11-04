@@ -19,12 +19,18 @@ from ..design import wind_cpe as W
 from ..report.scene3d import Scene3D, heat_color
 from .ec1_wind_snow import TERRAIN, site_qp
 
-KINDS = ["Building (walls and roof)", "Canopy roof (no walls)"]
-ROOFS = ["Flat (α < 5°)", "Monopitch", "Duopitch", "Hipped"]
+KINDS = ["Building (walls and roof)", "Canopy roof (no walls)", "Free-standing wall or parapet",
+         "Signboard"]
+ROOFS = ["Flat (α < 5°)", "Monopitch", "Duopitch", "Hipped", "Vaulted (cylindrical)"]
 EAVES = ["Sharp eaves", "Parapets", "Curved eaves", "Mansard eaves"]
 CANOPIES = ["Monopitch canopy", "Duopitch canopy"]
 INTERNAL = ["Most onerous of +0.2 and −0.3", "From the opening ratio μ (Figure 7.13)",
-            "None (no openings)"]
+            "None (no openings)", "Dominant opening (7.2.9(5))"]
+DOM_FACES = ["Long face (length L)", "End face (width W)"]
+SURFACES = {"Smooth (steel, smooth concrete)": "smooth",
+            "Rough (rough concrete, tar-boards)": "rough",
+            "Very rough (ripples, ribs, folds)": "very_rough"}
+PSI_MC = {1: (1.0, 0.8), 2: (0.9, 0.7), 3: (0.7, 0.7)}  # Table 7.8 (max, min)
 VIEWS = ["θ = 0°", "θ = 90°", "θ = 180°"]
 
 
@@ -41,8 +47,10 @@ class WindPressuresEC1(DesignModule):
     uses_annex = True
     has_3d = True
     description = ("External pressure coefficients for the walls (zones A–E) and the roof — "
-                   "flat, monopitch, duopitch, hipped — for every wind direction, internal "
-                   "pressure and net pressures; canopy roofs with blockage. 3D view of the zones.")
+                   "flat, monopitch, duopitch, hipped, multispan, vaulted — for every wind "
+                   "direction, internal pressure (incl. dominant openings), net pressures and "
+                   "friction; canopy roofs, free-standing walls, parapets and signboards. 3D view "
+                   "of the zones.")
 
     fields = [
         Field("use_site", "Use the project site (maps of the National Annex)", kind="bool",
@@ -80,12 +88,42 @@ class WindPressuresEC1(DesignModule):
               show_if="eave=Curved eaves"),
         Field("am", "Mansard eave angle α", "°", 45.0, min=30, max=89, group="Roof",
               show_if="eave=Mansard eaves"),
+        Field("f", "Rise of the vault f", "m", 3.0, min=0.1, group="Roof",
+              show_if="roof=Vaulted (cylindrical)",
+              help="h is the height to the crown; the walls are h − f high (Figure 7.11)."),
+        Field("spans", "Number of spans (multispan roofs)", "", 1, kind="int", min=1, max=20,
+              group="Roof", help="Monopitch (saw-tooth) or duopitch spans side by side across "
+                                 "W, each W/n wide (7.2.7, Figure 7.10)."),
         Field("canopy", "Canopy type", kind="choice", choices=CANOPIES, default=CANOPIES[0],
               group="Canopy", show_if="kind=Canopy roof (no walls)"),
         Field("phi", "Blockage under the canopy φ", "", 0.0, min=0, max=1, group="Canopy",
               show_if="kind=Canopy roof (no walls)",
               help="0 = empty, 1 = fully blocked to the downwind eaves by stored goods "
                    "(Figure 7.15)."),
+        Field("bays", "Number of bays (multibay duopitch canopy)", "", 1, kind="int", min=1,
+              max=20, group="Canopy", show_if="canopy=Duopitch canopy",
+              help="Reduction factors ψ_mc of Table 7.8 for the end, second and inner bays."),
+        Field("wphi", "Solidity φ of the wall / fence", "", 1.0, min=0.8, max=1.0,
+              group="Wall / signboard", show_if="kind=Free-standing wall or parapet",
+              help="1 = solid; 0.8 = 20 % openings. Below 0.8 treat as a plane lattice (7.11)."),
+        Field("ret", "Length of return corner", "m", 0.0, min=0, group="Wall / signboard",
+              show_if="kind=Free-standing wall or parapet",
+              help="Wall returning at the end, 0 … h (Table 7.9 note a)."),
+        Field("on_building", "Parapet on a building", kind="bool", default=False,
+              group="Wall / signboard", show_if="kind=Free-standing wall or parapet",
+              help="Then h is the parapet height and z_e = h_b + h (7.4.1(2))."),
+        Field("hb", "Building height below the parapet h_b", "m", 9.0, min=0,
+              group="Wall / signboard", show_if="on_building"),
+        Field("sheltered", "Sheltered by an upwind wall", kind="bool", default=False,
+              group="Wall / signboard", show_if="kind=Free-standing wall or parapet",
+              help="Upwind wall at least as high (7.4.2, Figure 7.20)."),
+        Field("xs", "Distance to the upwind wall x", "m", 10.0, min=0, group="Wall / signboard",
+              show_if="sheltered"),
+        Field("phi_up", "Solidity of the upwind wall", "", 1.0, min=0.8, max=1.0,
+              group="Wall / signboard", show_if="sheltered"),
+        Field("zg", "Clearance of the signboard above ground z_g", "m", 2.5, min=0,
+              group="Wall / signboard", show_if="kind=Signboard",
+              help="For a signboard L is its width b and h its height (Figure 7.21)."),
         Field("A", "Loaded area A (element or fixing)", "m²", 10.0, min=0.1, group="Pressures",
               help="≥ 10 m²: c_pe,10 (overall structure); ≤ 1 m²: c_pe,1 (cladding, fixings); "
                    "between: Figure 7.2."),
@@ -95,6 +133,18 @@ class WindPressuresEC1(DesignModule):
         Field("mu", "Opening ratio μ", "", 0.5, min=0, max=1, group="Pressures",
               show_if="internal=From the opening ratio μ (Figure 7.13)",
               help="Area of openings where c_pe ≤ 0 / area of all openings (Eq. 7.4)."),
+        Field("dom_face", "Face with the dominant opening", kind="choice", choices=DOM_FACES,
+              default=DOM_FACES[0], group="Pressures",
+              show_if="internal=Dominant opening (7.2.9(5))",
+              help="The opening may be windward, leeward or on a side wall depending on the wind "
+                   "direction; all cases are checked."),
+        Field("dom_ratio", "Openings of the dominant face / openings of the other faces", "",
+              3.0, min=2.0, max=100, group="Pressures",
+              show_if="internal=Dominant opening (7.2.9(5))",
+              help="≥ 2 makes the face dominant (7.2.9(4)); 2 → c_pi = 0.75 c_pe, ≥ 3 → 0.90 c_pe."),
+        Field("surface", "Surface roughness (friction)", kind="choice", choices=list(SURFACES),
+              default="Rough (rough concrete, tar-boards)", group="Pressures",
+              help="Table 7.10 — friction on the surfaces parallel to the wind (7.5)."),
         Field("view", "Direction shown in 3D", kind="choice", choices=VIEWS, default=VIEWS[0],
               group="Pressures"),
     ]
@@ -106,26 +156,40 @@ class WindPressuresEC1(DesignModule):
             calc.warn("Provisional pressure coefficients: {s}.", s=W.SOURCE)
         L, Wd, h = inp["L"] / 1000, inp["Wd"] / 1000, inp["h"] / 1000
         A = inp["A"] / 1e6
-        canopy = inp["kind"] == KINDS[1]
+        kind = inp["kind"]
         ze = h
-        if not canopy and inp["roof"] == ROOFS[0] and inp["eave"] == "Parapets":
+        if kind == KINDS[0] and inp["roof"] == ROOFS[0] and inp["eave"] == "Parapets":
             ze = h + inp["hp"] / 1000
+        if kind == KINDS[2] and inp["on_building"]:
+            ze = inp["hb"] / 1000 + h
+        sign_wall = kind == KINDS[3] and inp["zg"] < inp["h"] / 4 and inp["L"] > inp["h"]
+        if kind == KINDS[3]:
+            ze = (inp["zg"] / 1000 + h) if sign_wall else inp["zg"] / 1000 + h / 2
         qp = site_qp(calc, inp, ze * 1000)
         calc.heading("Geometry")
-        calc.input("L", inp["L"], "m", "Length (along the ridge)")
-        calc.input("W", inp["Wd"], "m", "Width (across the ridge)")
-        calc.input("h", inp["h"], "m", "Height")
-        calc.input("A", inp["A"], "m²", "Loaded area for c_pe")
-        if canopy:
-            cls._canopy(calc, inp, qp, L, Wd, h)
-            return
-        cls._building(calc, inp, qp, L, Wd, h, A)
+        if kind in (KINDS[0], KINDS[1]):
+            calc.input("L", inp["L"], "m", "Length (along the ridge)")
+            calc.input("W", inp["Wd"], "m", "Width (across the ridge)")
+            calc.input("h", inp["h"], "m", "Height")
+            calc.input("A", inp["A"], "m²", "Loaded area for c_pe")
+        fr = W.FRICTION[SURFACES[inp["surface"]]]
+        if kind == KINDS[1]:
+            cls._canopy(calc, inp, qp, L, Wd, h, fr)
+        elif kind == KINDS[2]:
+            cls._free_wall(calc, inp, qp, L, h, fr, ze)
+        elif kind == KINDS[3]:
+            cls._signboard(calc, inp, qp, L, h, ze, sign_wall, fr)
+        else:
+            cls._building(calc, inp, qp, L, Wd, h, A, fr)
 
     # ------------------------------------------------------------------- building
     @classmethod
-    def _building(cls, calc, inp, qp, L, Wd, h, A) -> None:
+    def _building(cls, calc, inp, qp, L, Wd, h, A, fr) -> None:
         roof = inp["roof"]
         alpha = inp["alpha"]
+        n = inp["spans"] if roof in (ROOFS[1], ROOFS[2]) else 1
+        if roof == ROOFS[4] and inp["f"] >= inp["h"]:
+            raise InputError("The rise f must be smaller than the height h", "f")
         if roof == ROOFS[2] and abs(alpha) < 5:
             calc.note("Duopitch with |α| < 5° is treated as a flat roof (Table 7.4a NOTE 2).")
             roof = ROOFS[0]
@@ -136,11 +200,27 @@ class WindPressuresEC1(DesignModule):
             elif alpha > 75:
                 raise InputError("Roof pitch above 75° is outside Tables 7.3–7.5", "alpha")
         dirs = ["0", "90", "180"] if roof == ROOFS[1] else ["0", "90"]
+        if n > 1:
+            calc.text("Multispan roof: {n} spans of {s:.2f} m (7.2.7, Figure 7.10).", n=n,
+                      s=Wd / n)
 
         # internal pressure
         calc.heading("Internal pressure")
         mode = inp["internal"]
-        if mode == INTERNAL[2]:
+        dom = None
+        if mode == INTERNAL[3]:
+            fdom = calc.formula("f_dom", f"Eq. 7.2/7.3, ratio {inp['dom_ratio']:g}",
+                                W.dominant_factor(inp["dom_ratio"]), "",
+                                "c_pi / c_pe at the dominant opening", ref="7.2.9(5)", dp=3)
+            dom = (fdom, inp["dom_face"])
+            cpis = []
+            calc.text("Dominant opening on the {f}: c_pi = {k:.2f} × c_pe of that face, for "
+                      "the opening windward, leeward or on a side wall (area-weighted c_pe of "
+                      "zones A–C) as the wind direction makes it.",
+                      f=calc.tr(inp["dom_face"]).lower(), k=fdom)
+            calc.note("If the dominant opening (door, window) is assumed closed at ULS, the open "
+                      "condition is an accidental design situation (7.2.9(3), EN 1990).")
+        elif mode == INTERNAL[2]:
             cpis = [0.0]
             calc.text("No internal pressure considered (c_pi = 0).")
         elif mode == INTERNAL[1]:
@@ -154,9 +234,9 @@ class WindPressuresEC1(DesignModule):
             calc.text("c_pi = +0.2 and −0.3, the more onerous is used for each zone "
                       "(7.2.9(6) NOTE 2).")
 
-        def net(cpe: float) -> tuple[float, float]:
+        def net(cpe: float, cands: list[float]) -> tuple[float, float]:
             """(most onerous c_pi, net coefficient c_pe − c_pi)."""
-            best = max(cpis, key=lambda c: abs(cpe - c))
+            best = max(cands, key=lambda c: abs(cpe - c))
             return best, cpe - best
 
         results = {}  # direction -> list of zone dicts
@@ -168,11 +248,32 @@ class WindPressuresEC1(DesignModule):
             calc.heading(f"Wind direction θ = {th}°")
             calc.text("Crosswind dimension b = {b:.2f} m, depth d = {d:.2f} m, e = min(b, 2h) "
                       "= {e:.2f} m", b=b, d=d, e=e)
-            zones = cls._walls(calc, b, d, h, e) + cls._roof(calc, roof, th, inp, b, d, h, e)
+            hw = h - inp["f"] / 1000 if roof == ROOFS[4] else h
+            walls = cls._walls(calc, b, d, h, e, hw)
+            if n > 1 and th == "90":
+                calc.text("θ = 90°: each span is treated individually, b = W/n = {b:.2f} m "
+                          "(7.2.7(1)).", b=Wd / n)
+                roofz = cls._roof(calc, roof, th, inp, Wd / n, d, h, min(Wd / n, 2 * h))
+            elif n > 1:
+                roofz = cls._multispan(calc, roof, th, inp, b, d / n, h, e, n)
+            else:
+                roofz = cls._roof(calc, roof, th, inp, b, d, h, e)
+            zones = walls + roofz
+            cands = cpis
+            if dom:
+                cpe_w = {z["zone"]: W.cpe_area(z["cell"], A) for z in walls}
+                side = sum(cpe_w[z["zone"]] * (z["u"][1] - z["u"][0]) for z in walls
+                           if "u" in z) / d
+                along = (th in ("0", "180")) == (dom[1] == DOM_FACES[0])
+                face = [cpe_w["D"], cpe_w["E"]] if along else [side]
+                cands = [dom[0] * c for c in face]
+                calc.text("Dominant opening: c_pe at the opening {c} → c_pi = {p}",
+                          c=" / ".join(f"{c:+.2f}" for c in face),
+                          p=" / ".join(f"{c:+.2f}" for c in cands))
             rows = []
             for z in zones:
                 cpe = W.cpe_area(z["cell"], A)
-                cpi, cn = net(cpe)
+                cpi, cn = net(cpe, cands)
                 z.update(cpe=cpe, we=qp * cpe, cpi=cpi, wn=qp * cn, theta=th)
                 rows.append([calc.tr(z["surface"]), z["zone"], z["size"],
                              f"{z['cell'][0]:+.2f}", f"{z['cell'][1]:+.2f}", f"{cpe:+.2f}",
@@ -187,6 +288,24 @@ class WindPressuresEC1(DesignModule):
                          "Net horizontal pressure on the building (windward + leeward)",
                          ref="7.2.2(3)", dp=3)
             results[th] = zones
+            # friction on the surfaces parallel to the wind (7.5)
+            x0 = min(2 * b, 4 * h)
+            roof_par = roof == ROOFS[0] or th == "90"
+            wroof = b if roof == ROOFS[0] else (
+                b / math.cos(math.radians(alpha)) if roof in (ROOFS[1], ROOFS[2], ROOFS[3])
+                else b)
+            par_total = d * (2 * hw + (wroof if roof_par else 0))
+            perp = 2 * b * h
+            if par_total <= 4 * perp:
+                calc.text("Friction: surfaces parallel to the wind {a:.0f} m² ≤ 4 × surfaces "
+                          "perpendicular {p:.0f} m² — may be disregarded (5.3(4)).",
+                          a=par_total, p=4 * perp)
+            elif d > x0:
+                Afr = (d - x0) * (2 * hw + (wroof if roof_par else 0))
+                calc.formula(f"F_fr,{th}", f"c_fr·q_p·A_fr = {fr:g}·q_p·{Afr:.1f} m²",
+                             fr * qp * Afr * 1e6, "kN",
+                             "Friction force (beyond min(2b, 4h) from the upwind edge)",
+                             ref="7.5, Table 7.10", dp=2)
         if any(z.get("signed") for zs in results.values() for z in zs):
             calc.note("Where a zone has a negative and a positive value (marked −/+), consider "
                       "separately the case with all negative and the case with all positive "
@@ -208,16 +327,17 @@ class WindPressuresEC1(DesignModule):
         gov("w_roof,max", roofz, max, "Roof — maximum downward pressure")
         gov("w_wall,max", wallz, max, "Walls — maximum pressure")
         gov("w_wall,min", wallz, min, "Walls — maximum suction")
-        calc.note("Friction (7.5), multispan (7.2.7), vaulted roofs (7.2.8), dominant openings "
-                  "(7.2.9(5)) and walls with more than one skin (7.2.10) are not included.")
+        calc.note("Domes (Figure 7.12) and walls or roofs with more than one skin (7.2.10) are "
+                  "not included.")
         th = {"θ = 0°": "0", "θ = 90°": "90", "θ = 180°": "180"}[inp["view"]]
         if th not in results:
             th = "0"
-        calc.model3d = cls._scene(calc, roof, inp, L, Wd, h, results[th], th)
+        calc.model3d = cls._scene(calc, roof, inp, L, Wd, h, results[th], th, n)
 
     @staticmethod
-    def _walls(calc, b, d, h, e) -> list[dict]:
+    def _walls(calc, b, d, h, e, hw=None) -> list[dict]:
         cells = W.walls(h / d)
+        h = hw or h
         out = []
         if e < d:
             parts = [("A", 0, e / 5), ("B", e / 5, e), ("C", e, d)]
@@ -307,6 +427,33 @@ class WindPressuresEC1(DesignModule):
             if e / 2 < d:
                 z += cls._expand("I", c["I"], [(e / 2, d, 0, b)], sz((e / 2, d, 0, b)))
             return z
+        if roof == ROOFS[4]:
+            f = inp["f"] / 1000
+            hw = h - f
+            if th == "90":
+                calc.text("Vaulted roof, θ = 90° (wind along the axis): Figure 7.11 does not apply;"
+                          " the zones of a flat roof with sharp eaves are used as an approximation.")
+                c = W.flat_roof("sharp", 0.0)
+                z = cls._expand("F", c["F"], corner, sz(corner[0]) + " ×2")
+                z += cls._expand("G", c["G"], [g_rect], sz(g_rect))
+                z += cls._expand("H", c["H"], [(e10, e2, 0, b)], sz((e10, e2, 0, b)))
+                if e / 2 < d:
+                    z += cls._expand("I", W.FLAT_I, [(e / 2, d, 0, b)], sz((e / 2, d, 0, b)))
+                return z
+            v = W.vaulted(f / d, hw / d)
+            calc.text("Vaulted roof: f/d = {fd:.3f}, h/d = {hd:.3f} (Figure 7.11, z_e = h + f). "
+                      "Zones A, B, C taken as the windward quarter, the middle half and the "
+                      "leeward quarter of the arc.", fd=f / d, hd=hw / d)
+            z = []
+            for zn, (u0, u1) in (("A", (0, d / 4)), ("B", (d / 4, 3 * d / 4)),
+                                 ("C", (3 * d / 4, d))):
+                vals = v[zn]
+                for i, c in enumerate(vals):
+                    name = zn + ((" (−)" if c < 0 else " (+)") if len(vals) > 1 else "")
+                    z.append({"surface": "Roof", "zone": name, "cell": (c, c),
+                              "rects": [(u0, u1, 0, b)], "size": sz((u0, u1, 0, b)),
+                              "signed": len(vals) > 1})
+            return z
         # hipped: the pitch of the windward face governs (Table 7.5 NOTE 3)
         a = alpha if th == "0" else inp["alpha90"]
         calc.text("Hipped roof: pitch of the windward face α = {a:g}° (Table 7.5, Figure 7.9).",
@@ -319,9 +466,36 @@ class WindPressuresEC1(DesignModule):
             z += cls._expand(zn, c[zn], [], "Fig. 7.9")
         return z
 
+    @classmethod
+    def _multispan(cls, calc, roof, th, inp, b, ds, h, e, n) -> list[dict]:
+        """Span 1 with all zones (d = W/n); spans 2 … n zones H (and I) modified (Fig. 7.10)."""
+        inp2 = dict(inp)
+        if roof == ROOFS[2] and inp["alpha"] > 0:
+            inp2["alpha"] = -inp["alpha"]
+            calc.text("Multispan duopitch: treated as troughed spans α = −{a:g}° "
+                      "(7.2.7(1), Figure 7.10 c, d).", a=inp["alpha"])
+        first = cls._roof(calc, roof, th, inp2, b, ds, h, e)
+        config = "d" if roof == ROOFS[2] else ("b" if th == "0" else "a")
+        keep = ("H", "I") if roof == ROOFS[2] else ("H",)
+        out = [{**z, "zone": z["zone"] + " ¹"} if z["zone"][0] in keep else z for z in first]
+        for k in range(2, n + 1):
+            for z in first:
+                if z["zone"][0] not in keep:
+                    continue
+                how, v = W.multispan_factor(config, k, z["cell"][0])
+                cell = (v, v) if how == "value" else (v * z["cell"][0], v * z["cell"][1])
+                rects = [(u0 + (k - 1) * ds, u1 + (k - 1) * ds, v0, v1)
+                         for (u0, u1, v0, v1) in z["rects"]]
+                tag = f"{v:g}" if how == "value" else f"{v:g}·c_pe"
+                out.append({**z, "zone": f"{z['zone']} {k}", "cell": cell, "rects": rects,
+                            "size": f"{z['size']} ({tag})"})
+        calc.text("Spans 2 … n: zones {z} with the factors of Figure 7.10 {c}; the span number "
+                  "follows the zone letter.", z=", ".join(keep), c=config)
+        return out
+
     # --------------------------------------------------------------------- canopy
     @classmethod
-    def _canopy(cls, calc, inp, qp, L, Wd, h) -> None:
+    def _canopy(cls, calc, inp, qp, L, Wd, h, fr) -> None:
         mono = inp["canopy"] == CANOPIES[0]
         alpha, phi = inp["alpha"], inp["phi"]
         tab = W.CANOPY_MONO if mono else W.CANOPY_DUO
@@ -363,15 +537,134 @@ class WindPressuresEC1(DesignModule):
                      "Local net pressure, downward (roofing, fixings)", dp=3)
         calc.formula("w_net,min", "min c_p,net · q_p", min(mn[1:]) * qp, "kN/m²",
                      "Local net pressure, upward (roofing, fixings)", dp=3)
-        calc.note("Friction forces (7.5) are to be added. Multibay canopies: Table 7.8.")
+        calc.formula("F_fr", f"c_fr·q_p·2·d·b = {fr:g}·q_p·2·{d:.2f}·{b:.2f}",
+                     fr * qp * 2 * d * b * 1e6, "kN", "Friction force (wind along the roof)",
+                     ref="7.5, Figure 7.22", dp=2)
+        if not mono and inp["bays"] > 1:
+            nb = inp["bays"]
+            rows = []
+            for k in range(1, nb + 1):
+                pos = min(k, nb + 1 - k)
+                fmax, fmin = PSI_MC[min(pos, 3)]
+                rows.append([str(k), f"{fmax:.1f}", f"{fmin:.1f}",
+                             f"{kpa(fmax * mx[0] * qp):+.3f}", f"{kpa(fmin * mn[0] * qp):+.3f}"])
+            calc.table(["Bay", "ψ_mc (max)", "ψ_mc (min)", "w_f,max [kN/m²]", "w_f,min [kN/m²]"],
+                       rows, caption="Table 7.8 — multibay duopitch canopy (Figure 7.18)")
         calc.model3d = cls._canopy_scene(calc, mono, L, Wd, h, alpha, mn[0])
+
+    # ------------------------------------------------------------- free walls
+    @classmethod
+    def _free_wall(cls, calc, inp, qp, l, h, fr, ze) -> None:
+        phi, ret = inp["wphi"], inp["ret"] / 1000
+        calc.heading("Free-standing wall or parapet — Table 7.9")
+        calc.input("l", inp["L"], "m", "Length of the wall")
+        calc.input("h", inp["h"], "m", "Height of the wall")
+        calc.formula("z_e", "h_b + h" if inp["on_building"] else "h", ze * 1000, "m",
+                     "Reference height", ref="7.4.1(2)", dp=2)
+        cp = W.free_wall(l / h, phi, ret / h)
+        both = phi < 1 or ret > 0
+        calc.text("l/h = {lh:.2f}, φ = {p:g}, return corner {r:.2f} m (r/h = {rh:.2f}). {s}",
+                  lh=l / h, p=phi, r=ret, rh=ret / h,
+                  s=calc.tr("Both signs (±) must be considered." if both else
+                            "Pressure on the windward face (no return corners, φ = 1)."))
+        parts = [("A", 0, 0.3 * h), ("B", 0.3 * h, 2 * h), ("C", 2 * h, 4 * h), ("D", 4 * h, l)]
+        psi = 1.0
+        if inp["sheltered"]:
+            psi = calc.formula("ψ_s", f"Figure 7.20, x/h = {inp['xs'] / inp['h']:.2f}, "
+                               f"φ = {inp['phi_up']:g}", W.shelter(inp["xs"] / inp["h"],
+                                                                     inp["phi_up"]), "",
+                               "Shelter factor (not within h of the free end)",
+                               ref="7.4.2, Eq. 7.7", dp=3)
+        rows, total, zones = [], 0.0, []
+        for (zn, u0, u1), c in zip(parts, cp):
+            u1 = min(u1, l)
+            if u1 <= u0:
+                continue
+            ps = psi if (inp["sheltered"] and u0 >= h) else 1.0
+            cn = c * ps
+            w = qp * cn
+            F = w * (u1 - u0) * h * 1e6
+            total += F
+            zones.append((zn, u0, u1, cn))
+            rows.append([zn, f"{u0:.2f} – {u1:.2f}", f"{c:.2f}", f"{ps:.2f}",
+                         f"{('±' if both else '')}{kpa(w):.3f}", f"{kpa(w) * h:.3f}",
+                         f"{F / 1e3:.2f}"])
+        calc.table(["Zone", "From – to [m]", "c_p,net", "ψ_s", "w [kN/m²]", "w·h [kN/m]",
+                    "F [kN]"], rows, caption="Zones from each free end (Figure 7.19)")
+        calc.formula("w_A", "c_p,net,A · q_p", qp * cp[0], "kN/m²", "Net pressure, end zone A",
+                     dp=3)
+        calc.formula("w_inner", f"c_p,net,{zones[-1][0]} · q_p", qp * zones[-1][3], "kN/m²",
+                     "Net pressure, inner zone", dp=3)
+        calc.formula("F_w", "Σ w·A_zone (one free end, both ends similar)", total, "kN",
+                     "Total wind force on the wall", dp=2)
+        calc.formula("F_fr", f"c_fr·q_p·2·h·l = {fr:g}·q_p·2·{h:.2f}·{l:.2f}",
+                     fr * qp * 2 * h * l * 1e6, "kN", "Friction force (wind along the wall)",
+                     ref="7.5, Figure 7.22", dp=2)
+        calc.note("Zones are measured from a free end; a wall with two free ends has the zones at "
+                  "both ends. Porous fences with φ < 0.8: plane lattices (7.11).")
+        sc = Scene3D("wind_wall", calc.tr)
+        sc.layer("wall", "Wall")
+        base = ze - h
+        cmax = max(abs(c) for *_, c in zones) or 1
+        for zn, u0, u1, c in zones:
+            sc.box("wall", (u0 + (u1 - u0) / 2, base + h / 2, 0), (u1 - u0, h, 0.25),
+                   heat_color(0.5 + 0.5 * c / cmax), opacity=0.95)
+            sc.label("wall", f"{zn} {c:.2f}", (u0 + (u1 - u0) / 2, base + h + 0.3, 0), "result")
+        if base > 0:
+            sc.box("wall", (min(l, 4 * h) / 2, base / 2, 3), (min(l, 4 * h), base, 6), "#cfd5dc",
+                   opacity=0.4)
+        return_scene = sc.to_dict()
+        calc.model3d = return_scene
+
+    @classmethod
+    def _signboard(cls, calc, inp, qp, b, h, ze, as_wall, fr) -> None:
+        zg = inp["zg"] / 1000
+        if as_wall:
+            calc.text("z_g = {z:.2f} m < h/4 and b/h > 1: treated as a boundary wall of height "
+                      "z_g + h (7.4.3(2)).", z=zg)
+            inp2 = dict(inp, wphi=1.0, ret=0.0, on_building=False, sheltered=False)
+            cls._free_wall(calc, inp2, qp, b, zg + h, fr, ze)
+            return
+        calc.heading("Signboard — 7.4.3")
+        calc.input("b", inp["L"], "m", "Width of the signboard")
+        calc.input("h", inp["h"], "m", "Height of the signboard")
+        calc.input("z_g", inp["zg"], "m", "Clearance above ground")
+        calc.formula("z_e", "z_g + h/2", ze * 1000, "m", "Reference height", ref="Figure 7.21",
+                     dp=2)
+        calc.formula("c_f", "Eq. 7.8", W.SIGN_CF, "", "Force coefficient", ref="7.4.3(1)", dp=2)
+        F = calc.formula("F_w", "c_s c_d · c_f · q_p · b · h, c_s c_d = 1",
+                         W.SIGN_CF * qp * b * h * 1e6, "kN", "Wind force on the signboard",
+                         ref="Eq. 5.3", dp=2)
+        ecc = calc.formula("e", "±0.25 b", 0.25 * b * 1000, "m", "Horizontal eccentricity",
+                           ref="Eq. 7.9", dp=2)
+        calc.formula("M_t", "F_w · e", F * ecc, "kNm", "Torsion about the vertical axis", dp=2)
+        calc.formula("M_base", "F_w · z_e", F * ze * 1000, "kNm",
+                     "Overturning moment at ground level", dp=2)
+        calc.note("Check divergence and stall flutter (7.4.3). c_s c_d = 1 assumed (6.2(1)).")
+        sc = Scene3D("wind_sign", calc.tr)
+        sc.layer("sign", "Signboard")
+        sc.box("sign", (0, zg + h / 2, 0), (b, h, 0.15), heat_color(0.9), opacity=0.95)
+        for x in (-b / 4, b / 4):
+            sc.box("sign", (x, zg / 2, 0), (0.2, zg, 0.2), "#7d8b99")
+        sc.arrow("sign", (0.25 * b, zg + h / 2, -3), (0, 0, 1), 2.6, "#2a6f97")
+        sc.label("sign", f"F_w = {F / 1e3:.1f} kN, e = ±{0.25 * b:.2f} m",
+                 (0, zg + h + 0.5, 0), "result")
+        calc.model3d = sc.to_dict()
 
     # ---------------------------------------------------------------------- 3D
     @staticmethod
-    def _roof_y(roof, alpha, Wd, h, x, z, L, a90):
+    def _roof_y(roof, alpha, Wd, h, x, z, L, a90, n=1, f=0.0):
         t = math.tan(math.radians(alpha))
         if roof == ROOFS[0]:
             return h
+        if roof == ROOFS[4]:
+            return h - f + f * max(0.0, 1 - (2 * z / Wd) ** 2)
+        if n > 1:
+            ds = Wd / n
+            zz = (z + Wd / 2) % ds if z < Wd / 2 - 1e-9 else ds
+            if roof == ROOFS[1]:
+                return h - (ds - zz) * t
+            return h - abs(zz - ds / 2) * abs(t)
         if roof == ROOFS[1]:
             return h - (Wd / 2 - z) * t
         if alpha < 0:
@@ -384,16 +677,22 @@ class WindPressuresEC1(DesignModule):
         return y
 
     @classmethod
-    def _scene(cls, calc, roof, inp, L, Wd, h, zones, th) -> dict:
+    def _scene(cls, calc, roof, inp, L, Wd, h, zones, th, n=1) -> dict:
         sc = Scene3D("wind_pressures", calc.tr)
         sc.layer("walls", "Walls")
         sc.layer("roof", "Roof")
         sc.layer("wind", "Wind")
         alpha, a90 = inp["alpha"], inp["alpha90"]
 
+        fv = inp["f"] / 1000 if roof == ROOFS[4] else 0.0
+
         def y(x, z):
-            return cls._roof_y(roof, alpha, Wd, h, x, z, L, a90)
-        if roof == ROOFS[1]:
+            return cls._roof_y(roof, alpha, Wd, h, x, z, L, a90, n, fv)
+        if roof == ROOFS[4]:
+            he = h - fv
+        elif n > 1:
+            he = h - (Wd / n) * abs(math.tan(math.radians(alpha))) / (1 if roof == ROOFS[1] else 2)
+        elif roof == ROOFS[1]:
             he = h - Wd * math.tan(math.radians(alpha))
         elif roof in (ROOFS[2], ROOFS[3]) and alpha > 0:
             he = h - Wd / 2 * math.tan(math.radians(alpha))
@@ -447,6 +746,8 @@ class WindPressuresEC1(DesignModule):
         # roof surface (zones as coloured patches, or plain for hipped roofs)
         done = set()
         for z in zones:
+            if roof == ROOFS[4] or n > 1:
+                break
             if z["surface"] != "Roof" or not z.get("rects") or z["zone"][0] + z["zone"] in done:
                 continue
             done.add(z["zone"][0] + z["zone"])
@@ -460,7 +761,8 @@ class WindPressuresEC1(DesignModule):
             (u0, u1, v0, v1) = z["rects"][0]
             px, pz = world((u0 + u1) / 2, (v0 + v1) / 2)
             sc.label("roof", f"{z['zone']} {z['cpe']:+.2f}", (px, y(px, pz) + 0.3, pz), "result")
-        if roof == ROOFS[3] or not any(z.get("rects") for z in zones if z["surface"] == "Roof"):
+        if roof in (ROOFS[3], ROOFS[4]) or n > 1 or not any(
+                z.get("rects") for z in zones if z["surface"] == "Roof"):
             n = 16
             verts, faces = [], []
             for i in range(n + 1):

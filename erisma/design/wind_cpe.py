@@ -311,3 +311,100 @@ def canopy(table: dict, alpha: float, phi: float) -> tuple[tuple, tuple]:
     mx, mn0, mn1 = row(0), row(1), row(2)
     mn = tuple(u + (v - u) * phi for u, v in zip(mn0, mn1))
     return mx, mn
+
+
+# ------------------------------------------------------- 7.2.7 multispan roofs
+def multispan_factor(config: str, k: int, cpe_first: float) -> tuple[str, float]:
+    """Figure 7.10: ('factor', f) → c_pe,k = f·c_pe of span 1, or ('value', v) → c_pe,k = v.
+
+    config 'a' — monopitch, wind onto the high eave (θ = 180°): 1, 0.8, 0.6 …
+    config 'b' — monopitch, wind onto the low eave (θ = 0°): c_pe > 0 → −0.4 on the following
+                 spans; c_pe < 0 → 0.8, 0.6 …
+    config 'd' — troughed duopitch spans: 1, 0.8, 0.6 …
+    """
+    if k == 1:
+        return "factor", 1.0
+    if config == "b" and cpe_first > 0:
+        return "value", -0.4
+    return "factor", 0.8 if k == 2 else 0.6
+
+
+# ------------------------------------------------- 7.2.8 vaulted roofs (Fig. 7.11)
+# c_pe,10 read from the lines of Figure 7.11 (f/d from 0.05; constant beyond the ends)
+_VAULT_A0 = [(0.05, 0.08), (0.5, 0.8)]                          # A, h/d = 0
+_VAULT_A05_NEG = [(0.05, -0.95), (0.1, -1.2), (0.2, -1.2), (0.3, -0.3)]  # A, h/d ≥ 0.5
+_VAULT_A05_POS = [(0.2, 0.0), (0.5, 0.8)]                       # A, h/d ≥ 0.5 (f/d ≥ 0.2)
+_VAULT_B = [(0.05, -0.75), (0.5, -1.2)]
+_VAULT_C = [(0.05, -0.55), (0.1, -0.4), (0.5, -0.4)]
+
+
+def _poly(pts, x):
+    if x <= pts[0][0]:
+        return pts[0][1]
+    if x >= pts[-1][0]:
+        return pts[-1][1]
+    for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
+        if x1 <= x <= x2:
+            return lerp(x, x1, x2, y1, y2)
+    return pts[-1][1]  # pragma: no cover
+
+
+def vaulted(f_d: float, h_d: float) -> dict[str, list[float]]:
+    """Zones A, B, C of a cylindrical vault: list of c_pe,10 values to consider (Fig. 7.11).
+
+    For 0.2 ≤ f/d ≤ 0.3 and h/d ≥ 0.5 two values of zone A apply; for 0 < h/d < 0.5 zone A is
+    interpolated linearly between h/d = 0 and h/d = 0.5.
+    """
+    a0 = _poly(_VAULT_A0, f_d)
+    if f_d < 0.2:
+        a05 = [_poly(_VAULT_A05_NEG, f_d)]
+    elif f_d <= 0.3:
+        a05 = [_poly(_VAULT_A05_NEG, f_d), _poly(_VAULT_A05_POS, f_d)]
+    else:
+        a05 = [_poly(_VAULT_A05_POS, f_d)]
+    t = min(max(h_d / 0.5, 0.0), 1.0)
+    A = [a0 + (v - a0) * t for v in a05]
+    return {"A": A, "B": [_poly(_VAULT_B, f_d)], "C": [_poly(_VAULT_C, f_d)]}
+
+
+# ------------------------------------------------------ 7.2.9 dominant openings
+def dominant_factor(ratio: float) -> float:
+    """Eq. 7.2 / 7.3: c_pi = f·c_pe with f = 0.75 (ratio 2) … 0.90 (ratio ≥ 3)."""
+    if ratio <= 2:
+        return 0.75
+    if ratio >= 3:
+        return 0.90
+    return lerp(ratio, 2, 3, 0.75, 0.90)
+
+
+# ------------------------------------- 7.4.1 free-standing walls (Table 7.9)
+FREE_WALL_SOLID = {3.0: (2.3, 1.4, 1.2, 1.2), 5.0: (2.9, 1.8, 1.4, 1.2),
+                   10.0: (3.4, 2.1, 1.7, 1.2)}   # φ = 1, without return corners, l/h
+FREE_WALL_RETURN = (2.1, 1.8, 1.4, 1.2)          # φ = 1, return corners ≥ h (±)
+FREE_WALL_POROUS = (1.2, 1.2, 1.2, 1.2)          # φ = 0.8 (±)
+
+
+def free_wall(l_h: float, phi: float, ret_h: float) -> tuple[float, ...]:
+    """c_p,net of zones A–D for l/h, solidity φ (0.8 … 1) and return corner length / h."""
+    a, b = bracket(list(FREE_WALL_SOLID), l_h)
+    solid = tuple(lerp(l_h, a, b, u, v) for u, v in zip(FREE_WALL_SOLID[a], FREE_WALL_SOLID[b]))
+    r = min(max(ret_h, 0.0), 1.0)
+    solid = tuple(u + (v - u) * r for u, v in zip(solid, FREE_WALL_RETURN))
+    t = (phi - 0.8) / 0.2
+    return tuple(p + (s - p) * t for s, p in zip(solid, FREE_WALL_POROUS))
+
+
+# Figure 7.20 — shelter factor ψ_s against x/h for φ = 1.0 and φ = 0.8
+_SHELTER_1 = [(0.0, 0.3), (5.0, 0.3), (10.0, 0.65), (15.0, 0.85), (20.0, 1.0)]
+_SHELTER_08 = [(0.0, 0.3), (5.0, 0.3), (10.0, 0.45), (15.0, 0.65), (20.0, 1.0)]
+
+
+def shelter(x_h: float, phi: float) -> float:
+    s1, s8 = _poly(_SHELTER_1, x_h), _poly(_SHELTER_08, x_h)
+    t = min(max((phi - 0.8) / 0.2, 0.0), 1.0)
+    return s8 + (s1 - s8) * t
+
+
+# ------------------------------------------------------- 7.4.3 signboards, 7.5 friction
+SIGN_CF = 1.80  # Eq. 7.8
+FRICTION = {"smooth": 0.01, "rough": 0.02, "very_rough": 0.04}  # Table 7.10

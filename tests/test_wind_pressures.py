@@ -84,3 +84,48 @@ def test_canopies():
     assert out(c, "w_f,min") == pytest.approx(-0.6 * qp(c))            # Table 7.7, α = −10°
     with pytest.raises(InputError):
         M.calculate({"kind": "Canopy roof (no walls)", "alpha": 40}, CY)
+
+
+def test_multispan_vaulted_and_dominant_openings():
+    # multispan monopitch θ = 180° (config a): span 2 = 0.8, span 3 = 0.6 × c_pe of span 1
+    assert W.multispan_factor("a", 2, -0.9) == ("factor", 0.8)
+    assert W.multispan_factor("a", 3, -0.9) == ("factor", 0.6)
+    assert W.multispan_factor("b", 2, 0.2) == ("value", -0.4)  # config b, c_pe > 0
+    c = M.calculate({"roof": "Monopitch", "alpha": 15, "spans": 3}, CY)
+    assert "H 3" in " ".join(r[1] for it in c.items if it.kind == "table"
+                             for r in it.data["rows"] if len(r) > 1)
+    # vaulted roof f/d = 0.25, h/d = 1/3: zone B −0.75 + (−0.45)(0.2/0.45) = −0.95
+    v = W.vaulted(0.25, 4 / 12)
+    assert v["B"] == [pytest.approx(-0.95)] and len(v["A"]) == 2
+    M.calculate({"roof": "Vaulted (cylindrical)", "f": 3}, CY)
+    with pytest.raises(InputError):
+        M.calculate({"roof": "Vaulted (cylindrical)", "f": 8}, CY)
+    # dominant opening on the long face, ratio 3 → c_pi = 0.9 c_pe,D
+    c = M.calculate({"internal": "Dominant opening (7.2.9(5))"}, CY)
+    d = 0.7 + 0.1 * (7 / 12 - 0.25) / 0.75
+    assert out(c, "f_dom") == 0.9
+    assert out(c, "w_wall,min") == pytest.approx(qp(c) * (-1.2 - 0.9 * d))
+    assert W.dominant_factor(2.5) == pytest.approx(0.825)
+
+
+def test_friction_free_walls_and_signboards():
+    c = M.calculate({"L": 60, "Wd": 12, "h": 5}, CY)        # θ = 90°: b 12, d 60, x0 = 20 m
+    Afr = 40 * (2 * 5 + 12 / __import__("math").cos(__import__("math").radians(20)))
+    assert out(c, "F_fr,90") == pytest.approx(0.02 * qp(c) * Afr)
+    c = M.calculate({"kind": "Free-standing wall or parapet", "L": 20, "h": 2}, CY)
+    assert out(c, "w_A") == pytest.approx(3.4 * qp(c))      # Table 7.9, l/h = 10
+    assert out(c, "w_inner") == pytest.approx(1.2 * qp(c))  # zone D
+    c = M.calculate({"kind": "Free-standing wall or parapet", "L": 20, "h": 2, "ret": 2,
+                     "sheltered": True, "xs": 20}, CY)
+    assert out(c, "w_A") == pytest.approx(2.1 * qp(c))      # return corner ≥ h
+    assert out(c, "ψ_s") == pytest.approx(0.65)            # Figure 7.20, x/h = 10, φ = 1
+    assert out(c, "w_inner") == pytest.approx(0.65 * 1.2 * qp(c))
+    assert W.free_wall(4, 0.8, 0) == (1.2, 1.2, 1.2, 1.2)
+    c = M.calculate({"kind": "Signboard", "L": 6, "h": 3, "zg": 3}, CY)
+    assert out(c, "F_w") == pytest.approx(1.8 * qp(c) * 6 * 3)
+    assert out(c, "e") == pytest.approx(1.5)
+    c = M.calculate({"kind": "Signboard", "L": 10, "h": 3, "zg": 0.5}, CY)  # boundary wall
+    assert "w_A" in c.outputs
+    c = M.calculate({"kind": "Canopy roof (no walls)", "canopy": "Duopitch canopy",
+                     "alpha": 10, "bays": 4}, CY)
+    assert out(c, "F_fr") == pytest.approx(0.02 * qp(c) * 2 * 12 * 20)
