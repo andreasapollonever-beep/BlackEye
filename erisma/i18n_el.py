@@ -2967,4 +2967,5 @@ EL: dict[str, str] = {
     'Oblique wind on a wall without return corner (Table 7.9 NOTE).': 'Λοξός άνεμος σε τοίχο χωρίς γωνιακή επιστροφή (Πίνακας 7.9 ΣΗΜΕΙΩΣΗ).',
     'Pressure and force coefficients: {s}; a National Annex may give other values.': 'Συντελεστές πίεσης και δύναμης: {s}· το Εθνικό Προσάρτημα μπορεί να ορίζει άλλες τιμές.',
     'With a return corner the values apply in both opposite directions (±).': 'Με γωνιακή επιστροφή οι τιμές ισχύουν και στις δύο αντίθετες διευθύνσεις (±).',
+    'Pressure coefficients and q_p: {src}.': 'Συντελεστές πίεσης και q_p: {src}.',
 }

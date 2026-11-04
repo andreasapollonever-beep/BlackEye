@@ -415,7 +415,9 @@ class BuildingFrame(DesignModule):
                    caption="Storey forces at the centre of the plan; z_e per Fig. 7.4; load "
                            "cases W_X and W_Y, each in both senses")
         calc.wind_shear = shear
-        if not VERIFIED:
+        if VERIFIED:
+            calc.note("Pressure coefficients and q_p: {src}.", src=SOURCE)
+        else:
             calc.warn("Wind pressure coefficients are provisional ({src}) — verify against "
                       "EN 1991-1-4 before issue.", src=SOURCE)
 
