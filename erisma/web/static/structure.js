@@ -106,6 +106,18 @@ Object.assign(UI.el, {
   "q used": "q που χρησιμοποιήθηκε", "Mode": "Ιδιομορφή", "torsion": "στρέψη",
   "Drift d_r·ν / (α·h) per storey": "Σχετική μετακίνηση d_r·ν / (α·h) ανά όροφο",
   "National Annex": "Εθνικό Προσάρτημα", "Code": "Κανονισμός", "Seismic zone": "Σεισμική ζώνη",
+  "Foundation plan": "Κάτοψη θεμελίωσης", "Members": "Μέλη", "Design members": "Διαστασιολόγηση μελών",
+  "Layers": "Επίπεδα", "Draw": "Σχεδίαση", "Define": "Ορισμοί", "Analyse": "Ανάλυση", "Modify": "Τροποποίηση",
+  "Project details": "Στοιχεία έργου", "Company, project, job number, engineer — printed on every report page":
+    "Εταιρεία, έργο, αριθμός έργου, μηχανικός — τυπώνονται σε κάθε σελίδα του τεύχους",
+  "Concrete": "Σκυρόδεμα", "Sections": "Διατομές",
+  "Sizes used where no member has its own (select a member to change only that one)":
+    "Διαστάσεις για όσα μέλη δεν έχουν δική τους (επιλέξτε ένα μέλος για να αλλάξετε μόνο αυτό)",
+  "Seismic action": "Σεισμική δράση", "Response spectrum": "Φάσμα απόκρισης", "Spectrum": "Φάσμα",
+  "Stiffness": "Δυσκαμψία", "Apply to q": "Εφαρμογή στο q", "Show mode": "Εμφάνιση",
+  "Animate": "Κίνηση", "Stop": "Διακοπή", "Speed": "Ταχύτητα",
+  "Animate the mode / deformed shape in the 3D view": "Κίνηση της ιδιομορφής / παραμόρφωσης στο 3D",
+  "Include the destabilising effect of the gravity loads": "Επιρροή των κατακόρυφων φορτίων στη δυσκαμψία (2ας τάξης)",
   "Load case": "Φόρτιση", "New case": "Νέα φόρτιση", "Rename": "Μετονομασία", "Delete case": "Διαγραφή φόρτισης",
   "Permanent G": "Μόνιμα G", "Imposed Q": "Κινητά Q", "Snow S": "Χιόνι S", "Apply loads": "Εφαρμογή φορτίων",
   "Area load": "Επιφανειακό", "Line load": "Γραμμικό", "Point load": "Σημειακό", "Value": "Τιμή",
@@ -139,7 +151,7 @@ const Structure = (() => {
   const VKEY = "erisma.structure.view";
   const S = { schema: null, inp: null, tool: "select", sel: [], res: null, view: "plan", tab: "home",
     hist: [], hpos: -1, timer: null, runId: 0, built: false, auto: true, dirty: false, vb: null, layers: {},
-    lcase: null, lval: { area: 2.0, line: 5.0, point: 20.0 }, lstorey: "all",
+    lcase: null, lval: { area: 2.0, line: 5.0, point: 20.0 }, lstorey: "all", mode: 1, anim: false, animSpeed: 1,
     opt: { colour: "util", storey: "all", labels: false, names: true, dims: true, axes: true, slabs: true,
       ribbonMin: false, onlyFail: false, filter: "", sort: ["member", 1] } };
   Object.assign(S.opt, store.get(VKEY, {}));
@@ -178,75 +190,95 @@ const Structure = (() => {
   const KIND = () => ({ column: t("Column"), wall: t("Wall"), beam: t("Beam"), panel: t("Slab panel"),
     slab: t("Slab"), fbeam: t("Foundation beam"), footing: t("Footing") });
 
-  // ------------------------------------------------------------ icons (24×24, stroke)
+  // ------------------------------------------------------------ icons
+  // 24×24, two-tone: strokes in the text colour, ".f" faces tinted with the accent colour,
+  // ".r" red accents (loads, seismic). Drawn to be recognisable at a glance, as in
+  // ETABS / Revit / Tekla ribbons.
   const P = {
-    new: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M12 11v6M9 14h6"/>',
-    open: '<path d="M3 7h6l2 2h10v10H3z"/><path d="M3 11h18"/>',
-    save: '<path d="M4 4h13l3 3v13H4z"/><path d="M8 4v5h7V4"/><rect x="7" y="13" width="10" height="7"/>',
-    print: '<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="1"/><path d="M7 14h10v7H7z"/>',
-    html: '<path d="M8 8l-4 4 4 4M16 8l4 4-4 4M13 6l-2 12"/>',
-    csv: '<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M4 9h16M4 14h16M10 4v16"/>',
-    undo: '<path d="M9 7L4 12l5 5"/><path d="M4 12h10a6 6 0 0 1 0 12"/>',
-    redo: '<path d="M15 7l5 5-5 5"/><path d="M20 12H10a6 6 0 0 0 0 12"/>',
-    del: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
-    select: '<path d="M5 3l12 8-6 1 3 7-2 1-3-7-4 4z"/>',
-    selcol: '<rect x="4" y="4" width="5" height="5"/><rect x="15" y="4" width="5" height="5"/><rect x="4" y="15" width="5" height="5"/><rect x="15" y="15" width="5" height="5"/>',
-    selbeam: '<path d="M3 6h18M3 18h18M6 3v18M18 3v18" stroke-width="2.6"/>',
-    selwall: '<rect x="3" y="9" width="18" height="6"/>',
-    selfail: '<circle cx="12" cy="12" r="8"/><path d="M12 7v6M12 16v1"/>',
-    clear: '<path d="M5 5l14 14M19 5L5 19"/>',
-    run: '<path d="M7 4l13 8-13 8z"/>',
-    auto: '<path d="M4 12a8 8 0 0 1 14-5l2-2v6h-6l2-2a5 5 0 1 0 1 5"/>',
-    plan: '<rect x="3" y="3" width="18" height="18"/><path d="M3 12h18M12 3v18"/>',
-    cube: '<path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M12 22V12M3 7l9 5 9-5"/>',
-    report: '<path d="M6 3h12v18H6z"/><path d="M9 8h6M9 12h6M9 16h4"/>',
-    table: '<rect x="3" y="4" width="18" height="16"/><path d="M3 9h18M3 14h18M9 4v16"/>',
-    column: '<rect x="8" y="8" width="8" height="8" fill="currentColor"/><path d="M3 12h5M16 12h5M12 3v5M12 16v5" stroke-dasharray="2 2"/>',
-    wallx: '<rect x="3" y="9.5" width="18" height="5" fill="currentColor"/>',
-    wally: '<rect x="9.5" y="3" width="5" height="18" fill="currentColor"/>',
-    beam: '<path d="M3 12h18" stroke-width="4"/><rect x="2" y="9" width="4" height="6" fill="currentColor"/><rect x="18" y="9" width="4" height="6" fill="currentColor"/>',
-    opening: '<rect x="4" y="4" width="16" height="16"/><path d="M4 12l8-8M4 20L20 4M12 20l8-8"/>',
-    grid: '<path d="M3 8h18M3 16h18M8 3v18M16 3v18"/>',
-    axisx: '<path d="M4 4v16M12 4v16M20 4v16" stroke-dasharray="3 2"/><circle cx="20" cy="4" r="2"/>',
-    axisy: '<path d="M4 4h16M4 12h16M4 20h16" stroke-dasharray="3 2"/><circle cx="20" cy="20" r="2"/>',
-    storeyadd: '<path d="M4 20h16M4 14h16M4 8h16M6 8v12M18 8v12"/><path d="M12 1v5M9.5 3.5h5"/>',
-    storeydel: '<path d="M4 20h16M4 14h16M6 14v6M18 14v6"/><path d="M9 6h6"/>',
-    zin: '<circle cx="10" cy="10" r="6"/><path d="M15 15l6 6M7 10h6M10 7v6"/>',
-    zout: '<circle cx="10" cy="10" r="6"/><path d="M15 15l6 6M7 10h6"/>',
-    fit: '<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>',
-    full: '<path d="M3 9V3h6M15 3h6v6M21 15v6h-6M9 21H3v-6"/>',
-    theme: '<circle cx="12" cy="12" r="5"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/>',
-    manual: '<path d="M4 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H4z"/><path d="M20 4h-4a2 2 0 0 0-2 2"/>',
-    keys: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h1M10 10h1M14 10h1M18 10h1M7 14h10"/>',
-    modes: '<path d="M4 20V4"/><path d="M4 20c6-2 10-8 12-16"/><path d="M4 20c3-4 8-6 16-6" stroke-dasharray="2 2"/>',
-    drift: '<path d="M6 21V3M6 3l10 3M6 9l8 2M6 15l5 1"/>',
-    qty: '<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>',
-    tag: '<path d="M3 12V3h9l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
+    // file
+    new: '<path class="f" d="M6 2.5h8l4 4V21.5H6z"/><path d="M6 2.5h8l4 4V21.5H6z"/><path d="M14 2.5v4h4"/><path d="M12 11v6M9 14h6"/>',
+    open: '<path class="f" d="M2.5 19.5l3-9h16l-3 9z"/><path d="M2.5 19.5V5.5h6l2 2h7v3"/><path d="M2.5 19.5l3-9h16l-3 9z"/>',
+    save: '<path class="f" d="M4 4h12.5L20 7.5V20H4z"/><path d="M4 4h12.5L20 7.5V20H4z"/><path d="M7.5 4v5h8V4"/><rect x="7" y="13" width="10" height="7"/>',
+    print: '<path d="M7 8V3h10v5"/><rect class="f" x="3" y="8" width="18" height="9" rx="1.5"/><rect x="3" y="8" width="18" height="9" rx="1.5"/><path d="M7 14h10v7H7z"/>',
+    html: '<path class="f" d="M5 3h10l4 4v14H5z"/><path d="M5 3h10l4 4v14H5z"/><path d="M9.5 11l-2 2.5 2 2.5M14.5 11l2 2.5-2 2.5"/>',
+    csv: '<rect class="f" x="3" y="4" width="18" height="16" rx="1"/><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 9h18M3 14.5h18M9 4v16M15 4v16"/>',
+    project: '<rect class="f" x="4" y="3" width="16" height="18" rx="1.5"/><rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+    annex: '<circle class="f" cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/>',
+    // edit / selection
+    undo: '<path d="M9 6L4 11l5 5"/><path d="M4 11h11a5 5 0 0 1 0 10h-3"/>',
+    redo: '<path d="M15 6l5 5-5 5"/><path d="M20 11H9a5 5 0 0 0 0 10h3"/>',
+    del: '<path d="M4 7h16"/><path d="M9.5 7V4h5v3"/><path class="f" d="M6 7l1 13.5h10L18 7z"/><path d="M6 7l1 13.5h10L18 7z"/><path d="M10 11v6M14 11v6"/>',
+    select: '<path class="f" d="M5 3l13 8.5-6 1.5 3.5 7-2.5 1.2-3.4-7L5 18z"/><path d="M5 3l13 8.5-6 1.5 3.5 7-2.5 1.2-3.4-7L5 18z"/>',
+    selcol: '<rect class="f" x="3" y="3" width="5" height="5"/><rect class="f" x="16" y="3" width="5" height="5"/><rect class="f" x="3" y="16" width="5" height="5"/><rect class="f" x="16" y="16" width="5" height="5"/><path d="M3 3h5v5H3zM16 3h5v5h-5zM3 16h5v5H3zM16 16h5v5h-5z"/><path d="M8 5.5h8M8 18.5h8M5.5 8v8M18.5 8v8" stroke-dasharray="1.5 2"/>',
+    selbeam: '<rect class="f" x="2.5" y="10" width="19" height="4"/><rect x="2.5" y="10" width="19" height="4"/><path d="M2.5 5h19M2.5 19h19" stroke-dasharray="1.5 2"/>',
+    selwall: '<rect class="f" x="9" y="2.5" width="6" height="19"/><rect x="9" y="2.5" width="6" height="19"/><path d="M5 2.5v19M19 2.5v19" stroke-dasharray="1.5 2"/>',
+    selfail: '<path class="f r" d="M12 3l9.5 17h-19z"/><path d="M12 3l9.5 17h-19z"/><path d="M12 9.5v5M12 17.2v.3"/>',
+    clear: '<rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="2.5 2"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7"/>',
+    // analysis
+    run: '<path class="f" d="M7 4.5l12 7.5-12 7.5z"/><path d="M7 4.5l12 7.5-12 7.5z"/>',
+    auto: '<path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4.5h-4.5"/><path class="f" d="M10 8.5l5 3.5-5 3.5z"/><path d="M10 8.5l5 3.5-5 3.5z"/>',
+    autosize: '<path d="M4 20L15.5 8.5"/><path class="f" d="M15.5 8.5l2-2 2.5 2.5-2 2z"/><path d="M15.5 8.5l2-2 2.5 2.5-2 2z"/><path d="M8 3.5v3M6.5 5h3M19 14.5v3M17.5 16h3M12 2.5v1.5"/>',
+    check: '<rect class="f" x="4" y="3" width="16" height="18" rx="1.5"/><rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M7.5 8l1.5 1.5L12 6.5M7.5 14l1.5 1.5 3-3M14 8h3M14 14h3"/>',
+    // views
+    plan: '<rect class="f" x="3" y="3" width="18" height="18"/><path d="M3 3h18v18H3zM3 12h18M12 3v18"/><rect x="10.5" y="10.5" width="3" height="3" fill="currentColor"/>',
+    cube: '<path class="f" d="M12 2.5l8.5 4.8v9.4L12 21.5l-8.5-4.8V7.3z"/><path d="M12 2.5l8.5 4.8v9.4L12 21.5l-8.5-4.8V7.3z"/><path d="M3.5 7.3L12 12l8.5-4.7M12 12v9.5"/>',
+    split: '<rect x="2" y="4" width="20" height="16" rx="1.5"/><path d="M12 4v16"/><path class="f" d="M4 6.5h6v11H4z"/><path d="M4 12h6M7 6.5v11"/><path d="M17 8l3 1.7v3.6L17 15l-3-1.7V9.7z"/>',
+    table: '<rect class="f" x="3" y="4" width="18" height="16" rx="1"/><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 9h18M3 14.5h18M9 9v11"/>',
+    report: '<path class="f" d="M6 2.5h9l3.5 3.5V21.5H6z"/><path d="M6 2.5h9l3.5 3.5V21.5H6z"/><path d="M9 9h6M9 12.5h6M9 16h4"/>',
+    // model
+    column: '<path class="f" d="M8 6.5l4-2 4 2v12l-4 2-4-2z"/><path d="M8 6.5l4-2 4 2v12l-4 2-4-2z"/><path d="M8 6.5l4 2 4-2M12 8.5v12"/>',
+    wallx: '<path class="f" d="M2.5 9l6-3h13l-6 3z"/><path d="M2.5 9h13v9.5h-13zM15.5 9l6-3v9.5l-6 3M2.5 9l6-3h13"/>',
+    wally: '<path class="f" d="M8 4l3-1.5v17L8 21z"/><path d="M8 4l3-1.5 5 2.5v17l-5-2.5-3 1.5zM11 2.5v17M8 4l5 2.5V21"/>',
+    beam: '<path class="f" d="M2.5 10l3-2h16l-3 2z"/><path d="M2.5 10h16v4h-16zM18.5 10l3-2v4l-3 2M2.5 10l3-2h16"/><path d="M4 14v6M17 14v6" stroke-dasharray="1.5 1.5"/>',
+    opening: '<path class="f" d="M2.5 15l5-7h14l-5 7z"/><path d="M2.5 15l5-7h14l-5 7z"/><path d="M10 13l2.2-3h4.3l-2.2 3z" fill="var(--panel)"/>',
+    slab: '<path class="f" d="M2.5 14l5-6h14l-5 6z"/><path d="M2.5 14l5-6h14l-5 6zM2.5 14v2.5h14l5-6V8M16.5 14v2.5"/>',
+    grid: '<path d="M7 5v15M17 5v15M3 9h18M3 16h18" stroke-dasharray="2 1.5"/><circle class="f" cx="7" cy="3" r="2"/><circle class="f" cx="17" cy="3" r="2"/><circle cx="7" cy="3" r="2"/><circle cx="17" cy="3" r="2"/>',
+    axisx: '<path d="M6 7v14M13 7v14" stroke-dasharray="2 1.5"/><circle cx="6" cy="4" r="2"/><circle cx="13" cy="4" r="2"/><path class="r" d="M19 9v8M15 13h8"/>',
+    axisy: '<path d="M7 7h14M7 14h14" stroke-dasharray="2 1.5"/><circle cx="4" cy="7" r="2"/><circle cx="4" cy="14" r="2"/><path class="r" d="M14 17v6M11 20h6"/>',
+    storeyadd: '<path class="f" d="M4 21V11h12v10"/><path d="M4 21V11h12v10M4 16h12M2 21h16M8 11V8h4v3"/><path class="r" d="M19.5 3v6M16.5 6h6"/>',
+    storeydel: '<path class="f" d="M4 21V14h12v7"/><path d="M4 21V14h12v7M2 21h16"/><path d="M4 9h12" stroke-dasharray="2 1.5"/><path class="r" d="M16.5 5h6"/>',
+    section: '<path class="f" d="M5 4h14v3H13.5v10H19v3H5v-3h5.5V7H5z"/><path d="M5 4h14v3H13.5v10H19v3H5v-3h5.5V7H5z"/>',
+    material: '<path class="f" d="M3 9l9-5 9 5-9 5z"/><path d="M3 9l9-5 9 5-9 5zM3 9v7l9 5 9-5V9M12 14v7"/><circle cx="8" cy="15" r=".6" fill="currentColor"/><circle cx="16" cy="15.5" r=".6" fill="currentColor"/>',
+    // loads
+    aload: '<path class="f" d="M2.5 18l4-4h15l-4 4z"/><path d="M2.5 18l4-4h15l-4 4z"/><path class="r" d="M7 3v8M12 3v8M17 3v8M5.5 9l1.5 2 1.5-2M10.5 9l1.5 2 1.5-2M15.5 9l1.5 2 1.5-2"/>',
+    lload: '<path class="f" d="M2.5 16h19v3h-19z"/><path d="M2.5 16h19v3h-19z"/><path class="r" d="M3 5h18M5 5v8.5M9.7 5v8.5M14.3 5v8.5M19 5v8.5M3.8 12l1.2 1.5 1.2-1.5M8.5 12l1.2 1.5 1.2-1.5M13.1 12l1.2 1.5 1.2-1.5M17.8 12l1.2 1.5 1.2-1.5"/>',
+    pload: '<path class="f" d="M3 18h18v3H3z"/><path d="M3 18h18v3H3z"/><path class="r" d="M12 2.5v13M8.5 12.5l3.5 3.5 3.5-3.5"/>',
+    combo: '<path d="M17.5 4H6.5l6 8-6 8h11"/>',
+    newcase: '<path class="f" d="M5 3h9.5L19 7.5V21H5z"/><path d="M5 3h9.5L19 7.5V21H5z"/><path class="r" d="M12 10v7M8.5 13.5h7"/>',
+    rename: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path class="f" d="M15 5l4 4 2-2-4-4z"/>',
+    // seismic / analysis options
+    seismic: '<path d="M2 12h3l2-6 3 12 3-15 3 15 2-6h4"/>',
+    spectrum: '<path d="M3 3v18h18"/><path class="r" d="M4 17l3-10h5c2 0 3 2 4 4.5S19 17 21 17.5"/>',
+    pdelta: '<path d="M8 21V4" stroke-dasharray="2 1.5"/><path d="M8 21C8 14 11 8 16 4"/><path class="r" d="M16 1v4M14 3l2 2 2-2"/><path d="M8 4h8"/>',
+    regular: '<circle cx="12" cy="12" r="8.5"/><circle class="f" cx="12" cy="12" r="3.5"/><circle cx="12" cy="12" r="3.5"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/>',
+    drift: '<path class="f" d="M5 21V5h7v16"/><path d="M5 21V5h7v16M2 21h13"/><path d="M5 5l3 0M12 5h0" /><path class="r" d="M14 8h7M18.5 5.5L21 8l-2.5 2.5"/>',
+    found: '<path d="M8 3v10h8V3"/><path class="f" d="M3 13h18v4H3z"/><path d="M3 13h18v4H3z"/><path d="M2 21h20" stroke-dasharray="2 1.5"/>',
+    soil: '<path class="f" d="M2 9h20v12H2z"/><path d="M2 9h20M2 13.5h20M2 18h20"/><path d="M5 11l1 .8M10 15.5l1 .8M15 11l1 .8M18 19.8l1 .8"/>',
+    // design
+    design: '<path class="f" d="M8 4h8v16H8z"/><path d="M8 4h8v16H8z"/><path d="M10 7v10M14 7v10M8 9h8M8 15h8"/>',
+    capacity: '<path d="M12 3v18M4 7h16"/><path class="f" d="M4 7l-2.5 6h5z"/><path d="M4 7l-2.5 6h5zM20 7l-2.5 4h5z"/><path d="M8 21h8"/>',
+    // results
+    diagM: '<path d="M2.5 9h19"/><path class="f r" d="M2.5 9c3 9 16 9 19 0z"/><path class="r" d="M2.5 9c3 9 16 9 19 0"/><path d="M2.5 6v6M21.5 6v6"/>',
+    diagV: '<path d="M2.5 12h19"/><path class="f r" d="M2.5 12V6h9.5v6zM12 12v6h9.5v-6z"/><path class="r" d="M2.5 12V6h9.5v12h9.5v-6"/>',
+    diagN: '<path d="M2.5 12h19"/><path class="f r" d="M2.5 7h19v5h-19z"/><path class="r" d="M2.5 7h19v5"/><path d="M4 14.5l-1.5 1.5 1.5 1.5M20 14.5l1.5 1.5-1.5 1.5M2.5 16h19"/>',
+    defl: '<path d="M2.5 6h19" stroke-dasharray="2 1.5"/><path class="r" d="M2.5 6c5 10 14 10 19 0"/><path d="M2.5 4v4M21.5 4v4"/>',
+    mode: '<path d="M7 21V4M17 21V4M7 9h10M7 14.5h10" stroke-dasharray="1.6 1.4"/><path class="r" d="M7 21c0-6 1.5-11 4.5-17M17 21c0-6 1.5-11 4.5-17M8.5 14.5h10M10 9h10.5"/>',
+    play: '<circle class="f" cx="12" cy="12" r="9.5"/><circle cx="12" cy="12" r="9.5"/><path d="M10 8l6 4-6 4z" fill="currentColor"/>',
+    pause: '<circle class="f" cx="12" cy="12" r="9.5"/><circle cx="12" cy="12" r="9.5"/><path d="M9.5 8v8M14.5 8v8" stroke-width="2.4"/>',
+    modes: '<path d="M3 21V3"/><path d="M3 20c7-2 12-9 14-17"/><path class="r" d="M3 20c4-4 10-6 18-6"/>',
+    qty: '<path class="f" d="M5 21v-8h3v8zM10.5 21V5h3v16zM16 21v-11h3v11z"/><path d="M5 21v-8h3v8zM10.5 21V5h3v16zM16 21v-11h3v11zM2.5 21h19"/>',
+    tag: '<path class="f" d="M3 12V3h9l9 9-9 9z"/><path d="M3 12V3h9l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
+    // navigation / window / help
+    zin: '<circle class="f" cx="10" cy="10" r="6.5"/><circle cx="10" cy="10" r="6.5"/><path d="M15 15l6 6M7 10h6M10 7v6"/>',
+    zout: '<circle class="f" cx="10" cy="10" r="6.5"/><circle cx="10" cy="10" r="6.5"/><path d="M15 15l6 6M7 10h6"/>',
+    fit: '<path d="M3 8.5V3h5.5M15.5 3H21v5.5M21 15.5V21h-5.5M8.5 21H3v-5.5"/><rect class="f" x="7.5" y="7.5" width="9" height="9"/><rect x="7.5" y="7.5" width="9" height="9"/>',
+    full: '<path d="M3 9V3h6M15 3h6v6M21 15v6h-6M9 21H3v-6"/><path d="M3 3l6 6M21 3l-6 6M21 21l-6-6M3 21l6-6"/>',
+    theme: '<path class="f" d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/>',
+    manual: '<path class="f" d="M3 4.5h7a2 2 0 0 1 2 2V20a2 2 0 0 0-2-2H3z"/><path d="M3 4.5h7a2 2 0 0 1 2 2V20a2 2 0 0 0-2-2H3zM21 4.5h-7a2 2 0 0 0-2 2V20a2 2 0 0 1 2-2h7z"/>',
+    keys: '<rect class="f" x="2" y="6" width="20" height="12" rx="2"/><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.5M10 10h.5M14 10h.5M18 10h.5M7 14h10"/>',
     min: '<path d="M6 15l6-6 6 6"/>',
-    split: '<rect x="2" y="4" width="9" height="16"/><path d="M13 7l4-3 5 3v10l-5 3-4-3z"/>',
-    diagM: '<path d="M3 18h18"/><path d="M3 18c4-12 14-12 18 0" fill="currentColor" fill-opacity=".25"/>',
-    diagV: '<path d="M3 12h18"/><path d="M3 6h9v6M12 12v6h9" />',
-    diagN: '<path d="M3 12h18"/><rect x="3" y="7" width="18" height="5" fill="currentColor" fill-opacity=".25"/>',
-    defl: '<path d="M3 6h18" stroke-dasharray="2 2"/><path d="M3 6c6 10 12 10 18 0"/>',
-    mode: '<path d="M6 21V5M18 21V5" stroke-dasharray="2 2"/><path d="M6 21c0-8 4-12 8-16M18 21c0-8-4-12-8-16"/>',
-    aload: '<rect x="3" y="12" width="18" height="8"/><path d="M6 3v7M12 3v7M18 3v7M4 8l2 2 2-2M10 8l2 2 2-2M16 8l2 2 2-2"/>',
-    lload: '<path d="M3 18h18" stroke-width="3"/><path d="M5 6v9M10 6v9M15 6v9M20 6v9M3 6h18"/>',
-    pload: '<path d="M12 3v14M8 13l4 4 4-4"/><path d="M4 21h16"/>',
-    combo: '<path d="M4 6h16M4 12h10M4 18h6"/><path d="M17 15l3 3-3 3"/>',
-    newcase: '<path d="M5 3h10l4 4v14H5z"/><path d="M12 10v6M9 13h6"/>',
-    autosize: '<path d="M4 20L20 4"/><path d="M14 4h6v6"/><rect x="3" y="13" width="8" height="8"/><path d="M15 15l2 2 4-4"/>',
-    found: '<path d="M3 20h18"/><rect x="5" y="14" width="14" height="4"/><path d="M9 14V4h6v10"/>',
   };
-  // compact reinforcement text for the plan: beams "2Ø14/3Ø12 · Ø8/250", columns "8Ø16",
-  // slabs "Ø8/200 | Ø8/150"
-  const shortR = (kind, text) => {
-    const tk = String(text || "").match(/\d*Ø\d+(?:\/\d+)?/g) || [];
-    if (kind === "beam") return tk.length >= 3 ? `${tk[0]}/${tk[1]} · ${tk[2]}` : tk.join(" ");
-    if (kind === "column") return tk[0] || "";
-    if (kind === "panel") return tk.slice(0, 2).join(" | ");
-    return tk.slice(0, 2).join(" ");
-  };
-  const icon = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${P[k] || ""}</svg>`;
+  const icon = (k) => `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${P[k] || P.tag}</svg>`;
 
   // ------------------------------------------------------------ history / persistence
   function commit(rerun = true) {
@@ -354,15 +386,20 @@ const Structure = (() => {
   const col = (...items) => el("div", { class: "rb-col" }, ...items);
 
   function tabs() {
+    // Workflow order of professional programs (ETABS / Revit / Tekla):
+    // File → Home → Draw → Define → Loads → Analyse → Design → Results → View → Help
     const tl = (id) => S.tool === id;
     const v = (id) => S.view === id;
     const nStorey = S.inp.storeys.length;
+    const ft = String(S.inp.found_type || "");
+    const nModes = Math.min(6, S.res?.structure?.modes?.length || 3);
     return [
       ["file", t("File"), [
-        group(t("Code"), col(annexSelect())),
         group(t("Project"), btn("new", t("New"), t("Start a new building from the example? The current one will be replaced."), newBuilding, { big: true }),
           btn("open", t("Open"), `${t("Open")} (Ctrl+O)`, () => $("#file-open").click(), { big: true }),
-          btn("save", t("Save"), `${t("Save")} (Ctrl+S)`, save, { big: true })),
+          btn("save", t("Save"), `${t("Save")} (Ctrl+S)`, save, { big: true }),
+          btn("project", t("Project details"), t("Company, project, job number, engineer — printed on every report page"), projectDialog, { big: true })),
+        group(t("Code"), btn("annex", t("National Annex"), t("National Annex"), () => {}, { big: true }), col(annexSelect(true))),
         group(t("Export"), btn("print", t("Print / PDF"), `${t("Print / PDF")} (Ctrl+P)`, print, { big: true }),
           col(btn("html", t("Report HTML"), "", html), btn("csv", t("Table CSV"), "", csv))),
       ]],
@@ -375,7 +412,7 @@ const Structure = (() => {
             btn("selwall", t("All walls"), "", () => selectAll("wall"))),
           col(btn("selfail", t("Failing members"), "", selectFailing), btn("clear", t("Clear"), "Esc", () => setSel([])))),
         group(t("Analysis"), btn("run", t("Run"), t("Run the analysis (F5)"), () => run(), { big: true, on: S.dirty }),
-          btn("auto", t("Auto"), t("Re-analyse automatically after every change"), () => { S.auto = !S.auto; renderRibbon(); if (S.auto && S.dirty) run(); }, { big: true, on: S.auto }),
+          btn("auto", t("Auto"), t("Re-analyse automatically after every change"), toggleAuto, { big: true, on: S.auto }),
           btn("autosize", t("Auto-size"), t("Enlarge members and adjust options until every Eurocode check passes"), autoSize, { big: true })),
         group(t("Views"), btn("plan", t("Plan"), t("Plan"), () => setView("plan"), { big: true, on: v("plan") }),
           btn("cube", "3D", "3D (Ctrl+3)", () => setView("3d"), { big: true, on: v("3d") }),
@@ -383,7 +420,7 @@ const Structure = (() => {
           btn("table", t("Table"), t("Table"), () => setView("table"), { big: true, on: v("table") }),
           btn("report", t("Report"), t("Report"), () => setView("report"), { big: true, on: v("report") })),
       ]],
-      ["model", t("Model"), [
+      ["draw", t("Draw"), [
         group(t("Elements"), btn("select", t("Select"), `${t("Select")} (V)`, () => setTool("select"), { big: true, on: tl("select") }),
           btn("column", t("Column"), `${t("Click a grid point to place a column.")} (C)`, () => setTool("column"), { big: true, on: tl("column") }),
           btn("wallx", t("Wall X"), `${t("Click a grid point to place a wall.")} (W)`, () => setTool("wallX"), { big: true, on: tl("wallX") }),
@@ -393,9 +430,25 @@ const Structure = (() => {
         group(t("Grid"), btn("grid", t("Grid wizard"), t("A regular grid replaces the current one (walls and edits outside it are removed)."), gridWizard, { big: true }),
           col(btn("axisx", t("+ Axis X"), "", () => axis("x_spans", 1)), btn("axisx", t("− Axis X"), "", () => axis("x_spans", -1))),
           col(btn("axisy", t("+ Axis Y"), "", () => axis("y_spans", 1)), btn("axisy", t("− Axis Y"), "", () => axis("y_spans", -1)))),
-        group(`${t("Storeys")} (${nStorey})`, col(btn("storeyadd", t("+ Storey"), "", () => storey(1)), btn("storeydel", t("− Storey"), "", () => storey(-1), { disabled: nStorey <= 1 }))),
-        group(t("Default sections"), col(ctl("col_b", { width: 62 }), ctl("col_h", { width: 62 })),
-          col(ctl("beam_b", { width: 62 }), ctl("beam_h", { width: 62 })), col(ctl("slab_t", { width: 62 }))),
+        group(`${t("Storeys")} (${nStorey})`, btn("storeyadd", t("+ Storey"), "", () => storey(1), { big: true }),
+          btn("storeydel", t("− Storey"), "", () => storey(-1), { big: true, disabled: nStorey <= 1 })),
+        group(t("Modify"), btn("del", t("Delete"), `${t("Delete")} (Del)`, removeSel, { big: true, disabled: !S.sel.length })),
+      ]],
+      ["define", t("Define"), [
+        group(t("Materials"), btn("material", t("Concrete"), "", () => {}, { big: true }), col(ctl("concrete", { width: 80 }), ctl("fyk", { width: 56 }), ctl("cover", { width: 56 }))),
+        group(t("Default sections"), btn("section", t("Sections"), t("Sizes used where no member has its own (select a member to change only that one)"), () => {}, { big: true }),
+          col(ctl("col_b", { width: 56 }), ctl("col_h", { width: 56 })), col(ctl("beam_b", { width: 56 }), ctl("beam_h", { width: 56 }), ctl("slab_t", { width: 56 }))),
+        group(t("Seismic action"), col(tog("seismic", "EN 1998-1"), ctl("ag", { width: 56 })), col(ctl("ground", { width: 56 }), ctl("importance", { width: 56 })),
+          ...(curAnnex()?.zones?.length ? [col(...curAnnex().zones.map((z) =>
+            btn("seismic", z.label, `a_gR = ${z.ag} g`, () => { S.inp.ag = z.ag; renderRibbon(); commit(); }, { on: Math.abs(S.inp.ag - z.ag) < 1e-9 })))] : [])),
+      ]],
+      ["found", t("Foundation"), [
+        group(t("Foundation"), btn("found", t("Foundation plan"), "", () => { S.opt.storey = "found"; saveView(); setView("plan"); renderRibbon(); }, { big: true, on: S.opt.storey === "found" }),
+          col(tog("foundations", t("Design foundation")), ctl("found_type", { width: 150 }))),
+        ...(ft.startsWith("Raft") ? [group(t("Raft"), col(ctl("raft_t", { width: 56 }), ctl("raft_over", { width: 56 }), ctl("raft_mesh", { width: 56 })))] :
+          ft.startsWith("Foundation beams") ? [group(t("Foundation beams"), col(ctl("fb_B", { width: 56 }), ctl("fb_bw", { width: 56 }), ctl("fb_h", { width: 56 })))] : []),
+        group(t("Soil"), btn("soil", t("Soil"), "", () => {}, { big: true }), col(ctl("D_found", { width: 52 }), ctl("phi_soil", { width: 52 }), ctl("ks", { width: 52 })),
+          col(ctl("c_soil", { width: 52 }), ctl("gamma_soil", { width: 52 }))),
       ]],
       ["loads", t("Loads"), [
         group(t("Area loads"), col(ctl("g_finish", { width: 52 }), ctl("q", { width: 52 }), ctl("category", { width: 52 })),
@@ -417,7 +470,7 @@ const Structure = (() => {
             ..."ABCDE".split("").map((x) => el("option", { value: x }, x)));
           cat.value = c?.category || "A";
           return el("div", { class: "rb-row" }, ty, cat);
-        })()), col(btn("newcase", t("New case"), "", newCase), btn("tag", t("Rename"), "", renameCase, { disabled: !curCase() }),
+        })()), col(btn("newcase", t("New case"), "", newCase), btn("rename", t("Rename"), "", renameCase, { disabled: !curCase() }),
           btn("del", t("Delete case"), "", deleteCase, { disabled: !curCase() }))),
         group(t("Apply loads"), btn("aload", t("Area load"), t("Click slab panels to add / remove the area load of the current case."), () => setTool("aload"), { big: true, on: S.tool === "aload" }),
           btn("lload", t("Line load"), t("Click beams to add / remove the line load of the current case."), () => setTool("lload"), { big: true, on: S.tool === "lload" }),
@@ -435,45 +488,48 @@ const Structure = (() => {
           })(), el("small", {}, "")))),
         group(t("Combinations"), btn("combo", t("Combinations…"), "", combosDialog, { big: true })),
       ]],
-      ["seismic", t("Seismic"), [
-        group(t("Seismic design"), col(tog("seismic", "EN 1998-1"))),
-        group(t("Site"), col(ctl("ag"), ctl("ground", { width: 56 })), col(ctl("importance", { width: 56 }))),
-        ...(curAnnex()?.zones?.length ? [group(t("Seismic zone"), ...curAnnex().zones.map((z) =>
-          btn("grid", `${z.label}`, `a_gR = ${z.ag} g`, () => { S.inp.ag = z.ag; renderRibbon(); commit(); }, { on: Math.abs(S.inp.ag - z.ag) < 1e-9 })))] : []),
-        group(t("Structure"), col(ctl("q_factor"), ctl("cracked")), col(ctl("drift", { width: 150 }), annexSelect())),
-        group(t("Analysis options"), col(ctl("n_modes"), ctl("phi_E")), col(tog("pdelta", t("P-Δ")))),
+      ["analyse", t("Analyse"), [
+        group(t("Run"), btn("run", t("Run"), t("Run the analysis (F5)"), () => run(), { big: true, on: S.dirty }),
+          btn("auto", t("Auto"), t("Re-analyse automatically after every change"), toggleAuto, { big: true, on: S.auto })),
+        group(t("Response spectrum"), btn("spectrum", t("Spectrum"), "", () => gotoReport("Design spectrum"), { big: true }),
+          col(ctl("q_factor", { width: 52 }), ctl("n_modes", { width: 52 }), ctl("phi_E", { width: 52 }))),
+        group(t("Stiffness"), col(ctl("cracked", { width: 52 }), tog("pdelta", t("P-Δ"))), btn("pdelta", t("P-Δ"), t("Include the destabilising effect of the gravity loads"), () => { S.inp.pdelta = !S.inp.pdelta; renderRibbon(); commit(); }, { big: true, on: !!S.inp.pdelta })),
+        group(t("Regularity"), btn("regular", t("Regularity"), "", () => gotoReport("Structural regularity"), { big: true }), col(tog("regularity", t("Apply to q")))),
+        group(t("Storey checks"), btn("drift", t("Storey checks"), "", () => gotoReport("Storey checks"), { big: true }), col(ctl("drift", { width: 150 }))),
       ]],
       ["design", t("Design"), [
-        group(t("Materials"), col(ctl("concrete", { width: 86 }), ctl("fyk")), col(ctl("cover"))),
-        group(t("Options"), col(tog("design", t("Design members")), tog("capacity", t("Capacity design"))),
-          col(tog("slabs", t("Design slabs")), tog("foundations", t("Design foundation")))),
+        group(t("Options"), btn("design", t("Members"), t("Design members"), () => { S.inp.design = !S.inp.design; renderRibbon(); commit(); }, { big: true, on: !!S.inp.design }),
+          col(tog("capacity", t("Capacity design")), tog("slabs", t("Design slabs")), tog("foundations", t("Design foundation")))),
         group(t("Auto-size"), btn("autosize", t("Auto-size"), t("Enlarge members and adjust options until every Eurocode check passes"), autoSize, { big: true })),
         group(t("Member tables"), btn("table", t("Table"), "", () => setView("table"), { big: true, on: v("table") }),
           btn("selfail", t("Failing members"), "", selectFailing, { big: true }), btn("csv", t("Table CSV"), "", csv, { big: true })),
       ]],
-      ["found", t("Foundation"), [
-        group(t("Foundation"), col(tog("foundations", t("Design foundation")), ctl("found_type", { width: 170 }))),
-        group(t("Raft"), col(ctl("raft_t"), ctl("raft_over")), col(ctl("raft_mesh"), ctl("ks"))),
-        group(t("Foundation beams"), col(ctl("fb_B"), ctl("fb_bw")), col(ctl("fb_h"))),
-        group(t("Soil"), col(ctl("D_found"), ctl("phi_soil")), col(ctl("c_soil"), ctl("gamma_soil"))),
-        group(t("View"), btn("found", t("Foundation"), "", () => { S.opt.storey = "found"; saveView(); setView("plan"); }, { big: true, on: S.opt.storey === "found" })),
-      ]],
       ["results", t("Results"), [
+        group(t("Modes"), (() => {
+          const ms = el("select", { on: { change: (e) => { showMode(Number(e.target.value)); } } },
+            ...Array.from({ length: nModes }, (_, k) => {
+              const md = S.res?.structure?.modes?.[k];
+              return el("option", { value: String(k + 1) }, md ? `${k + 1}: T = ${md.T.toFixed(3)} s (${md.type === "RZ" ? t("torsion") : md.type})` : `${t("Mode")} ${k + 1}`);
+            }));
+          ms.value = String(S.mode || 1);
+          ms.style.width = "170px";
+          return col(ms, el("label", { class: "rb-ctl", title: t("Speed") }, el("span", {}, t("Speed")),
+            el("input", { type: "range", min: "0.3", max: "3", step: "0.1", value: S.animSpeed || 1, style: "width:90px",
+              on: { input: (e) => { S.animSpeed = Number(e.target.value); window.dispatchEvent(new CustomEvent("erisma:anim", { detail: { host: "st-3d", on: S.anim, speed: S.animSpeed } })); } } }), el("small", {}, "")));
+        })(), btn("mode", t("Show mode"), t("Show / hide in the 3D view"), () => showMode(S.mode || 1, true), { big: true, on: !!S.layers[`mode${S.mode || 1}`] }),
+          btn(S.anim ? "pause" : "play", S.anim ? t("Stop") : t("Animate"), t("Animate the mode / deformed shape in the 3D view"), toggleAnim, { big: true, on: S.anim })),
+        group(t("Diagrams"), ...[["diagM", "Moments M", "dM"], ["diagV", "Shear V", "dV"], ["diagN", "Axial N", "dN"],
+          ["defl", "Deformed", "defl"]].map(([ic, lab, key]) => btn(ic, t(lab), t("Show / hide in the 3D view"), () => layer3d(key), { big: true, on: !!S.layers[key] }))),
         group(t("Colour by"), col(...[["util", t("Utilisation")], ["rho", t("Steel ratio")], ["status", t("Pass / fail")]]
           .map(([k, lab]) => { const r = el("input", { type: "radio", name: "rb-col", on: { change: () => { S.opt.colour = k; saveView(); drawPlan(); } } }); r.checked = S.opt.colour === k; return el("label", { class: "rb-chk" }, r, el("span", {}, lab)); }))),
         group(t("Storey shown"), col((() => {
-          const s = el("select", { on: { change: (e) => { S.opt.storey = e.target.value; saveView(); drawPlan(); } } },
+          const s2 = el("select", { on: { change: (e) => { S.opt.storey = e.target.value; saveView(); drawPlan(); } } },
             el("option", { value: "all" }, t("All storeys")), ...S.inp.storeys.map((_, k) => el("option", { value: String(k + 1) }, `${t("Storey")} ${k + 1}`)),
             el("option", { value: "found" }, t("Foundation")));
-          s.value = S.opt.storey in { all: 1, found: 1 } || +S.opt.storey <= nStorey ? S.opt.storey : "all";
-          return s;
-        })())),
-        group(t("Labels"), col(viewTog("labels", t("Reinforcement")), viewTog("names", t("Names")))),
-        group(t("Diagrams"), ...[["diagM", "Moments M", "dM"], ["diagV", "Shear V", "dV"], ["diagN", "Axial N", "dN"],
-          ["defl", "Deformed", "defl"]].map(([ic, lab, key]) => btn(ic, t(lab), t("Show / hide in the 3D view"), () => layer3d(key), { big: true, on: !!S.layers[key] }))),
-        group(t("Modes"), ...[1, 2, 3].map((n) => btn("mode", t(`Mode ${n}`), t("Show / hide in the 3D view"), () => layer3d(`mode${n}`), { big: true, on: !!S.layers[`mode${n}`] }))),
+          s2.value = S.opt.storey in { all: 1, found: 1 } || +S.opt.storey <= nStorey ? S.opt.storey : "all";
+          return s2;
+        })(), viewTog("labels", t("Reinforcement")), viewTog("names", t("Names")))),
         group(t("Reports"), btn("modes", t("Modes"), "", () => gotoReport("Masses and modal analysis"), { big: true }),
-          btn("drift", t("Storey checks"), "", () => gotoReport("Storey checks"), { big: true }),
           btn("qty", t("Quantities"), "", () => gotoReport("Quantities and cost estimate"), { big: true }),
           btn("report", t("Report"), "", () => setView("report"), { big: true })),
       ]],
@@ -495,6 +551,48 @@ const Structure = (() => {
           btn("keys", t("Shortcuts"), "?", shortcuts, { big: true })),
       ]],
     ];
+  }
+
+  // ------------------------------------------------------------ modes, animation, project details
+  // while a mode / deformed shape is shown, the solid model is hidden (wireframe + shape)
+  function solidFor() {
+    const shape = Object.entries(S.layers).some(([k, on]) => on && (k.startsWith("mode") || k === "defl"));
+    return { frame: !shape, slabs: !shape, found: !shape, ghost: !shape };
+  }
+  function showMode(n, toggle = false) {
+    const prev = S.mode || 1;
+    S.mode = n;
+    const key = `mode${n}`;
+    const on = toggle ? !S.layers[key] : true;
+    const show = {};
+    for (let k = 1; k <= 6; k++) { S.layers[`mode${k}`] = false; show[`mode${k}`] = false; }
+    S.layers[key] = on; show[key] = on;
+    if (on && S.view !== "3d" && S.view !== "split") setView("split");
+    window.dispatchEvent(new CustomEvent("erisma:layers", { detail: { host: "st-3d", show: { ...show, ...solidFor() } } }));
+    if (prev !== n || toggle) renderRibbon();
+  }
+  function toggleAnim() {
+    S.anim = !S.anim;
+    if (S.anim && !Object.entries(S.layers).some(([k, on]) => on && (k.startsWith("mode") || k === "defl"))) showMode(S.mode || 1);
+    window.dispatchEvent(new CustomEvent("erisma:anim", { detail: { host: "st-3d", on: S.anim, speed: S.animSpeed || 1 } }));
+    renderRibbon();
+  }
+  function toggleAuto() { S.auto = !S.auto; renderRibbon(); if (S.auto && S.dirty) run(); }
+  function projectDialog() {
+    const fields = (typeof PROJECT_FIELDS !== "undefined" ? PROJECT_FIELDS : []);
+    const dlg = el("dialog", { class: "st-dlg" }, el("h3", {}, t("Project details")),
+      ...fields.map(([key, label]) => el("label", { class: "st-f" }, el("span", {}, t(label)),
+        el("span", { class: "inp" }, el("input", { type: key === "date" ? "date" : "text", value: state.project[key] || "", "data-k": key })))),
+      el("div", { class: "btns" }, el("button", { type: "button", class: "ghost", on: { click: () => dlg.close() } }, t("Cancel")),
+        el("button", { type: "button", class: "primary", on: { click: () => {
+          dlg.querySelectorAll("input[data-k]").forEach((i) => { state.project[i.dataset.k] = i.value; });
+          store.set("erisma.project", state.project);
+          if (typeof renderProject === "function") renderProject();
+          dlg.close(); changed();
+        } } }, t("Save"))));
+    document.body.append(dlg);
+    dlg.addEventListener("close", () => dlg.remove());
+    dlg.showModal();
   }
 
   function renderRibbon() {
@@ -554,7 +652,7 @@ const Structure = (() => {
   function layer3d(key) {
     S.layers[key] = !S.layers[key];
     if (S.view !== "3d" && S.view !== "split") setView("split");
-    window.dispatchEvent(new CustomEvent("erisma:layers", { detail: { host: "st-3d", show: { [key]: S.layers[key] } } }));
+    window.dispatchEvent(new CustomEvent("erisma:layers", { detail: { host: "st-3d", show: { [key]: S.layers[key], ...solidFor() } } }));
     renderRibbon();
   }
   window.addEventListener("erisma:pick", (e) => {
@@ -1297,7 +1395,7 @@ const Structure = (() => {
 
   // ------------------------------------------------------------ National Annex (project-wide)
   const curAnnex = () => (state.annexes || []).find((a) => a.code === (state.project.annex || "EN"));
-  function annexSelect() {
+  function annexSelect(bare = false) {
     const sel = el("select", { title: t("National Annex"), on: { change: (e) => {
       state.project.annex = e.target.value;
       store.set("erisma.project", state.project);
@@ -1305,7 +1403,8 @@ const Structure = (() => {
       renderRibbon(); changed();
     } } }, ...(state.annexes || []).map((a) => el("option", { value: a.code, title: a.reference }, a.label)));
     sel.value = state.project.annex || "EN";
-    sel.style.width = "170px";
+    sel.style.width = bare ? "200px" : "170px";
+    if (bare) return el("div", { class: "rb-row" }, sel);
     return el("label", { class: "rb-ctl" }, el("span", {}, t("National Annex")), sel, el("small", {}, ""));
   }
 
@@ -1449,8 +1548,9 @@ const Structure = (() => {
       $("#st-report").srcdoc = res.html;
       if (res.model3d) {
         window.dispatchEvent(new CustomEvent("erisma:model3d", { detail: { host: "st-3d", model: res.model3d, summary: res.summary } }));
-        window.dispatchEvent(new CustomEvent("erisma:layers", { detail: { host: "st-3d", show: Object.fromEntries(
-          ["dM", "dV", "dN", "defl", "mode1", "mode2", "mode3"].map((k) => [k, !!S.layers[k]])) } }));
+        const shown = Object.fromEntries(["dM", "dV", "dN", "defl", "mode1", "mode2", "mode3", "mode4", "mode5", "mode6"].map((k) => [k, !!S.layers[k]]));
+        window.dispatchEvent(new CustomEvent("erisma:layers", { detail: { host: "st-3d", show: { ...shown, ...solidFor() } } }));
+        window.dispatchEvent(new CustomEvent("erisma:anim", { detail: { host: "st-3d", on: S.anim, speed: S.animSpeed || 1 } }));
         highlight3d();
       }
       renderResult(res);

@@ -52,12 +52,15 @@ class Scene3D:
                              "z": _r(z), "color": color, "opacity": opacity, "edges": edges})
 
     def box(self, layer: str, center: Vec, size: Vec, color: str, opacity: float = 1.0,
-            edges: bool = True, pick: str | None = None) -> None:
-        """``pick``: id returned by the viewer when the box is clicked (editable models)."""
+            edges: bool = True, pick: str | None = None, tip: str | None = None) -> None:
+        """``pick``: id returned by the viewer when the box is clicked (editable models);
+        ``tip``: text shown when the pointer is over it."""
         o = {"t": "box", "layer": layer, "c": [_r(v) for v in center],
              "s": [_r(v) for v in size], "color": color, "opacity": opacity, "edges": edges}
         if pick:
             o["pick"] = pick
+        if tip:
+            o["tip"] = tip
         self.objects.append(o)
 
     def mesh(self, layer: str, vertices: list[Vec], faces: list[tuple[int, int, int]],
@@ -74,6 +77,15 @@ class Scene3D:
         self.objects.append({"t": "line", "layer": layer,
                              "p": [[_r(a) for a in p] for p in points], "color": color,
                              "dashed": dashed, "closed": closed})
+
+    def anim(self, layer: str, segments: list[tuple[Vec, Vec]], amplitude: list[tuple[Vec, Vec]],
+             color: str) -> None:
+        """Line segments that the viewer can animate: point = base + amplitude·sin(ωt)
+        (mode shapes, deformed shapes). Without animation it is drawn at full amplitude."""
+        self.objects.append({"t": "anim", "layer": layer,
+                             "p": [[_r(v) for v in pt] for seg in segments for pt in seg],
+                             "d": [[_r(v) for v in pt] for seg in amplitude for pt in seg],
+                             "color": color})
 
     def cylinder(self, layer: str, p1: Vec, p2: Vec, radius: float, color: str,
                  opacity: float = 1.0) -> None:

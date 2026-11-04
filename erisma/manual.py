@@ -329,7 +329,11 @@ member, with its design forces, in the member calculation.</li>
 <li><b>Report and 3D:</b> the <b>3D</b> and <b>Report</b> buttons (Ctrl+3) show the model
 and the full step-by-step report, which prints with Ctrl+P.</li>
 </ol>
-<p><b>The ribbon</b> groups the commands as in professional structural software:
+<p><b>The ribbon</b> follows the workflow of professional structural software — File → Home →
+Draw → Define → Foundation → Loads → Analyse → Design → Results → View → Help. In the 3D view the
+member under the pointer is highlighted with its name, size, bars and utilisation, a click selects
+it; in Results the chosen mode (or the deformed shape) can be animated, with a speed control.
+Previously it grouped the commands as:
 <b>File</b> (new, open, save, print, HTML report, CSV table) · <b>Home</b> (undo/redo, delete,
 select all columns/beams/walls or the failing members, <b>Run</b> F5 and the <b>Auto</b> switch for
 large models, views) · <b>Model</b> (element tools, grid wizard, add/remove axes and storeys,
@@ -390,7 +394,11 @@ the browser; <b>Save</b> writes a project file that <b>Open</b> brings back.</p>
 <li><b>Τεύχος και 3D:</b> τα κουμπιά <b>3D</b> και <b>Τεύχος</b> (Ctrl+3) δείχνουν το
 μοντέλο και το πλήρες αναλυτικό τεύχος, που εκτυπώνεται με Ctrl+P.</li>
 </ol>
-<p><b>Το ribbon</b> ομαδοποιεί τις εντολές όπως στα επαγγελματικά στατικά προγράμματα:
+<p><b>Το ribbon</b> ακολουθεί τη ροή εργασίας των επαγγελματικών στατικών προγραμμάτων — Αρχείο →
+Αρχική → Σχεδίαση → Ορισμοί → Θεμελίωση → Φορτία → Ανάλυση → Σχεδιασμός → Αποτελέσματα → Προβολή →
+Βοήθεια. Στο 3D το μέλος κάτω από τον δείκτη φωτίζεται και δείχνει όνομα, διατομή, οπλισμό και
+εκμετάλλευση· το κλικ το επιλέγει. Στα Αποτελέσματα η επιλεγμένη ιδιομορφή (ή ο παραμορφωμένος
+φορέας) κινείται, με ρύθμιση ταχύτητας. Αναλυτικά οι εντολές:
 <b>Αρχείο</b> (νέο, άνοιγμα, αποθήκευση, εκτύπωση, τεύχος HTML, πίνακας CSV) · <b>Αρχική</b>
 (αναίρεση/επανάληψη, διαγραφή, επιλογή όλων των υποστυλωμάτων/δοκών/τοιχωμάτων ή των ανεπαρκών
 μελών, <b>Επίλυση</b> F5 και διακόπτης <b>Αυτόματα</b> για μεγάλα μοντέλα, προβολές) ·

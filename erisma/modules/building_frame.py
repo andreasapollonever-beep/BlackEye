@@ -1112,7 +1112,7 @@ class BuildingFrame(DesignModule):
                            ("dN", "Axial forces N (ULS)"), ("defl", "Deformed shape (G+ψ2Q)")):
             sc.layer(key, label, visible=False)
         if seis is not None:
-            for n in range(min(3, seis.modes.n_modes)):
+            for n in range(min(6, seis.modes.n_modes)):
                 sc.layer(f"mode{n + 1}", calc.tr("Mode {n} (deformed)", n=n + 1), visible=False)
         sc.layer("grid", "Grid labels")
         des = {d.member: d for d in designs}
@@ -1163,8 +1163,18 @@ class BuildingFrame(DesignModule):
                 col = heat_color(0.85 * min(max(t, 0.0), 1.0))
             pk = mem.id.split(".", 1)[1]
             pick = {"C": "column", "W": "wall", "B": "beam"}.get(mem.id[0])
+            tip = None
+            if pick:
+                kname = {"column": "Column", "wall": "Wall", "beam": "Beam"}[pick]
+                st = mem.id[1:mem.id.index(".")]
+                tip = f"{calc.tr(kname)} {pk} · {calc.tr('Storey')} {st}"
+                if not mem.id.startswith("W"):
+                    tip += f"\n{size[0]:g}×{size[2]:g}" if pick == "column" else \
+                        f"\n{min(size[0], size[2]):g}×{size[1]:g}"
+                if d is not None:
+                    tip += f"\n{BuildingFrame._reinf(calc, d.reinforcement)}\nη = {d.utilisation:.2f}"
             sc.box("frame", tuple(m(v) for v in c), tuple(m(v) for v in size), col,
-                   pick=f"{pick}:{pk}" if pick else None)
+                   pick=f"{pick}:{pk}" if pick else None, tip=tip)
         xs, ys, zs = info["xs"], info["ys"], info["zs"]
         rf = info.get("raft")
         if rf:
@@ -1200,17 +1210,23 @@ class BuildingFrame(DesignModule):
         frame = [mm for mm in model.members.values() if mm.id[0] in "CWB" and "." in mm.id]
 
         def deformed(layer, u_nodes, scale, color):
+            """Animated shape (viewer: base + amplitude·sin ωt) over the undeformed frame."""
+            segs, amps = [], []
             for mem in frame:
-                pts = []
+                seg, amp = [], []
                 for nid in (mem.i, mem.j):
                     n = model.nodes[nid]
                     u = u_nodes[dm.index[nid]] * scale
-                    pts.append((m(n.x + u[0]), m(n.z + u[2]), m(n.y + u[1])))
-                sc.line(layer, pts, color)
+                    seg.append((m(n.x), m(n.z), m(n.y)))
+                    amp.append((m(u[0]), m(u[2]), m(u[1])))
+                segs.append(seg)
+                amps.append(amp)
+                sc.line(layer, seg, "#8a96a8", dashed=True)
+            sc.anim(layer, segs, amps, color)
 
         if seis is not None:
             kinds = {"X": "X", "Y": "Y", "RZ": calc.tr("torsion")}
-            for n in range(min(3, seis.modes.n_modes)):
+            for n in range(min(6, seis.modes.n_modes)):
                 deformed(f"mode{n + 1}", seis.modes.mode_shape(n), 0.08 * ext, PALETTE["seismic"])
                 sc.label(f"mode{n + 1}", calc.tr("Mode {n}: T = {t:.3f} s ({k})", n=n + 1,
                                                  t=float(seis.modes.periods[n]),

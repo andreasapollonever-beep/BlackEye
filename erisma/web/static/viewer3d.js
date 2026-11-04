@@ -29,7 +29,7 @@ class Viewer {
     this.buildUi();
     this.enablePicking();
     new ResizeObserver(() => this.resize()).observe(host);
-    const loop = () => { this.controls.update(); this.render(); requestAnimationFrame(loop); };
+    const loop = () => { this.controls.update(); this.stepAnimation(); this.render(); requestAnimationFrame(loop); };
     loop();
   }
 
@@ -104,7 +104,47 @@ class Viewer {
   build(o) {
     const obj = this.build1(o);
     if (obj && o.pick) obj.userData.pick = o.pick;
+    if (obj && o.tip) obj.userData.tip = o.tip;
     return obj;
+  }
+
+  // animated line sets (mode shapes): position = base + d · sin(phase)
+  stepAnimation() {
+    if (!this.anims?.length) return;
+    const on = this.animOn;
+    this.phase = (this.phase || 0) + (on ? 0.06 * (this.animSpeed || 1) : 0);
+    const f = on ? Math.sin(this.phase) : 1;
+    for (const a of this.anims) {
+      if (!a.line.parent?.visible) continue;
+      const pos = a.line.geometry.attributes.position;
+      for (let i = 0; i < a.base.length; i++) pos.array[i] = a.base[i] + a.d[i] * f;
+      pos.needsUpdate = true;
+    }
+  }
+
+  setAnimation(on, speed) {
+    this.animOn = !!on;
+    if (speed) this.animSpeed = speed;
+    if (!on) this.stepAnimation();
+  }
+
+  pickAt(e) {
+    const el = this.labels.domElement;
+    const r = el.getBoundingClientRect();
+    const ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(ndc, this.camera);
+    const cands = [];
+    this.root?.traverse((o) => {
+      if (o.isMesh && o.userData.pick) {
+        let v = true;
+        for (let p = o; p; p = p.parent) if (p.visible === false) v = false;
+        if (v) cands.push(o);
+      }
+    });
+    const hits = ray.intersectObjects(cands, false);
+    // members (columns, beams, walls) win over the slabs they sit under / over
+    return (hits.find((h) => !String(h.object.userData.pick).startsWith("panel:")) || hits[0])?.object || null;
   }
 
   // click (without dragging) on an object carrying a "pick" id → erisma:pick event
@@ -114,22 +154,40 @@ class Viewer {
     el.addEventListener("pointerdown", (e) => { down = [e.clientX, e.clientY, e.button]; });
     el.addEventListener("pointerup", (e) => {
       if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4 || down[2] !== 0) return;
-      const r = el.getBoundingClientRect();
-      const ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
-      const ray = new THREE.Raycaster();
-      ray.setFromCamera(ndc, this.camera);
-      const cands = [];
-      this.root?.traverse((o) => {
-        if (o.isMesh && o.userData.pick) {
-          let v = true;
-          for (let p = o; p; p = p.parent) if (p.visible === false) v = false;
-          if (v) cands.push(o);
-        }
-      });
-      const hit = ray.intersectObjects(cands, false)[0];
+      const hit = this.pickAt(e);
       window.dispatchEvent(new CustomEvent("erisma:pick", { detail: { host: this.host.id,
-        pick: hit ? hit.object.userData.pick : null, shift: e.shiftKey || e.ctrlKey || e.metaKey } }));
+        pick: hit ? hit.userData.pick : null, shift: e.shiftKey || e.ctrlKey || e.metaKey } }));
     });
+    // hover: highlight the member under the pointer and show its name
+    this.tip = document.createElement("div");
+    this.tip.className = "v3d-tip";
+    this.host.append(this.tip);
+    let pending = false;
+    el.addEventListener("pointermove", (e) => {
+      if (pending || e.buttons) return;
+      pending = true;
+      requestAnimationFrame(() => {
+        pending = false;
+        const hit = this.pickAt(e);
+        if (this.hovered && this.hovered !== hit) {
+          const m = this.hovered.material;
+          if (m?.emissive && !this.picked?.has(this.hovered.userData.pick)) { m.emissive.set(0x000000); m.emissiveIntensity = 0; }
+        }
+        this.hovered = hit;
+        if (hit && hit.material?.emissive && !this.picked?.has(hit.userData.pick)) {
+          hit.material.emissive.set(0x0ea5e9); hit.material.emissiveIntensity = 0.45;
+        }
+        el.style.cursor = hit ? "pointer" : "";
+        if (hit?.userData.tip) {
+          const r = this.host.getBoundingClientRect();
+          this.tip.textContent = hit.userData.tip;
+          this.tip.style.left = `${e.clientX - r.left + 14}px`;
+          this.tip.style.top = `${e.clientY - r.top + 14}px`;
+          this.tip.style.display = "block";
+        } else this.tip.style.display = "none";
+      });
+    });
+    el.addEventListener("pointerleave", () => { this.tip.style.display = "none"; });
   }
 
   highlight(picks) {
@@ -142,6 +200,16 @@ class Viewer {
   }
 
   build1(o) {
+    if (o.t === "anim") {
+      const base = new Float32Array(o.p.flat());
+      const d = new Float32Array(o.d.flat());
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(base), 3));
+      const line = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: o.color }));
+      for (let i = 0; i < base.length; i++) geo.attributes.position.array[i] = base[i] + d[i];
+      this.anims.push({ line, base, d });
+      return line;
+    }
     if (o.t === "prism") {
       const shape = new THREE.Shape(o.pts.map(([x, y]) => new THREE.Vector2(x, y)));
       const geo = new THREE.ExtrudeGeometry(shape, { depth: o.depth, bevelEnabled: false });
@@ -219,6 +287,8 @@ class Viewer {
     this.kind = scene.kind;
     this.root = new THREE.Group();
     this.groups = {};
+    this.anims = [];
+    this.hovered = null;
     for (const l of scene.layers) {
       const g = new THREE.Group();
       this.groups[l.key] = g;
@@ -331,5 +401,6 @@ window.addEventListener("erisma:layers", (e) => {
   v.applyVisibility();
   v.panel.querySelectorAll("input[data-k]").forEach((i) => { i.checked = !v.hidden[i.dataset.k]; });
 });
+window.addEventListener("erisma:anim", (e) => viewers[e.detail?.host || "viewer3d"]?.setAnimation(e.detail.on, e.detail.speed));
 window.addEventListener("erisma:highlight", (e) => viewers[e.detail?.host || "viewer3d"]?.highlight(e.detail.picks));
 if (window.__erismaModel) show(window.__erismaModel);

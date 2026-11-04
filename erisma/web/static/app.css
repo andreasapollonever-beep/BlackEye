@@ -516,3 +516,14 @@ button.danger{color:var(--fail)!important}
   .rb-ctl>span{max-width:120px}
 }
 .st-rlbl{font-weight:600;paint-order:stroke;stroke:var(--preview);stroke-width:30px}
+.v3d-tip{position:absolute;display:none;pointer-events:none;z-index:5;background:var(--overlay);color:var(--ink);border:1px solid var(--line2);border-radius:6px;padding:4px 8px;font-size:12px;white-space:pre;box-shadow:var(--shadow)}
+/* two-tone ribbon icons */
+.ic .f{fill:var(--accent2);fill-opacity:.22;stroke:none}
+.ic .r{stroke:#e0624f}.ic .f.r{fill:#e0624f;fill-opacity:.2;stroke:none}
+.rb-btn.big svg{width:30px;height:30px}
+.rb-btn.on .ic .f{fill-opacity:.4}
+.rb-grp input[type=range]{accent-color:var(--accent2)}
+/* workspace 3D: the layer list folds into a small tab (opens on hover) */
+#st-3d .v3d-panel{max-height:30px;overflow:hidden;transition:max-height .2s}
+#st-3d .v3d-panel:hover{max-height:80vh;overflow:auto}
+#st-3d .v3d-panel .v3d-title::after{content:" ▾"}
