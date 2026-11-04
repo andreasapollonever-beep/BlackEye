@@ -170,6 +170,44 @@ class OptimiseRequest(RunRequest):
     variables: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class ReserveRequest(RunRequest):
+    mode: str = "loads"            # "loads" (reserve factor λ) or "field" (inverse solution)
+    groups: list[str] = Field(default_factory=list)
+    field: str = ""
+
+
+@app.get("/api/modules/{module_id}/reserve")
+def reserve_spec(module_id: str, lang: str = "en") -> dict[str, Any]:
+    """Load groups that can be scaled and inputs that can be solved for."""
+    from ..reserve import spec as rspec
+    _module(module_id)
+    sp = rspec(module_id)
+    L = _lang(lang)
+    sp["group_labels"] = {g: tr(t, L) for g, t in sp["group_labels"].items()}
+    for f in sp["fields"]:
+        f["label"] = tr(f["label"], L)
+    return sp
+
+
+@app.post("/api/modules/{module_id}/reserve")
+def reserve_run(module_id: str, req: ReserveRequest) -> dict[str, Any]:
+    """Reserve factor on the loads, or the range of an input for which all checks pass."""
+    from ..reserve import inverse, reserve
+    _module(module_id)
+    L = _lang(req.lang)
+    _check_license(L)
+    try:
+        if req.mode == "field":
+            res = inverse(module_id, req.inputs, req.project, req.field, L)
+            if res.get("message"):
+                res["message"] = tr(res["message"], L)
+        else:
+            res = reserve(module_id, req.inputs, req.project, req.groups or ["G", "Q", "E", "A"], L)
+    except ValueError as exc:
+        raise HTTPException(422, {"message": tr(str(exc), L), "field": None}) from exc
+    return _json_safe(res)
+
+
 @app.get("/api/modules/{module_id}/optimise")
 def optimise_spec(module_id: str, lang: str = "en") -> list[dict[str, Any]]:
     _module(module_id)

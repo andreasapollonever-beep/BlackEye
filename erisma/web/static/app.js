@@ -51,7 +51,8 @@ const UI = {
     "Erisma is free to try for 30 days. Buy a licence to continue after the trial.":
       "Το Erisma δοκιμάζεται δωρεάν 30 ημέρες. Για συνέχεια μετά τη δοκιμή χρειάζεται άδεια.", "Manual": "Εγχειρίδιο", "User manual (F1)": "Εγχειρίδιο χρήσης (F1)",
     "How this calculation works (F1)": "Πώς λειτουργεί ο υπολογισμός (F1)",
-    "🎯 Most economical": "🎯 Οικονομικότερη λύση", "📖 How it works": "📖 Πώς υπολογίζεται",
+    "🎯 Most economical": "🎯 Οικονομικότερη λύση", "📈 Reserve": "📈 Εφεδρεία",
+    "How much more can it carry? — reserve and inverse solution": "Πόσο ακόμα αντέχει; — εφεδρεία και αντίστροφη λύση", "📖 How it works": "📖 Πώς υπολογίζεται",
     "↺ Reset": "↺ Επαναφορά", "Find the most economical design": "Βρες την πιο οικονομική λύση",
     "Arithmetic allowed, e.g. 2*3,5": "Επιτρέπονται πράξεις, π.χ. 2*3,5", "Not a number": "Δεν είναι αριθμός",
     "Duplicate row": "Αντιγραφή γραμμής", "Tip: paste rows from Excel (Ctrl+V)": "Συμβουλή: επικόλληση γραμμών από Excel (Ctrl+V)",

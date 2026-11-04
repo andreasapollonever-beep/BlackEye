@@ -124,7 +124,8 @@ green when all checks pass, red with the failing checks and what to change.</li>
 <li><b>Report / 3D model</b> (right): the full calculation sheet and the interactive model.</li>
 <li><b>Above the form:</b> <b>+ Add to project</b> (see “Projects”), <b>⚖ Alternative</b>
 (see “Comparing alternative solutions”), <b>🎯 Most economical</b> (automatic design),
-<b>📖 How it works</b> (this manual at that calculation) and <b>↺ Reset</b> (back to the
+<b>📈 Reserve</b> (see “How much more can it carry?”), <b>📖 How it works</b> (this manual at
+that calculation) and <b>↺ Reset</b> (back to the
 example values). In the status banner the
 <b>💶</b> cost estimate.</li>
 <li><b>Top bar:</b> Home, light/dark theme, language ΕΛ/EN, licence state, Manual, Open, Save,
@@ -148,7 +149,8 @@ example values). In the status banner the
 μοντέλο.</li>
 <li><b>Πάνω από τη φόρμα:</b> <b>+ Στο έργο</b> (βλ. «Έργα»), <b>⚖ Εναλλακτική λύση</b> (βλ.
 «Σύγκριση εναλλακτικών λύσεων»), <b>🎯 Οικονομικότερη λύση</b> (αυτόματη διαστασιολόγηση),
-<b>📖 Πώς υπολογίζεται</b> (αυτό το εγχειρίδιο στον συγκεκριμένο υπολογισμό) και
+<b>📈 Εφεδρεία</b> (βλ. «Πόσο ακόμα αντέχει;»), <b>📖 Πώς υπολογίζεται</b> (αυτό το
+εγχειρίδιο στον συγκεκριμένο υπολογισμό) και
 <b>↺ Επαναφορά</b> (πίσω στις τιμές του παραδείγματος). Στη μπάρα κατάστασης
 η εκτίμηση κόστους <b>💶</b>.</li>
 <li><b>Πάνω μπάρα:</b> Αρχική, φωτεινό/σκούρο θέμα, γλώσσα ΕΛ/EN, κατάσταση άδειας,
@@ -672,6 +674,74 @@ optimum is an ordinary design: check it and round it to practical dimensions if 
 σταματά μετά από 40 s και δίνει την καλύτερη που βρήκε. Αν καμία δεν επαρκεί στα εύρη:
 «Δεν βρέθηκε λύση που επαρκεί — διευρύνετε τα όρια». Η βέλτιστη λύση είναι κανονική λύση:
 ελέγξτε τη και στρογγυλέψτε τη σε πρακτικές διαστάσεις αν χρειάζεται.</p>"""}),
+    ("reserve", {"en": "How much more can it carry? — reserve factor and inverse solution",
+                 "el": "Πόσο ακόμα αντέχει; — εφεδρεία και αντίστροφη λύση"}, {
+        "en": """
+<p><b>📈 Reserve</b> (above the form) answers two questions for every calculation with checks.</p>
+<h4>Reserve factor λ on the loads</h4>
+<ul>
+<li>Tick the loads to increase: permanent G, variable Q, seismic E, or the design actions of
+calculations that take design values. The chosen inputs are multiplied by λ and the
+<b>whole calculation is run again</b> — eccentricities, effective areas, buckling, second
+order, everything — so λ is exact, not a linear estimate.</li>
+<li>λ is the largest factor for which every check that depends on the loads passes; the
+check that fails first is named with its clause. λ = 1.56 means the loads can grow by 56 %;
+λ &lt; 1 means they must be reduced to 1/λ.</li>
+<li>Checks whose utilisation does not change with the loads (minimum reinforcement, spacing,
+slenderness limits) are listed separately and do not limit λ. Loads that the program computes
+itself — self-weight of the member, earth pressure — are <i>not</i> scaled, which is why λ can
+differ from 1/U<sub>max</sub>.</li>
+<li><b>Verification</b> is printed with every result: at λ all checks pass (U<sub>max</sub> ≤ 1),
+just above λ the governing check fails (U &gt; 1). If the limit comes from the range of an input
+(e.g. a<sub>g</sub> above its maximum) the result says so.</li>
+<li>Method: a scan from λ = 1 (doubling up to 1000, or down to 0) finds the first failure, so
+a response that passes again at higher loads is not missed; bisection then narrows λ to
+0.01 %.</li>
+</ul>
+<h4>Inverse solution — range of one input</h4>
+<p>Choose any input: it is varied over its whole range with everything else unchanged, and
+the interval in which every check passes is given with the check that limits each end —
+e.g. the lowest φ' of the soil, the longest span, the highest water table, the lowest concrete
+strength from cores. Each limit is verified the same way and <b>Apply this value</b> puts it in
+the form. For choices (concrete class, section, bar diameter) and whole numbers every option is
+calculated and listed with its utilisation.</p>
+<p class="warn">The reserve is that of the element under the loads you give. Effects that
+change the loads themselves — redistribution in the structure, a heavier seismic mass, a new
+storey — need a new analysis of the structure.</p>""",
+        "el": """
+<p>Το <b>📈 Εφεδρεία</b> (πάνω από τη φόρμα) απαντά σε δύο ερωτήματα για κάθε υπολογισμό με
+ελέγχους.</p>
+<h4>Συντελεστής εφεδρείας λ στα φορτία</h4>
+<ul>
+<li>Επιλέξτε ποια φορτία αυξάνονται: μόνιμα G, μεταβλητά Q, σεισμική δράση E ή τα εντατικά
+μεγέθη σχεδιασμού όπου ο υπολογισμός δέχεται τιμές σχεδιασμού. Τα επιλεγμένα δεδομένα
+πολλαπλασιάζονται επί λ και <b>ξανατρέχει ολόκληρος ο υπολογισμός</b> — εκκεντρότητες, ενεργές
+επιφάνειες, λυγισμός, δεύτερη τάξη, όλα — άρα το λ είναι ακριβές, όχι γραμμική εκτίμηση.</li>
+<li>λ είναι ο μεγαλύτερος συντελεστής για τον οποίο επαρκούν όλοι οι έλεγχοι που εξαρτώνται
+από τα φορτία· ο έλεγχος που αστοχεί πρώτος αναφέρεται με το άρθρο του. λ = 1,56 σημαίνει ότι
+τα φορτία μπορούν να αυξηθούν κατά 56 %· λ &lt; 1 ότι πρέπει να μειωθούν στο 1/λ.</li>
+<li>Έλεγχοι των οποίων η αξιοποίηση δεν αλλάζει με τα φορτία (ελάχιστος οπλισμός, αποστάσεις,
+όρια λυγηρότητας) εμφανίζονται χωριστά και δεν περιορίζουν το λ. Φορτία που υπολογίζει το
+ίδιο το πρόγραμμα — ίδιο βάρος του μέλους, ωθήσεις γαιών — <i>δεν</i> πολλαπλασιάζονται, γι'
+αυτό το λ μπορεί να διαφέρει από το 1/U<sub>max</sub>.</li>
+<li>Με κάθε αποτέλεσμα τυπώνεται <b>επαλήθευση</b>: στο λ όλοι οι έλεγχοι επαρκούν
+(U<sub>max</sub> ≤ 1), ακριβώς πάνω από το λ ο κρίσιμος έλεγχος αστοχεί (U &gt; 1). Αν το όριο
+προκύπτει από το εύρος ενός δεδομένου (π.χ. a<sub>g</sub> πάνω από το μέγιστο), το αποτέλεσμα
+το αναφέρει.</li>
+<li>Μέθοδος: σάρωση από λ = 1 (διπλασιασμός έως 1000, ή προς το 0) βρίσκει την πρώτη αστοχία,
+ώστε να μη χαθεί απόκριση που επαρκεί ξανά σε μεγαλύτερα φορτία· μετά η διχοτόμηση
+προσδιορίζει το λ με ακρίβεια 0,01 %.</li>
+</ul>
+<h4>Αντίστροφη λύση — εύρος ενός δεδομένου</h4>
+<p>Επιλέξτε οποιοδήποτε δεδομένο: μεταβάλλεται σε όλο το εύρος του με όλα τα άλλα σταθερά, και
+δίνεται το διάστημα στο οποίο επαρκούν όλοι οι έλεγχοι, με τον έλεγχο που θέτει κάθε όριο —
+π.χ. το ελάχιστο φ' του εδάφους, το μέγιστο άνοιγμα, η υψηλότερη στάθμη νερού, η ελάχιστη
+αντοχή σκυροδέματος από πυρήνες. Κάθε όριο επαληθεύεται με τον ίδιο τρόπο και το
+<b>Εφαρμογή της τιμής</b> το περνά στη φόρμα. Για επιλογές (κατηγορία σκυροδέματος, διατομή,
+διάμετρος) και ακέραιους υπολογίζεται κάθε επιλογή και εμφανίζεται με την αξιοποίησή της.</p>
+<p class="warn">Η εφεδρεία αφορά το στοιχείο για τα φορτία που δίνετε. Ό,τι αλλάζει τα ίδια τα
+φορτία — ανακατανομή στον φορέα, μεγαλύτερη σεισμική μάζα, νέος όροφος — χρειάζεται νέα
+ανάλυση του φορέα.</p>"""}),
     ("compare", {"en": "Comparing alternative solutions", "el": "Σύγκριση εναλλακτικών λύσεων"}, {
         "en": """
 <p>Erisma compares different solutions for the same element — e.g. footing 2,0 × 2,0 m against
