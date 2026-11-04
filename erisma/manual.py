@@ -360,6 +360,12 @@ beams or grid points (on all floors, the roof or one storey). <b>Combinations…
 EN 1990 combinations generated with the factors of the National Annex (ULS 6.10 with each
 variable action leading, SLS characteristic / frequent / quasi-permanent, seismic) and lets you
 add your own; members are designed for the envelope.</p>
+<p><b>Wind.</b> The <b>Wind</b> button (Loads or Analyse tab) adds the wind of EN 1991-1-4 to
+the analysis when you want it: v_b,0 from the wind map of the National Annex at the project
+site (or typed in), terrain category and c_o give q_p(z_e) (Fig. 7.4); the windward/leeward
+coefficients c_pe,10 with the lack-of-correlation factor give the storey forces, applied as load
+cases W_X and W_Y in both senses and combined with ψ0 = 0.6. The report compares the wind and
+seismic storey shears; members are designed for the envelope.</p>
 <p><b>Plan + 3D</b> shows both windows at once; elements can be selected in the 3D view too
 (empty positions are drawn faintly so that the tools can add columns and beams there). The
 <b>Results</b> tab switches the 3D bending-moment, shear, axial-force and deformed-shape
@@ -429,6 +435,13 @@ the browser; <b>Save</b> writes a project file that <b>Open</b> brings back.</p>
 συντελεστές του Εθνικού Προσαρτήματος (ΟΚΑ 6.10 με κάθε μεταβλητή δράση ως κύρια, ΟΚΛ
 χαρακτηριστικός / συχνός / οιονεί μόνιμος, σεισμικός) και επιτρέπουν δικούς σας· τα μέλη
 διαστασιολογούνται για την περιβάλλουσα.</p>
+<p><b>Άνεμος.</b> Το κουμπί <b>Άνεμος</b> (καρτέλα Φορτία ή Ανάλυση) προσθέτει τον άνεμο του
+EN 1991-1-4 στην ανάλυση όταν το θέλετε: η v_b,0 από τον χάρτη ανέμου του Εθνικού Προσαρτήματος
+στη θέση του έργου (ή όπως τη δίνετε), η κατηγορία εδάφους και ο c_o δίνουν το q_p(z_e) (Σχ.
+7.4)· οι συντελεστές c_pe,10 προσήνεμης/υπήνεμης όψης με τον συντελεστή έλλειψης συσχέτισης
+δίνουν τις δυνάμεις ορόφων, ως φορτίσεις W_X και W_Y με τις δύο φορές, συνδυασμένες με ψ0 = 0.6.
+Το τεύχος συγκρίνει τις τέμνουσες ορόφων ανέμου και σεισμού· τα μέλη διαστασιολογούνται για την
+περιβάλλουσα.</p>
 <p>Η <b>Κάτοψη + 3D</b> δείχνει και τα δύο παράθυρα μαζί· τα στοιχεία επιλέγονται και στο 3D (οι
 κενές θέσεις εμφανίζονται αχνά ώστε τα εργαλεία να προσθέτουν εκεί υποστυλώματα και δοκούς). Η
 καρτέλα <b>Αποτελέσματα</b> ανάβει/σβήνει στο 3D τα διαγράμματα ροπών, τεμνουσών, αξονικών, τον

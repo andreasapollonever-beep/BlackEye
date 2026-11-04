@@ -113,7 +113,8 @@ Object.assign(UI.el, {
   "Concrete": "Σκυρόδεμα", "Sections": "Διατομές",
   "Sizes used where no member has its own (select a member to change only that one)":
     "Διαστάσεις για όσα μέλη δεν έχουν δική τους (επιλέξτε ένα μέλος για να αλλάξετε μόνο αυτό)",
-  "Seismic action": "Σεισμική δράση", "Response spectrum": "Φάσμα απόκρισης", "Spectrum": "Φάσμα",
+  "Seismic action": "Σεισμική δράση", "Wind": "Άνεμος", "Wind on the building": "Άνεμος στο κτίριο",
+  "Include wind (EN 1991-1-4)": "Συμπερίληψη ανέμου (EN 1991-1-4)", "Wind forces": "Δυνάμεις ανέμου", "NA wind map": "Χάρτης ανέμου ΕΠ", "Terrain": "Έδαφος", "Response spectrum": "Φάσμα απόκρισης", "Spectrum": "Φάσμα",
   "Stiffness": "Δυσκαμψία", "Apply to q": "Εφαρμογή στο q", "Show mode": "Εμφάνιση",
   "Animate": "Κίνηση", "Stop": "Διακοπή", "Speed": "Ταχύτητα",
   "Animate the mode / deformed shape in the 3D view": "Κίνηση της ιδιομορφής / παραμόρφωσης στο 3D",
@@ -248,6 +249,7 @@ const Structure = (() => {
     rename: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path class="f" d="M15 5l4 4 2-2-4-4z"/>',
     // seismic / analysis options
     seismic: '<path d="M2 12h3l2-6 3 12 3-15 3 15 2-6h4"/>',
+    wind: '<path class="r" d="M3 8h11a3 3 0 1 0-3-3"/><path d="M3 12h16a3 3 0 1 1-3 3"/><path class="r" d="M3 16h7"/>',
     spectrum: '<path d="M3 3v18h18"/><path class="r" d="M4 17l3-10h5c2 0 3 2 4 4.5S19 17 21 17.5"/>',
     pdelta: '<path d="M8 21V4" stroke-dasharray="2 1.5"/><path d="M8 21C8 14 11 8 16 4"/><path class="r" d="M16 1v4M14 3l2 2 2-2"/><path d="M8 4h8"/>',
     regular: '<circle cx="12" cy="12" r="8.5"/><circle class="f" cx="12" cy="12" r="3.5"/><circle cx="12" cy="12" r="3.5"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/>',
@@ -453,6 +455,8 @@ const Structure = (() => {
       ["loads", t("Loads"), [
         group(t("Area loads"), col(ctl("g_finish", { width: 52 }), ctl("q", { width: 52 }), ctl("category", { width: 52 })),
           col(ctl("q_roof", { width: 52 }), ctl("g_wall", { width: 52 }))),
+        group(t("Wind"), btn("wind", t("Wind"), t("Include wind (EN 1991-1-4)"), () => { S.inp.wind = !S.inp.wind; renderRibbon(); commit(); }, { big: true, on: !!S.inp.wind }),
+          col(tog("wind_site", t("NA wind map")), ctl("wind_vb0", { width: 52, label: "v_b,0 [m/s]" })), col(ctl("wind_terrain", { width: 52, label: t("Terrain") }), ctl("wind_co", { width: 52, label: "c_o" }))),
         group(t("Load case"), col((() => {
           const sel = el("select", { on: { change: (e) => { S.lcase = e.target.value || null; renderRibbon(); drawPlan(); } } },
             el("option", { value: "", title: t("Built-in case — edit its loads in the Loads tab values") }, "G / Q"),
@@ -493,6 +497,8 @@ const Structure = (() => {
           btn("auto", t("Auto"), t("Re-analyse automatically after every change"), toggleAuto, { big: true, on: S.auto })),
         group(t("Response spectrum"), btn("spectrum", t("Spectrum"), "", () => gotoReport("Design spectrum"), { big: true }),
           col(ctl("q_factor", { width: 52 }), ctl("n_modes", { width: 52 }), ctl("phi_E", { width: 52 }))),
+        group(t("Wind"), btn("wind", t("Wind"), t("Include wind (EN 1991-1-4)"), () => { S.inp.wind = !S.inp.wind; renderRibbon(); commit(); }, { big: true, on: !!S.inp.wind }),
+          btn("table", t("Wind forces"), "", () => gotoReport("Wind on the building"), { big: true, disabled: !S.inp.wind })),
         group(t("Stiffness"), col(ctl("cracked", { width: 52 }), tog("pdelta", t("P-Δ"))), btn("pdelta", t("P-Δ"), t("Include the destabilising effect of the gravity loads"), () => { S.inp.pdelta = !S.inp.pdelta; renderRibbon(); commit(); }, { big: true, on: !!S.inp.pdelta })),
         group(t("Regularity"), btn("regular", t("Regularity"), "", () => gotoReport("Structural regularity"), { big: true }), col(tog("regularity", t("Apply to q")))),
         group(t("Storey checks"), btn("drift", t("Storey checks"), "", () => gotoReport("Storey checks"), { big: true }), col(ctl("drift", { width: 150 }))),

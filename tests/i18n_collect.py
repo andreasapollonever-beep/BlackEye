@@ -10,7 +10,7 @@ SCENARIOS = {
     "ec3_steel_beam": [{}, {"L": 12, "Lcr": 0}, {"section": "IPE 600", "grade": "S235"},
                        {"Gk_pt": 50, "Qk_pt": 30}, {"section": "HEA 300", "L": 3, "qk": 200}],
     "beam_analysis": [{}],
-    "building_frame": [{}, {"seismic": False}, {"design": False, "n_modes": 3},
+    "building_frame": [{}, {"wind": True}, {"seismic": False}, {"design": False, "n_modes": 3},
                        {"walls": [], "pdelta": True, "capacity": True},
                        {"found_type": "Isolated pad footings", "walls": []},
                        {"found_type": "Foundation beams (Winkler)"},

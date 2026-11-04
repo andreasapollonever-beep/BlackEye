@@ -76,6 +76,9 @@ class BuildingSpec:
     #   {"kind": "point", "points", "storeys", "F" (N, downwards)}]}]; "all" or lists
     cases: list[dict] = field(default_factory=list)
     labels: dict[str, str] = field(default_factory=dict)
+    # horizontal storey loads (wind): {case: {storey k: (Fx, Fy) in N}}, applied at the centre
+    # of the plan through the rigid diaphragm of the floor
+    lateral: dict = field(default_factory=dict)
 
     def check(self) -> None:
         for name, vals in (("X spans", self.x_spans), ("Y spans", self.y_spans),
@@ -310,6 +313,16 @@ def build(spec: BuildingSpec) -> tuple[Model, dict]:
         level = [node_id(i, j, k) for i in range(nx) for j in range(ny)
                  if node_id(i, j, k) in used]
         m.diaphragm(f"L{k}", level)
+        for case, per in spec.lateral.items():   # storey forces at the centre of the plan
+            Fx, Fy = per.get(k, (0.0, 0.0))
+            if (Fx or Fy) and level:
+                cx, cy = (xs[0] + xs[-1]) / 2, (ys[0] + ys[-1]) / 2
+                nx_ = sum(m.nodes[n].x for n in level) / len(level)
+                ny_ = sum(m.nodes[n].y for n in level) / len(level)
+                for n in level:
+                    m.load_node(case, n, Fx=Fx / len(level), Fy=Fy / len(level))
+                # move the resultant from the centroid of the nodes to the centre of the plan
+                m.load_node(case, level[0], Mz=Fy * (cx - nx_) - Fx * (cy - ny_))
     fbeams, raft = {}, None
     if spec.foundation and spec.foundation.get("type") == "raft":
         raft = _raft(m, spec, xs, ys, wall_at, conc)

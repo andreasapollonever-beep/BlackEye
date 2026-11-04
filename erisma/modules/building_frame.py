@@ -95,6 +95,22 @@ class BuildingFrame(DesignModule):
         Field("category", "Use category (ψ factors)", kind="choice", choices=CATEGORY,
               default="A", group="Loads",
               help="EN 1990 Table A1.1: A dwellings, B offices, C assembly, D shopping, E storage."),
+        Field("wind", "Wind on the building (EN 1991-1-4)", kind="bool", default=False,
+              group="Wind",
+              help="Storey forces ±W_X, ±W_Y from the peak velocity pressure and c_pe of the "
+                   "windward/leeward walls, combined to EN 1990 (ψ0 = 0.6)."),
+        Field("wind_site", "Basic wind velocity from the National Annex map", kind="bool",
+              default=True, group="Wind", show_if="wind",
+              help="Uses the project site (📍 Map in the project details) when the annex has "
+                   "a wind map; otherwise the value below."),
+        Field("wind_vb0", "Fundamental basic wind velocity v_b,0", "", 24.0, min=10, max=60,
+              group="Wind", show_if="wind", help="In m/s."),
+        Field("wind_terrain", "Terrain category", kind="choice", choices=["0", "I", "II", "III", "IV"],
+              default="III", group="Wind", show_if="wind",
+              help="EN 1991-1-4 Table 4.1: 0 sea, I lakes, II open country, III suburbs/villages, "
+                   "IV towns (15 % covered by buildings > 15 m)."),
+        Field("wind_co", "Orography factor c_o", "", 1.0, min=1.0, max=2.0, group="Wind",
+              show_if="wind", help="1.0 on flat ground (EN 1991-1-4 4.3.3)."),
         Field("seismic", "Seismic design (EN 1998-1)", kind="bool", default=True,
               group="Seismic"),
         Field("ag", "Reference ground acceleration a_gR", "", 0.16, min=0, max=0.6,
@@ -193,6 +209,7 @@ class BuildingFrame(DesignModule):
             cls._user_cases(inp))
         if inp["beam_h"] <= inp["slab_t"]:
             raise InputError("The beam depth must be greater than the slab thickness", "beam_h")
+        wind = cls._wind(calc, inp, na, spec) if inp["wind"] else None
         calc.issues = []   # machine-readable failures, used by the automatic sizing
         g_unf, _, g_q = na.combos["DA1-C1"][:3]
         psi0, psi1, psi2 = na.psi[inp["category"]]
@@ -216,13 +233,15 @@ class BuildingFrame(DesignModule):
         quasi = an.combine(res, qp, "G+ψ2Q")
         # characteristic sums for the foundation modules (permanent / variable)
         gsum = {c.name: 1.0 for c in cases if c.type == "G"}
-        qsum = {c.name: 1.0 for c in cases if c.type != "G"}
+        qsum = {c.name: 1.0 for c in cases if c.type not in ("G", "W")}
         res_agg = {"G": an.combine(res, gsum, "ΣG"),
                    "Q": an.combine(res, qsum, "ΣQ") if qsum else res["G"].scaled(0.0, "ΣQ")}
         calc.combos, calc.cases, calc._res_agg = combos, cases, res_agg
 
         cls._model_section(calc, spec, info, an, res)
         cls._loads_section(calc, cases, combos, res)
+        if wind:
+            cls._wind_section(calc, inp, wind, spec)
         calc.heading("Global stability")
         calc.formula("α_cr", calc.tr("eigenvalue of (K + α K_G) φ = 0 for G + {p:g}Q", p=psi2),
                      acr, "", "Elastic critical load factor", ref="EN 1993-1-1 5.2.1(3)", dp=1)
@@ -325,12 +344,86 @@ class BuildingFrame(DesignModule):
             else:
                 cases.append(Case(c["name"], "Q", tuple(na.psi.get(c.get("category", "A"),
                                                                    na.psi["A"]))))
+        if spec.lateral:
+            cases += [Case(name, "W", tuple(na.psi["wind"])) for name in spec.lateral]
         return cases
+
+    @staticmethod
+    def _wind(calc, inp, na, spec):
+        """Storey wind forces (EN 1991-1-4) → spec.lateral; returns (v_b, directions)."""
+        from ..design import sitezones
+        from ..structure.wind import storey_forces
+        vb0, src = inp["wind_vb0"], "input"
+        p = calc.project
+        if inp["wind_site"] and na.wind_map:
+            try:
+                w = sitezones.wind_at(na.code, float(p.lat), float(p.lon))
+            except (TypeError, ValueError):
+                w = None
+            if w and w.get("special"):
+                raise InputError("The site lies in the Troodos summit area of the wind map, for "
+                                 "which the National Annex gives no value — a special study is "
+                                 "required.", "wind_site")
+            if w and w.get("vb0"):
+                vb0, src = w["vb0"], "map"
+        zs = [0.0]
+        for h in spec.heights:
+            zs.append(zs[-1] + h)
+        dirs = storey_forces(sum(spec.x_spans), sum(spec.y_spans), zs, vb0, inp["wind_terrain"],
+                             inp["wind_co"], na.air_density)
+        for d in dirs:
+            spec.lateral[d.name] = {k + 1: ((F, 0.0) if d.axis == 0 else (0.0, F))
+                                    for k, F in enumerate(d.forces)}
+        return {"vb0": vb0, "src": src, "dirs": dirs, "zs": zs}
+
+    @staticmethod
+    def _wind_section(calc, inp, wind, spec) -> None:
+        from ..structure.wind import SOURCE, VERIFIED
+        calc.heading("Wind on the building (EN 1991-1-4)")
+        if wind["src"] == "map":
+            calc.formula("v_b,0", "NA wind map at the site", wind["vb0"], "",
+                         "Fundamental basic wind velocity [m/s]", ref="NA 2.4", dp=1)
+        else:
+            calc.input("v_b,0", wind["vb0"], "", "Fundamental basic wind velocity [m/s]", dp=1)
+        calc.text("v_b = c_dir c_season v_b,0 with c_dir = c_season = 1.0 (Eq. 4.1); terrain "
+                  "category {t}, c_o = {co:g}; q_p(z) = [1 + 7 I_v(z)] ½ ρ v_m²(z) (Eq. 4.8).",
+                  t=inp["wind_terrain"], co=inp["wind_co"])
+        h = wind["zs"][-1]
+        for d in wind["dirs"]:
+            axis = "X" if d.axis == 0 else "Y"
+            calc.text("Wind along {a}: b = {b:.2f} m, d = {d:.2f} m, h/d = {hd:.2f}; "
+                      "c_pe,10 D = {D:+.2f}, E = {E:+.2f}; lack of correlation {c:.3f} "
+                      "(7.2.2(3)) → c_net = {n:.3f}",
+                      a=axis, b=d.b / 1e3, d=d.d / 1e3, hd=h / d.d, D=d.cpe_D, E=d.cpe_E,
+                      c=d.corr, n=d.cf_net)
+        X, Y = wind["dirs"]
+        rows, VX, VY = [], 0.0, 0.0
+        n = len(X.forces)
+        shear = []
+        for k in range(n, 0, -1):
+            VX += X.forces[k - 1]
+            VY += Y.forces[k - 1]
+            shear.append((k, VX, VY))
+        shear = dict((k, (vx, vy)) for k, vx, vy in shear)
+        for k in range(1, n + 1):
+            rows.append([str(k), f"{wind['zs'][k] / 1e3:.2f}", f"{X.qp_ref[k - 1]:.3f}",
+                         f"{Y.qp_ref[k - 1]:.3f}", f"{X.forces[k - 1] / 1e3:.1f}",
+                         f"{Y.forces[k - 1] / 1e3:.1f}", f"{shear[k][0] / 1e3:.1f}",
+                         f"{shear[k][1] / 1e3:.1f}"])
+        calc.table(["Storey", "z [m]", "q_p(z_e) X [kN/m²]", "q_p(z_e) Y [kN/m²]", "F_X [kN]",
+                    "F_Y [kN]", "V_X [kN]", "V_Y [kN]"], rows,
+                   caption="Storey forces at the centre of the plan; z_e per Fig. 7.4; load "
+                           "cases W_X and W_Y, each in both senses")
+        calc.wind_shear = shear
+        if not VERIFIED:
+            calc.warn("Wind pressure coefficients are provisional ({src}) — verify against "
+                      "EN 1991-1-4 before issue.", src=SOURCE)
 
     @staticmethod
     def _loads_section(calc, cases, combos, res) -> None:
         calc.heading("Load cases and combinations (EN 1990)")
-        tname = {"G": calc.tr("permanent"), "Q": calc.tr("imposed"), "S": calc.tr("snow")}
+        tname = {"G": calc.tr("permanent"), "Q": calc.tr("imposed"), "S": calc.tr("snow"),
+                 "W": calc.tr("wind")}
         calc.table(["Load case", "Type", "ψ0", "ψ1", "ψ2", "Σ F_z [kN]"],
                    [[c.name, tname[c.type], *([f"{v:g}" for v in c.psi] if c.type != "G" else
                                               ["—"] * 3),
@@ -369,7 +462,7 @@ class BuildingFrame(DesignModule):
                    caption="EN 1998-1 4.2.3.2(4), (5)")
         rows = []
         for n, m_ in enumerate(reg.storey_m):
-            rows.append([str(n + 1), f"{m_ * 1e3:.0f}", f"{reg.storey_k['X'][n] / 1e3:.0f}",
+            rows.append([str(n + 1), f"{m_:.1f}", f"{reg.storey_k['X'][n] / 1e3:.0f}",
                          f"{reg.storey_k['Y'][n] / 1e3:.0f}"])
         calc.table(["Storey", "m [t]", "K_X [kN/mm]", "K_Y [kN/mm]"], rows,
                    caption="Storey mass and lateral stiffness (V_i / interstorey drift under the "
@@ -403,7 +496,7 @@ class BuildingFrame(DesignModule):
                      ref="EN 1998-1 4.2.4", dp=2)
         source = {c.name: (1.0 if c.type == "G" else inp["phi_E"] * c.psi[2]) for c in cases}
         md = modal(an, source, n_modes=inp["n_modes"])
-        calc.formula("M", "Σ (G + ψ_E Q) / g", md.total_mass["X"] * 1e3, "",
+        calc.formula("M", "Σ (G + ψ_E Q) / g", md.total_mass["X"], "",
                      "Seismic mass above the base [t]", dp=1)
         kind = {"X": calc.tr("translation X"), "Y": calc.tr("translation Y"),
                 "RZ": calc.tr("torsion")}
@@ -457,7 +550,7 @@ class BuildingFrame(DesignModule):
         calc.input("α", alpha, "", "Drift limit ratio", dp=4)
         rows = []
         for s in seis.storeys:
-            rows.append([str(s.index), f"{s.z / 1000:.2f}", f"{s.mass * 1e3:.0f}",
+            rows.append([str(s.index), f"{s.z / 1000:.2f}", f"{s.mass:.1f}",
                          f"{s.V['X'] / 1e3:.0f}", f"{s.V['Y'] / 1e3:.0f}",
                          f"{s.drift['X']:.1f}", f"{s.drift['Y']:.1f}",
                          f"{s.theta['X']:.3f}", f"{s.theta['Y']:.3f}"])
@@ -465,6 +558,20 @@ class BuildingFrame(DesignModule):
                     "d_r,Y [mm]", "θ_X", "θ_Y"], rows,
                    caption="d_r = q d_e (4.3.4) at the most stressed column line; "
                            "θ = P_tot d_r / (V_tot h) (Eq. 4.28)")
+        ws = getattr(calc, "wind_shear", None)
+        if ws:
+            gq = get_annex(calc.project.annex).combos["DA1-C1"][2]
+            rows = []
+            for s in seis.storeys:
+                wx, wy = ws.get(s.index, (0.0, 0.0))
+                gov = lambda e, w: calc.tr("wind") if gq * w > e else calc.tr("seismic")  # noqa: E731
+                rows.append([str(s.index), f"{s.V['X'] / 1e3:.0f}", f"{gq * wx / 1e3:.0f}",
+                             gov(s.V["X"], wx), f"{s.V['Y'] / 1e3:.0f}", f"{gq * wy / 1e3:.0f}",
+                             gov(s.V["Y"], wy)])
+            calc.table(["Storey", "V_E,X [kN]", "γ_Q V_W,X [kN]", "Governs X", "V_E,Y [kN]",
+                        "γ_Q V_W,Y [kN]", "Governs Y"], rows,
+                       caption="Seismic versus wind storey shears; members are designed for "
+                               "the envelope of both")
         for s in seis.storeys:
             for d in ("X", "Y"):
                 calc.check(calc.tr("Storey {i} drift {d}: d_r ν ≤ α h", i=s.index, d=d),
