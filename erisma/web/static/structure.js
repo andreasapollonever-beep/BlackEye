@@ -237,6 +237,15 @@ const Structure = (() => {
     autosize: '<path d="M4 20L20 4"/><path d="M14 4h6v6"/><rect x="3" y="13" width="8" height="8"/><path d="M15 15l2 2 4-4"/>',
     found: '<path d="M3 20h18"/><rect x="5" y="14" width="14" height="4"/><path d="M9 14V4h6v10"/>',
   };
+  // compact reinforcement text for the plan: beams "2Ø14/3Ø12 · Ø8/250", columns "8Ø16",
+  // slabs "Ø8/200 | Ø8/150"
+  const shortR = (kind, text) => {
+    const tk = String(text || "").match(/\d*Ø\d+(?:\/\d+)?/g) || [];
+    if (kind === "beam") return tk.length >= 3 ? `${tk[0]}/${tk[1]} · ${tk[2]}` : tk.join(" ");
+    if (kind === "column") return tk[0] || "";
+    if (kind === "panel") return tk.slice(0, 2).join(" | ");
+    return tk.slice(0, 2).join(" ");
+  };
   const icon = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${P[k] || ""}</svg>`;
 
   // ------------------------------------------------------------ history / persistence
@@ -389,19 +398,21 @@ const Structure = (() => {
           col(ctl("beam_b", { width: 62 }), ctl("beam_h", { width: 62 })), col(ctl("slab_t", { width: 62 }))),
       ]],
       ["loads", t("Loads"), [
-        group(t("Area loads"), col(ctl("g_finish"), ctl("q")), col(ctl("q_roof"), ctl("g_wall")), col(ctl("category", { width: 60 }))),
+        group(t("Area loads"), col(ctl("g_finish", { width: 52 }), ctl("q", { width: 52 }), ctl("category", { width: 52 })),
+          col(ctl("q_roof", { width: 52 }), ctl("g_wall", { width: 52 }))),
         group(t("Load case"), col((() => {
           const sel = el("select", { on: { change: (e) => { S.lcase = e.target.value || null; renderRibbon(); drawPlan(); } } },
-            el("option", { value: "" }, `G / Q — ${t("Built-in case — edit its loads in the Loads tab values")}`),
+            el("option", { value: "", title: t("Built-in case — edit its loads in the Loads tab values") }, "G / Q"),
             ...ucases().map((c) => el("option", { value: c.name }, c.name)));
           sel.value = S.lcase || "";
-          sel.style.width = "190px";
+          sel.style.width = "150px";
           return sel;
         })(), (() => {
           const c = curCase();
           const ty = el("select", { disabled: c ? null : "", on: { change: (e) => { c.type = e.target.value; commit(); renderRibbon(); } } },
             el("option", { value: "G" }, t("Permanent G")), el("option", { value: "Q" }, t("Imposed Q")), el("option", { value: "S" }, t("Snow S")));
           ty.value = c?.type || "G";
+          ty.style.width = "92px";
           const cat = el("select", { disabled: c && c.type === "Q" ? null : "", title: t("Category"), on: { change: (e) => { c.category = e.target.value; commit(); } } },
             ..."ABCDE".split("").map((x) => el("option", { value: x }, x)));
           cat.value = c?.category || "A";
@@ -411,9 +422,9 @@ const Structure = (() => {
         group(t("Apply loads"), btn("aload", t("Area load"), t("Click slab panels to add / remove the area load of the current case."), () => setTool("aload"), { big: true, on: S.tool === "aload" }),
           btn("lload", t("Line load"), t("Click beams to add / remove the line load of the current case."), () => setTool("lload"), { big: true, on: S.tool === "lload" }),
           btn("pload", t("Point load"), t("Click grid points to add / remove the point load of the current case."), () => setTool("pload"), { big: true, on: S.tool === "pload" }),
-          col(...[["area", "kN/m²"], ["line", "kN/m"], ["point", "kN"]].map(([k, u]) => el("label", { class: "rb-ctl" },
-            el("span", {}, t({ area: "Area load", line: "Line load", point: "Point load" }[k])),
-            el("input", { type: "number", step: "0.5", value: S.lval[k], style: "width:60px", on: { change: (e) => { S.lval[k] = parseFloat(e.target.value) || 0; } } }),
+          col(...[["area", "q", "kN/m²"], ["line", "w", "kN/m"], ["point", "F", "kN"]].map(([k, sym, u]) => el("label", { class: "rb-ctl", title: t({ area: "Area load", line: "Line load", point: "Point load" }[k]) },
+            el("span", {}, sym),
+            el("input", { type: "number", step: "0.5", value: S.lval[k], style: "width:52px", on: { change: (e) => { S.lval[k] = parseFloat(e.target.value) || 0; } } }),
             el("small", {}, u)))),
           col(el("label", { class: "rb-ctl" }, el("span", {}, t("On storeys")), (() => {
             const ss = el("select", { on: { change: (e) => { S.lstorey = e.target.value; } } },
@@ -426,10 +437,10 @@ const Structure = (() => {
       ]],
       ["seismic", t("Seismic"), [
         group(t("Seismic design"), col(tog("seismic", "EN 1998-1"))),
-        group(t("Site"), col(ctl("ag"), ctl("ground", { width: 56 })), col(ctl("importance", { width: 56 }), annexSelect())),
+        group(t("Site"), col(ctl("ag"), ctl("ground", { width: 56 })), col(ctl("importance", { width: 56 }))),
         ...(curAnnex()?.zones?.length ? [group(t("Seismic zone"), ...curAnnex().zones.map((z) =>
           btn("grid", `${z.label}`, `a_gR = ${z.ag} g`, () => { S.inp.ag = z.ag; renderRibbon(); commit(); }, { on: Math.abs(S.inp.ag - z.ag) < 1e-9 })))] : []),
-        group(t("Structure"), col(ctl("q_factor"), ctl("cracked")), col(ctl("drift", { width: 190 }))),
+        group(t("Structure"), col(ctl("q_factor"), ctl("cracked")), col(ctl("drift", { width: 150 }), annexSelect())),
         group(t("Analysis options"), col(ctl("n_modes"), ctl("phi_E")), col(tog("pdelta", t("P-Δ")))),
       ]],
       ["design", t("Design"), [
@@ -819,12 +830,12 @@ const Structure = (() => {
         fill: open.has(id) ? "url(#st-hatch)" : "" }, gPan);
       const sr = open.has(id) ? [] : shown("panel", id);
       const pc = sr.length ? colourFor("panel", id) : null;
-      if (pc && S.opt.storey !== "found") { r.style.fill = pc; r.style.fillOpacity = "0.28"; }
+      if (pc && S.opt.storey !== "found") { r.style.fill = pc; r.style.fillOpacity = "0.13"; }
       sv("title", {}, r).textContent = `${t("Slab panel")} ${id}${open.has(id) ? ` — ${t("Open (no slab)")}` : ""}` +
         (sr.length ? `\n${sr.map((x) => `${t("Storey")} ${x.storey}: ${x.reinforcement} (η = ${x.util.toFixed(2)})`).join("\n")}` : "");
       tag(r, "panel", id);
       if (S.opt.labels && sr.length && S.opt.storey !== "found") sv("text", { x: X((xs[i] + xs[i + 1]) * 500), y: Y((ys[j] + ys[j + 1]) * 500), "font-size": unit * 1.1, class: "st-rlbl", "text-anchor": "middle" }, gTxt)
-        .textContent = sr[sr.length - 1].reinforcement;
+        .textContent = shortR("panel", sr[sr.length - 1].reinforcement);
     }
     const ext = unit * 6, rb = unit * 2.2;
     for (let i = 0; i < nx; i++) {
@@ -874,9 +885,11 @@ const Structure = (() => {
       const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
       if (S.opt.names && bsz[id]) sv("text", { x: mx, y: my + (horiz ? -unit * 1.3 : 0), dx: horiz ? 0 : unit * 1.3, "font-size": unit * 1.25, class: "st-mname", "text-anchor": horiz ? "middle" : "start" }, gTxt).textContent = `${b}×${h}`;
       if (S.opt.labels && r.length) {
-        const txt = S.opt.storey === "all" ? r[0].reinforcement + (r.length > 1 ? " …" : "") : r[0].reinforcement;
-        const e = sv("text", { x: mx, y: my + (horiz ? unit * 1.9 : 0), dx: horiz ? 0 : -unit * 1.3, "font-size": unit * 1.1, class: "st-rlbl", "text-anchor": horiz ? "middle" : "end" }, gTxt);
-        e.textContent = txt.replace(/ \(.*\)$/, "");
+        const worst = [...r].sort((p, q) => q.util - p.util)[0];
+        const tx = horiz ? mx : mx - unit * 1.6, ty = horiz ? my + unit * 2.0 : my;
+        const e = sv("text", { x: tx, y: ty, "font-size": unit * 1.25, class: "st-rlbl", "text-anchor": "middle",
+          transform: horiz ? "" : `rotate(-90 ${tx} ${ty})` }, gTxt);
+        e.textContent = shortR("beam", (S.opt.storey === "all" ? worst : r[0]).reinforcement) + (S.opt.storey === "all" && r.length > 1 ? " *" : "");
       }
     };
     const foundView = S.opt.storey === "found";
@@ -945,8 +958,8 @@ const Structure = (() => {
         node = sv("rect", { x: cx - b / 2, y: cy - h / 2, width: b, height: h, class: `st-col${isSel("column", id) ? " sel" : ""}` }, gCol);
         const r = shown("column", id);
         sv("title", {}, node).textContent = `${t("Column")} ${id} — ${b}×${h}` + (r.length ? `\n${lbl(r)}` : "");
-        if (S.opt.labels && r.length) sv("text", { x: cx + unit * 1.2, y: cy + unit * 2.2, "font-size": unit * 1.1, class: "st-rlbl", "text-anchor": "start" }, gTxt)
-          .textContent = (S.opt.storey === "all" ? r[0] : r[0]).reinforcement;
+        if (S.opt.labels && r.length) sv("text", { x: cx + unit * 1.2, y: cy + unit * 2.4, "font-size": unit * 1.25, class: "st-rlbl", "text-anchor": "start" }, gTxt)
+          .textContent = shortR("column", [...r].sort((p, q) => q.util - p.util)[0].reinforcement);
       }
       const c = kind === "point" ? null : colourFor(kind, id);
       if (c) node.style.fill = c;
@@ -1292,7 +1305,7 @@ const Structure = (() => {
       renderRibbon(); changed();
     } } }, ...(state.annexes || []).map((a) => el("option", { value: a.code, title: a.reference }, a.label)));
     sel.value = state.project.annex || "EN";
-    sel.style.width = "220px";
+    sel.style.width = "170px";
     return el("label", { class: "rb-ctl" }, el("span", {}, t("National Annex")), sel, el("small", {}, ""));
   }
 
