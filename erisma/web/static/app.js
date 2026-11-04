@@ -51,6 +51,8 @@ const UI = {
     "Erisma is free to try for 30 days. Buy a licence to continue after the trial.":
       "Το Erisma δοκιμάζεται δωρεάν 30 ημέρες. Για συνέχεια μετά τη δοκιμή χρειάζεται άδεια.", "Manual": "Εγχειρίδιο", "User manual (F1)": "Εγχειρίδιο χρήσης (F1)",
     "How this calculation works (F1)": "Πώς λειτουργεί ο υπολογισμός (F1)",
+    "🎯 Most economical": "🎯 Οικονομικότερη λύση", "📖 How it works": "📖 Πώς υπολογίζεται",
+    "↺ Reset": "↺ Επαναφορά", "Find the most economical design": "Βρες την πιο οικονομική λύση",
     "Arithmetic allowed, e.g. 2*3,5": "Επιτρέπονται πράξεις, π.χ. 2*3,5", "Not a number": "Δεν είναι αριθμός",
     "Duplicate row": "Αντιγραφή γραμμής", "Tip: paste rows from Excel (Ctrl+V)": "Συμβουλή: επικόλληση γραμμών από Excel (Ctrl+V)",
     "Changed from the example values": "Αλλαγμένα από τις τιμές του παραδείγματος",
@@ -532,7 +534,6 @@ const PICS = {
   ec2_rc_slab: '<path d="M8 20l20-12h60l-20 12z" fill="#b4b8bf"/><path d="M8 20h60v6H8z M68 20l20-12v6l-20 12z" fill="#9aa0a8"/><path d="M16 26v16M60 26v16" stroke="#9aa0a8" stroke-width="5"/>',
   ec7_strip_footing: '<path d="M2 26h92" stroke="#a08060"/><rect x="20" y="4" width="10" height="24" fill="#9aa0a8"/><rect x="8" y="28" width="34" height="8" fill="#b4b8bf"/><rect x="66" y="4" width="10" height="24" fill="#9aa0a8"/><rect x="54" y="28" width="34" height="8" fill="#b4b8bf"/><path d="M42 31h12" stroke="#7d8794" stroke-width="5"/>',
   ec1_wind_snow: '<path d="M6 14h40q8 0 8-6M6 24h56q8 0 8 6M6 34h34" stroke="#2f8fd8"/><path d="M70 40l12-14 12 14z" fill="#e3e4e6"/><circle cx="78" cy="10" r="2" fill="#9ab"/><circle cx="88" cy="16" r="2" fill="#9ab"/>',
-  ec8_lateral_force: '<path d="M30 44V8h26v36" stroke="#334"/><path d="M30 17h26M30 26h26M30 35h26" stroke="#334" stroke-width="1"/><path d="M58 11h16M58 20h12M58 29h8" stroke="#e03b3b" stroke-width="3"/><path d="M4 44q6-8 10 0t10 0" stroke="#e03b3b"/>',
   en1990_combinations: '<path d="M18 10h60M18 20h60M18 30h60M18 40h60" stroke="#8892a0" stroke-width="1"/><text x="20" y="27" font-size="16" fill="#2a6f97" stroke="none" font-family="sans-serif">γ·ψ</text>',
   ec7_pile: '<path d="M2 12h92" stroke="#a08060"/><path d="M2 30h92" stroke="#c9b48a" stroke-dasharray="3 3"/><rect x="42" y="4" width="12" height="40" fill="#b4b8bf"/><path d="M36 18h6M36 26h6M36 34h6M60 18h-6M60 26h-6M60 34h-6" stroke="#2e9b5f"/><path d="M48 48v-3" stroke="#2e9b5f" stroke-width="3"/>',
   ec7_settlement: '<rect x="36" y="6" width="24" height="6" fill="#b4b8bf"/><path d="M28 14q20 44 40 0" fill="#f0c428" fill-opacity="0.35" stroke="#e03b3b"/><path d="M38 14q10 22 20 0" fill="#e03b3b" fill-opacity="0.35" stroke="none"/><path d="M4 12h88" stroke="#a08060"/>',

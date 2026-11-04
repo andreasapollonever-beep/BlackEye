@@ -93,8 +93,11 @@ body.side-collapsed .sec.closed .items{display:block}
 /* ---------------------------------------------------------------- editor */
 #editor{overflow:auto;padding:12px 16px;border-right:1px solid var(--line);background:var(--panel2)}
 #editor h2{margin:14px 0 2px;font-size:17px;color:var(--accent)}
-.mod-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
-.mod-head h2{flex:1}
+.mod-head{display:flex;flex-direction:column;gap:6px}
+.mod-head h2{margin:0}
+.mod-tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.mod-tools #proj-add{display:contents}
+.mod-tools .ghost{font-size:12.5px;padding:4px 9px;white-space:nowrap;text-decoration:none}
 #mod-help{text-decoration:none;font-size:13px}
 button.ghost,.ghost{color:var(--accent2);border:1px solid var(--line);background:var(--raised);font-size:12px;
 padding:3px 8px;white-space:nowrap;border-radius:6px}
@@ -280,7 +283,8 @@ padding:6px 10px;font-size:13px;border-bottom:1px solid var(--line)}
 .sec.proj{border:1px solid var(--line);border-radius:8px;margin:6px 8px 10px;padding:4px 0;background:var(--panel)}
 .proj-h{display:flex;justify-content:space-between;align-items:center;padding:2px 10px;font-weight:700;
 font-size:12px;color:var(--accent)}
-.proj-btns{display:flex;gap:3px}
+.proj-btns{display:flex;gap:4px;flex-wrap:wrap;padding:2px 10px 6px}
+.proj-btns button.mini{font-size:12px;padding:2px 7px}
 button.mini{all:unset;cursor:pointer;font-size:13px;padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
 button.mini:hover{background:var(--hover)}
 .pad.small{font-size:11px;padding:2px 10px;margin:2px 0}
@@ -499,3 +503,6 @@ button.danger{color:var(--fail)!important}
 .rb-row select,.rb-grp select{max-width:190px}
 .st-dlg.wide{min-width:640px;max-width:90vw}
 .st-dlg input{background:var(--input);color:var(--ink);border:1px solid var(--line2);border-radius:4px;padding:3px 5px}
+.tbl.cmp tr.grp td{background:var(--accent-soft);font-weight:700;color:var(--accent)}
+.tbl.cmp tr.fail td{opacity:.65}
+.cmp-help{margin:6px 0 10px 18px;line-height:1.6}

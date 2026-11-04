@@ -14,6 +14,16 @@ const OUI = {
     "Reset prices": "Προεπιλεγμένες τιμές", "Comparison of the project calculations": "Σύγκριση υπολογισμών έργου",
     "Element": "Στοιχείο", "Calculation": "Υπολογισμός", "Result": "Αποτέλεσμα", "Quantities": "Ποσότητες",
     "cheapest passing of its type": "φθηνότερη επαρκής λύση του είδους της", "PASS": "ΕΠΑΡΚΕΙ", "FAIL": "ΑΝΕΠΑΡΚΕΙ",
+    "Comparison of alternative solutions": "Σύγκριση εναλλακτικών λύσεων", "Solution": "Λύση", "Difference": "Διαφορά",
+    "cheapest": "φθηνότερη", "not eligible": "δεν επαρκεί",
+    "To compare solutions you need at least two of them in the project:": "Για σύγκριση χρειάζονται τουλάχιστον δύο λύσεις στο έργο:",
+    "Open a calculation, e.g. a footing, and enter the first solution.": "Ανοίξτε έναν υπολογισμό, π.χ. πέδιλο, και δώστε την πρώτη λύση.",
+    "Press “⚖ Alternative” above the form: the solution is kept and a copy opens.": "Πατήστε «⚖ Εναλλακτική λύση» πάνω από τη φόρμα: η λύση κρατιέται και ανοίγει αντίγραφο.",
+    "Change the copy (other dimensions, other wall type…). Repeat for more alternatives.": "Αλλάξτε το αντίγραφο (άλλες διαστάσεις, άλλο είδος τοίχου…). Επαναλάβετε για περισσότερες εναλλακτικές.",
+    "Press “⚖ Compare” in the project list on the left.": "Πατήστε «⚖ Σύγκριση» στη λίστα του έργου αριστερά.",
+    "How do I add alternatives?": "Πώς προσθέτω εναλλακτικές;",
+    "The project items are grouped by kind of calculation. Within each group the solutions are sorted by cost; ★ marks the cheapest one that passes all checks, and the last column shows how much more each other solution costs. Solutions that fail a check cannot be chosen. Costs come from the quantities and your unit prices (💶 in the project details).":
+      "Τα στοιχεία του έργου ομαδοποιούνται ανά είδος υπολογισμού. Σε κάθε ομάδα οι λύσεις ταξινομούνται κατά κόστος· το ★ δείχνει τη φθηνότερη που επαρκεί σε όλους τους ελέγχους και η τελευταία στήλη πόσο ακριβότερη είναι κάθε άλλη λύση. Λύσεις που δεν επαρκούν δεν μπορούν να επιλεγούν. Το κόστος προκύπτει από τις ποσότητες και τις τιμές μονάδας σας (💶 στα στοιχεία έργου).",
     "This calculation has no design variables to optimise.": "Ο υπολογισμός αυτός δεν έχει μεταβλητές για βελτιστοποίηση.",
     "Only the variables you tick are changed; all checks must pass. Cost from the quantities and unit prices.":
       "Αλλάζουν μόνο οι μεταβλητές που επιλέγετε· όλοι οι έλεγχοι πρέπει να επαρκούν. Κόστος από ποσότητες και τιμές μονάδας.",
@@ -112,34 +122,60 @@ const Opt = {
   },
 
   async compare() {
-    if (!Proj.ws.calcs.length) { alert(pt("The project is empty — open a calculation and press “+ Add to project”.")); return; }
+    const help = () => el("ol", { class: "small cmp-help" },
+      el("li", {}, ot("Open a calculation, e.g. a footing, and enter the first solution.")),
+      el("li", {}, ot("Press “⚖ Alternative” above the form: the solution is kept and a copy opens.")),
+      el("li", {}, ot("Change the copy (other dimensions, other wall type…). Repeat for more alternatives.")),
+      el("li", {}, ot("Press “⚖ Compare” in the project list on the left.")));
+    if (Proj.ws.calcs.length < 2) {
+      dialog(`⚖ ${ot("Comparison of alternative solutions")}`,
+        el("p", {}, ot("To compare solutions you need at least two of them in the project:")), help(),
+        el("div", { class: "btns" }, el("button", { type: "button", class: "primary", on: { click: (e) => e.target.closest("dialog").close() } }, ot("Close"))));
+      return;
+    }
     let res;
     try { res = await api("/api/project/run", { doc: Proj.doc() }); } catch (err) {
       if (err.license) licenseDialog(); else alert(err.message);
       return;
     }
-    const items = Proj.ws.calcs.map((c) => ({ c, r: res.results?.[c.uid] || {} }));
-    const best = {};
-    for (const { c, r } of items) {
-      if (r.summary?.passed && r.quantities) {
-        if (!best[c.module] || r.quantities.total < best[c.module].total) best[c.module] = { uid: c.uid, total: r.quantities.total };
-      }
+    const groups = new Map();
+    for (const c of Proj.ws.calcs) {
+      const r = res.results?.[c.uid] || {};
+      if (!groups.has(c.module)) groups.set(c.module, []);
+      groups.get(c.module).push({ c, r });
     }
-    const total = items.reduce((s, { r }) => s + (r.quantities?.total || 0), 0);
-    dialog(`⚖ ${ot("Comparison of the project calculations")}`,
-      el("table", { class: "tbl cmp" }, el("thead", {}, el("tr", {}, el("th", {}, ot("Element")), el("th", {}, ot("Calculation")),
-        el("th", {}, ot("Result")), el("th", {}, "U"), el("th", {}, ot("Quantities")), el("th", {}, ot("Cost")))),
-      el("tbody", {}, ...items.map(({ c, r }) => {
+    const rows = [];
+    for (const [mid, items] of groups) {
+      const title = items[0].r.title || state.modules.find((m) => m.id === mid)?.title || mid;
+      const ok = items.filter(({ r }) => r.summary?.passed && r.quantities);
+      const best = ok.length ? Math.min(...ok.map(({ r }) => r.quantities.total)) : null;
+      items.sort((a, b) => (a.r.quantities?.total ?? Infinity) - (b.r.quantities?.total ?? Infinity));
+      rows.push(el("tr", { class: "grp" }, el("td", { colspan: 6 }, `${title} (${items.length})`)));
+      for (const { c, r } of items) {
         const s = r.summary;
         const q = r.quantities;
-        const cheapest = best[c.module]?.uid === c.uid && items.filter((x) => x.c.module === c.module).length > 1;
-        return el("tr", { class: cheapest ? "best" : "" }, el("td", {}, c.name), el("td", {}, r.title || c.module),
-          el("td", { class: s ? (s.passed ? "ok" : "ko") : "ko" }, s ? ot(s.passed ? "PASS" : "FAIL") : (r.error || "—")),
-          el("td", {}, s ? fmtNum(+s.max_utilisation.toFixed(2)) : "—"),
+        const passed = !!s?.passed;
+        const isBest = passed && q && best !== null && q.total === best && items.length > 1;
+        let diff = "—";
+        if (q && best !== null && items.length > 1) {
+          diff = isBest ? ot("cheapest") : `+${eur(q.total - best)} (+${Math.round((q.total / best - 1) * 100)}%)`;
+        }
+        rows.push(el("tr", { class: isBest ? "best" : passed ? "" : "fail" },
+          el("td", {}, (isBest ? "★ " : "") + c.name),
+          el("td", { class: s ? (passed ? "ok" : "ko") : "ko" }, s ? ot(passed ? "PASS" : "FAIL") : (r.error || "—")),
+          el("td", { class: "num" }, s ? fmtNum(+s.max_utilisation.toFixed(2)) : "—"),
           el("td", { class: "small" }, q ? q.rows.map((x) => `${itemName(x.item)} ${fmtNum(+x.qty.toFixed(2))} ${x.unit}`).join(" · ") : "—"),
-          el("td", { class: "num" }, q ? eur(q.total) + (cheapest ? " ★" : "") : "—"));
-      }), el("tr", { class: "tot" }, el("td", { colspan: 5 }, "Σ"), el("td", { class: "num" }, eur(total))))),
-      el("p", { class: "muted small" }, `★ ${ot("cheapest passing of its type")}`));
+          el("td", { class: "num" }, q ? eur(q.total) : "—"),
+          el("td", { class: "num" }, passed ? diff : ot("not eligible"))));
+      }
+    }
+    dialog(`⚖ ${ot("Comparison of alternative solutions")}`,
+      el("p", { class: "muted small" }, ot("The project items are grouped by kind of calculation. Within each group the solutions are sorted by cost; ★ marks the cheapest one that passes all checks, and the last column shows how much more each other solution costs. Solutions that fail a check cannot be chosen. Costs come from the quantities and your unit prices (💶 in the project details).")),
+      el("table", { class: "tbl cmp" }, el("thead", {}, el("tr", {}, el("th", {}, ot("Solution")),
+        el("th", {}, ot("Result")), el("th", {}, "U"), el("th", {}, ot("Quantities")), el("th", {}, ot("Cost")),
+        el("th", {}, ot("Difference")))), el("tbody", {}, ...rows)),
+      el("details", { class: "small" }, el("summary", {}, ot("How do I add alternatives?")), help()),
+      el("div", { class: "btns" }, el("button", { type: "button", class: "primary", on: { click: (e) => e.target.closest("dialog").close() } }, ot("Close"))));
   },
 };
 window.ErismaCompare = { open: () => Opt.compare() };

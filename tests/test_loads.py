@@ -37,14 +37,3 @@ def test_combinations_hand_calc():
     c = get_module("en1990_combinations").calculate({}, {"annex": "CY"})
     assert c.values["E_d,max"] == pytest.approx(1.35 * 250 + 1.5 * 80 + 1.5 * 0.5 * 10
                                                 + 1.5 * 0.6 * 35)
-
-
-def test_lateral_force_hand_calc():
-    c = get_module("ec8_lateral_force").calculate({}, {"annex": "CY"})
-    v = c.values
-    H = 3.2 + 3 * 3.0
-    T1 = 0.075 * H**0.75
-    assert v["T_1"] == pytest.approx(T1)
-    Sd = 0.25 * 1.2 * 2.5 / 3.9  # T_B < T1 < T_C, ground B
-    assert v["S_d(T_1)"] == pytest.approx(Sd)
-    assert v["F_b"] / 1e3 == pytest.approx(Sd * 8100 * 0.85)

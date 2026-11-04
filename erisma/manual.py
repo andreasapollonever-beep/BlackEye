@@ -122,8 +122,10 @@ every report and are kept for all calculations.</li>
 <li><b>Input form</b> (middle): fields grouped in boxes. Above it the <b>status banner</b>:
 green when all checks pass, red with the failing checks and what to change.</li>
 <li><b>Report / 3D model</b> (right): the full calculation sheet and the interactive model.</li>
-<li><b>Above the form:</b> <b>+ Add to project</b> (see “Projects”), <b>🎯</b> automatic
-design (most economical solution) and <b>Reset to defaults</b>. In the status banner the
+<li><b>Above the form:</b> <b>+ Add to project</b> (see “Projects”), <b>⚖ Alternative</b>
+(see “Comparing alternative solutions”), <b>🎯 Most economical</b> (automatic design),
+<b>📖 How it works</b> (this manual at that calculation) and <b>↺ Reset</b> (back to the
+example values). In the status banner the
 <b>💶</b> cost estimate.</li>
 <li><b>Top bar:</b> Home, light/dark theme, language ΕΛ/EN, licence state, Manual, Open, Save,
 <b>DXF</b> (only for calculations with a drawing), Export HTML, Print / PDF.</li>
@@ -144,8 +146,10 @@ design (most economical solution) and <b>Reset to defaults</b>. In the status ba
 να αλλάξετε.</li>
 <li><b>Τεύχος / 3D μοντέλο</b> (δεξιά): το πλήρες τεύχος υπολογισμών και το διαδραστικό
 μοντέλο.</li>
-<li><b>Πάνω από τη φόρμα:</b> <b>+ Στο έργο</b> (βλ. «Έργα»), <b>🎯</b> αυτόματη
-διαστασιολόγηση (οικονομικότερη λύση) και <b>Επαναφορά προεπιλογών</b>. Στη μπάρα κατάστασης
+<li><b>Πάνω από τη φόρμα:</b> <b>+ Στο έργο</b> (βλ. «Έργα»), <b>⚖ Εναλλακτική λύση</b> (βλ.
+«Σύγκριση εναλλακτικών λύσεων»), <b>🎯 Οικονομικότερη λύση</b> (αυτόματη διαστασιολόγηση),
+<b>📖 Πώς υπολογίζεται</b> (αυτό το εγχειρίδιο στον συγκεκριμένο υπολογισμό) και
+<b>↺ Επαναφορά</b> (πίσω στις τιμές του παραδείγματος). Στη μπάρα κατάστασης
 η εκτίμηση κόστους <b>💶</b>.</li>
 <li><b>Πάνω μπάρα:</b> Αρχική, φωτεινό/σκούρο θέμα, γλώσσα ΕΛ/EN, κατάσταση άδειας,
 Εγχειρίδιο, Άνοιγμα, Αποθήκευση, <b>DXF</b> (μόνο σε υπολογισμούς με σχέδιο), Εξαγωγή HTML,
@@ -165,7 +169,7 @@ back; <kbd>↑</kbd>/<kbd>↓</kbd> change the value in small steps (with <kbd>S
 <li><b>Help:</b> the help text of a field appears while the field is selected, or click
 <b>ⓘ</b>.</li>
 <li><b>Changed fields</b> are marked with a dot; <b>↺</b> returns that field to the example
-value. Each group shows how many of its fields you changed. “Reset to defaults” restores the
+value. Each group shows how many of its fields you changed. “↺ Reset” restores the
 whole example.</li>
 <li><b>Groups</b> can be collapsed by clicking their title — Erisma remembers it.</li>
 <li><b>Conditional fields</b> appear only when needed (e.g. jacket data only when “RC jacket”
@@ -189,7 +193,7 @@ and the field concerned is highlighted.</li>
 <li><b>Βοήθεια:</b> το κείμενο βοήθειας ενός πεδίου εμφανίζεται όσο το πεδίο είναι
 επιλεγμένο, ή με κλικ στο <b>ⓘ</b>.</li>
 <li><b>Αλλαγμένα πεδία</b> σημειώνονται με τελεία· το <b>↺</b> επαναφέρει το πεδίο στην τιμή
-του παραδείγματος. Κάθε ομάδα δείχνει πόσα πεδία της αλλάξατε. Το «Επαναφορά προεπιλογών»
+του παραδείγματος. Κάθε ομάδα δείχνει πόσα πεδία της αλλάξατε. Η «↺ Επαναφορά»
 επαναφέρει όλο το παράδειγμα.</li>
 <li><b>Ομάδες:</b> συμπτύσσονται με κλικ στον τίτλο τους — το Erisma το θυμάται.</li>
 <li><b>Πεδία υπό συνθήκη:</b> εμφανίζονται μόνο όταν χρειάζονται (π.χ. τα στοιχεία μανδύα μόνο
@@ -449,12 +453,12 @@ of each name is <span class="ok">green</span> when all checks pass, <span class=
 when a check fails and grey before the first run; hover over it to see the maximum utilisation
 U. 🔗<i>n</i> shows how many inputs are linked. Next to each item: <b>↑</b> moves it up (this is
 also the order in the project report), <b>✎</b> renames, <b>×</b> removes it (links that used it
-are removed too). The header buttons are <b>📄</b> project report, <b>⚖</b> comparison and
-<b>✚</b> new, empty project.</p>
+are removed too). The buttons under the title are <b>📄 Report</b> (project report),
+<b>⚖ Compare</b> and <b>✚ New</b> (new, empty project).</p>
 <p>The project is autosaved in the browser. <b>Save</b> (<kbd>Ctrl</kbd>+<kbd>S</kbd>) then
 writes <i>one</i> <code>.erisma</code> file with all items, their inputs, links and the project
 details (file name from the job no. or project name); <b>Open</b> restores the whole project.
-<b>Reset to defaults</b> on a project item also removes its links.</p>""",
+<b>↺ Reset</b> on a project item also removes its links.</p>""",
         "el": """
 <p>Ένα <b>έργο</b> συγκεντρώνει όλους τους υπολογισμούς μιας μελέτης (π.χ. υποστύλωμα Κ1, πέδιλο
 Π1, τοίχος Τ1) ώστε να αποθηκεύονται, να συνδέονται, να κοστολογούνται και να τυπώνονται
@@ -472,12 +476,12 @@ details (file name from the job no. or project name); <b>Open</b> restores the w
 με το ποντίκι πάνω της φαίνεται η μέγιστη αξιοποίηση U. Το 🔗<i>n</i> δείχνει πόσα δεδομένα
 είναι συνδεδεμένα. Δίπλα σε κάθε στοιχείο: <b>↑</b> μετακίνηση πάνω (αυτή είναι και η σειρά στο
 τεύχος έργου), <b>✎</b> μετονομασία, <b>×</b> αφαίρεση (αφαιρούνται και οι συνδέσεις που το
-χρησιμοποιούσαν). Τα κουμπιά της κεφαλίδας: <b>📄</b> τεύχος έργου, <b>⚖</b> σύγκριση και
-<b>✚</b> νέο, κενό έργο.</p>
+χρησιμοποιούσαν). Τα κουμπιά κάτω από τον τίτλο: <b>📄 Τεύχος</b> (τεύχος έργου),
+<b>⚖ Σύγκριση</b> και <b>✚ Νέο</b> (νέο, κενό έργο).</p>
 <p>Το έργο αποθηκεύεται αυτόματα στον browser. Η <b>Αποθήκευση</b> (<kbd>Ctrl</kbd>+<kbd>S</kbd>)
 γράφει <i>ένα</i> αρχείο <code>.erisma</code> με όλα τα στοιχεία, τα δεδομένα τους, τις
 συνδέσεις και τα στοιχεία έργου (όνομα αρχείου από τον αρ. έργου ή το όνομα του έργου)· το
-<b>Άνοιγμα</b> επαναφέρει ολόκληρο το έργο. Η <b>Επαναφορά προεπιλογών</b> σε στοιχείο έργου
+<b>Άνοιγμα</b> επαναφέρει ολόκληρο το έργο. Η <b>↺ Επαναφορά</b> σε στοιχείο έργου
 καταργεί και τις συνδέσεις του.</p>"""}),
     ("chain", {"en": "Linking calculations (calculation chain)", "el": "Σύνδεση υπολογισμών (αλυσίδα)"}, {
         "en": """
@@ -598,7 +602,7 @@ a bill of quantities (no laps, wastage, site overheads or VAT).</p>""",
 είναι προμέτρηση (δεν περιλαμβάνει υπερκαλύψεις, φύρα, γενικά έξοδα ή ΦΠΑ).</p>"""}),
     ("optimise", {"en": "Automatic design — most economical solution", "el": "Αυτόματη διαστασιολόγηση — οικονομικότερη λύση"}, {
         "en": """
-<p><b>🎯</b> (above the form) searches for the <b>cheapest design that passes every check</b>.
+<p><b>🎯 Most economical</b> (above the form) searches for the <b>cheapest design that passes every check</b>.
 It is available for the calculations listed with “Automatic design” in the calculation
 reference, together with the variables it may change.</p>
 <ol>
@@ -621,7 +625,7 @@ it is worth starting from a sensible design. A search stops after 40 s and retur
 found. If nothing passes in the ranges: “No passing design found — widen the ranges”. The
 optimum is an ordinary design: check it and round it to practical dimensions if necessary.</p>""",
         "el": """
-<p>Το <b>🎯</b> (πάνω από τη φόρμα) αναζητά τη <b>φθηνότερη λύση που επαρκεί σε όλους τους
+<p>Το <b>🎯 Οικονομικότερη λύση</b> (πάνω από τη φόρμα) αναζητά τη <b>φθηνότερη λύση που επαρκεί σε όλους τους
 ελέγχους</b>. Υπάρχει στους υπολογισμούς που στον «Οδηγό υπολογισμών» έχουν «Αυτόματη
 διαστασιολόγηση», μαζί με τις μεταβλητές που μπορεί να αλλάξει.</p>
 <ol>
@@ -647,21 +651,52 @@ optimum is an ordinary design: check it and round it to practical dimensions if 
 σταματά μετά από 40 s και δίνει την καλύτερη που βρήκε. Αν καμία δεν επαρκεί στα εύρη:
 «Δεν βρέθηκε λύση που επαρκεί — διευρύνετε τα όρια». Η βέλτιστη λύση είναι κανονική λύση:
 ελέγξτε τη και στρογγυλέψτε τη σε πρακτικές διαστάσεις αν χρειάζεται.</p>"""}),
-    ("compare", {"en": "Comparing alternatives", "el": "Σύγκριση εναλλακτικών λύσεων"}, {
+    ("compare", {"en": "Comparing alternative solutions", "el": "Σύγκριση εναλλακτικών λύσεων"}, {
         "en": """
-<p><b>⚖</b> in the project header shows all project items in one table: element, calculation,
-result (PASS / FAIL), maximum utilisation U, quantities and cost, with the project total Σ.
-To compare alternatives add the same element several times with different designs — e.g.
-“Wall – cantilever RC”, “Wall – gravity”, “Wall – gabions”, or two footing sizes. Among
-items of the <b>same calculation type</b> the cheapest one that passes is marked
-<b>★</b>.</p>""",
+<p>Erisma compares different solutions for the same element — e.g. footing 2,0 × 2,0 m against
+2,4 × 2,4 m, or a cantilever RC wall against a gravity wall — by checks and by cost.</p>
+<ol>
+<li>Open the calculation and enter the first solution.</li>
+<li>Press <b>⚖ Alternative</b> above the form. The current solution is kept in the project
+(“… – Solution A”) and a copy opens with the name you give (default “… – Solution B”).</li>
+<li>Change the copy — other dimensions, other reinforcement, or open another calculation (e.g.
+a gravity wall) and add it with <b>+ Add to project</b>. Press ⚖ Alternative again for more
+solutions; a note above the form confirms each one.</li>
+<li>Press <b>⚖ Compare</b> in the project list on the left.</li>
+</ol>
+<p>The table groups the project items by kind of calculation. In each group the solutions are
+sorted by cost and show result (PASS / FAIL), maximum utilisation U, quantities, cost and the
+<b>difference</b> from the cheapest solution that passes (e.g. “+230 € (+38%)”). The cheapest
+solution that passes all checks is marked <b>★</b>; solutions that fail a check are greyed out
+and marked “not eligible”. Costs come from the quantities and the unit prices
+(💶 in the project details), so set your own prices for a meaningful comparison. With fewer
+than two solutions in the project ⚖ Compare shows these steps instead of a table.</p>
+<p>To compare <i>wall types</i>, give the items clear names (“Wall W1 – cantilever”, “Wall W1 –
+gravity”): different calculation types are listed in separate groups, so read the costs of the
+groups side by side.</p>""",
         "el": """
-<p>Το <b>⚖</b> στην κεφαλίδα του έργου δείχνει όλα τα στοιχεία του έργου σε έναν πίνακα:
-στοιχείο, υπολογισμός, αποτέλεσμα (ΕΠΑΡΚΕΙ / ΑΝΕΠΑΡΚΕΙ), μέγιστη αξιοποίηση U, ποσότητες και
-κόστος, με το σύνολο του έργου Σ. Για σύγκριση εναλλακτικών προσθέστε το ίδιο στοιχείο
-πολλές φορές με διαφορετικές λύσεις — π.χ. «Τοίχος – πρόβολος ΟΣ», «Τοίχος – βαρύτητας»,
-«Τοίχος – συρματοκιβώτια», ή δύο μεγέθη πεδίλου. Μεταξύ στοιχείων του <b>ίδιου τύπου
-υπολογισμού</b> η φθηνότερη λύση που επαρκεί σημειώνεται με <b>★</b>.</p>"""}),
+<p>Το Erisma συγκρίνει διαφορετικές λύσεις για το ίδιο στοιχείο — π.χ. πέδιλο 2,0 × 2,0 m με
+2,4 × 2,4 m, ή τοίχο ΟΣ προβόλου με τοίχο βαρύτητας — ως προς τους ελέγχους και το κόστος.</p>
+<ol>
+<li>Ανοίξτε τον υπολογισμό και δώστε την πρώτη λύση.</li>
+<li>Πατήστε <b>⚖ Εναλλακτική λύση</b> πάνω από τη φόρμα. Η τρέχουσα λύση κρατιέται στο έργο
+(«… – Λύση Α») και ανοίγει αντίγραφο με το όνομα που δίνετε (προεπιλογή «… – Λύση Β»).</li>
+<li>Αλλάξτε το αντίγραφο — άλλες διαστάσεις, άλλος οπλισμός — ή ανοίξτε άλλο υπολογισμό (π.χ.
+τοίχο βαρύτητας) και προσθέστε τον με <b>+ Στο έργο</b>. Πατήστε ξανά ⚖ Εναλλακτική λύση για
+περισσότερες λύσεις· ένα μήνυμα πάνω από τη φόρμα επιβεβαιώνει την καθεμία.</li>
+<li>Πατήστε <b>⚖ Σύγκριση</b> στη λίστα του έργου αριστερά.</li>
+</ol>
+<p>Ο πίνακας ομαδοποιεί τα στοιχεία του έργου ανά είδος υπολογισμού. Σε κάθε ομάδα οι λύσεις
+ταξινομούνται κατά κόστος και δείχνουν αποτέλεσμα (ΕΠΑΡΚΕΙ / ΑΝΕΠΑΡΚΕΙ), μέγιστη αξιοποίηση U,
+ποσότητες, κόστος και τη <b>διαφορά</b> από τη φθηνότερη λύση που επαρκεί (π.χ. «+230 €
+(+38%)»). Η φθηνότερη λύση που επαρκεί σε όλους τους ελέγχους σημειώνεται με <b>★</b>· οι λύσεις
+που δεν επαρκούν εμφανίζονται αχνές με την ένδειξη «δεν επαρκεί». Το κόστος προκύπτει από τις
+ποσότητες και τις τιμές μονάδας (💶 στα στοιχεία έργου), οπότε βάλτε τις δικές σας τιμές για
+ουσιαστική σύγκριση. Με λιγότερες από δύο λύσεις στο έργο, η ⚖ Σύγκριση δείχνει αυτά τα βήματα
+αντί για πίνακα.</p>
+<p>Για σύγκριση <i>ειδών τοίχου</i>, δώστε σαφή ονόματα («Τοίχος Τ1 – πρόβολος», «Τοίχος Τ1 –
+βαρύτητας»): διαφορετικά είδη υπολογισμού εμφανίζονται σε χωριστές ομάδες, οπότε συγκρίνετε τα
+κόστη των ομάδων μεταξύ τους.</p>"""}),
     ("dxf", {"en": "DXF drawings for CAD", "el": "Σχέδια DXF για CAD"}, {
         "en": """
 <p>For the calculations marked “DXF drawing” in the calculation reference the <b>DXF</b> button
@@ -897,11 +932,6 @@ NOTES: dict[str, dict[str, list[str]]] = {
                "Πλάκες ανά φάτνωμα (EC2, διέρειστες), βέλος δοκών με λόγο ανοίγματος/ύψους "
                "(EC2 7.4.2) και θεμελίωση: πεδιλοδοκοί σε ελατήρια Winkler (EC2 + φέρουσα "
                "ικανότητα EC7, υπεραντοχή EN 1998-1 4.4.2.6) ή μεμονωμένα πέδιλα (EC7)."]},
-    "ec8_lateral_force": {
-        "en": ["Type 1 design spectrum, T1 = C_t H^¾, λ = 0.85 when applicable, storey forces "
-               "with a linear mode shape (Eq. 4.11)."],
-        "el": ["Φάσμα σχεδιασμού Τύπου 1, T1 = C_t H^¾, λ = 0.85 όπου ισχύει, δυνάμεις ορόφων με "
-               "γραμμική ιδιομορφή (Εξ. 4.11)."]},
     "en1990_combinations": {
         "en": ["All ULS (6.10), seismic (6.12b) and SLS combinations with ψ of the annex; each "
                "variable action in turn as leading action."],

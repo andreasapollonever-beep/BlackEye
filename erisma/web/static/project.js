@@ -23,6 +23,12 @@ const PUI = {
     "The project is empty — open a calculation and press “+ Add to project”.":
       "Το έργο είναι κενό — ανοίξτε έναν υπολογισμό και πατήστε «+ Στο έργο».",
     "Circular links": "Κυκλικές συνδέσεις", "Compare": "Σύγκριση",
+    "📄 Report": "📄 Τεύχος", "⚖ Compare": "⚖ Σύγκριση", "✚ New": "✚ Νέο",
+    "⚖ Alternative": "⚖ Εναλλακτική λύση",
+    "Keep this design and make a copy to try another solution; then compare them": "Κρατά αυτή τη λύση και φτιάχνει αντίγραφο για να δοκιμάσετε άλλη· μετά τις συγκρίνετε",
+    "Name of the alternative": "Όνομα εναλλακτικής λύσης", "Solution": "Λύση",
+    "Alternative “{n}” created — change its values, then press ⚖ Compare in the project list on the left.":
+      "Δημιουργήθηκε η εναλλακτική «{n}» — αλλάξτε τις τιμές της και πατήστε ⚖ Σύγκριση στη λίστα του έργου αριστερά.",
   },
 };
 const pt = (k) => (LANG !== "en" && PUI[LANG]?.[k]) || t(k);
@@ -38,13 +44,42 @@ const Proj = {
   doc() { return { format: "erisma", version: 2, project: state.project, calcs: this.ws.calcs }; },
 
   add() {
-    const name = prompt(pt("Name of this element (e.g. Footing F1)"),
+    let name = prompt(pt("Name of this element (e.g. Footing F1)"),
       `${state.schema.title} ${this.ws.calcs.filter((c) => c.module === state.schema.id).length + 1}`);
     if (name === null) return;
+    name = name.trim() || `${state.schema.title} ${this.ws.calcs.filter((c) => c.module === state.schema.id).length + 1}`;
     const uid = `c${Date.now().toString(36)}`;
     this.ws.calcs.push({ uid, module: state.schema.id, name, inputs: structuredClone(state.inputs), links: {} });
     this.save();
     location.hash = `p/${uid}`;
+  },
+  // keep the current design and open a copy of it as a new alternative
+  alternative() {
+    const letters = LANG === "el" ? "ΑΒΓΔΕΖΗΘ" : "ABCDEFGH";
+    const sameType = () => this.ws.calcs.filter((c) => c.module === state.schema.id).length;
+    let cur = this.current();
+    if (!cur) {
+      cur = { uid: `c${Date.now().toString(36)}`, module: state.schema.id,
+        name: `${state.schema.title} – ${pt("Solution")} ${letters[sameType()] || sameType() + 1}`,
+        inputs: structuredClone(state.inputs), links: {} };
+      this.ws.calcs.push(cur);
+    }
+    const def = `${state.schema.title} – ${pt("Solution")} ${letters[sameType()] || sameType() + 1}`;
+    let name = prompt(pt("Name of the alternative"), def);
+    if (name === null) { this.save(); renderNav(); return; }
+    name = name.trim() || def;
+    const uid = `c${(Date.now() + 1).toString(36)}`;
+    const i = this.ws.calcs.indexOf(cur);
+    this.ws.calcs.splice(i + 1, 0, { uid, module: cur.module, name, inputs: structuredClone(state.inputs),
+      links: structuredClone(cur.links || {}) });
+    this.save();
+    location.hash = `p/${uid}`;
+    const note = $("#restored");
+    if (note) {
+      note.textContent = pt("Alternative “{n}” created — change its values, then press ⚖ Compare in the project list on the left.").replace("{n}", name);
+      note.hidden = false;
+      setTimeout(() => { note.hidden = true; }, 12000);
+    }
   },
   remove(uid) {
     if (!confirm(pt("Remove this calculation from the project?"))) return;
@@ -71,12 +106,12 @@ const Proj = {
   // -------------------------------------------------------------- sidebar
   navSection() {
     const sec = el("div", { class: "sec proj" });
-    const head = el("div", { class: "proj-h" }, el("span", {}, `📁 ${pt("Project")}`),
-      el("span", { class: "proj-btns" },
-        el("button", { type: "button", class: "mini", title: pt("Project report"), on: { click: () => this.report() } }, "📄"),
-        el("button", { type: "button", class: "mini", title: pt("Compare"), on: { click: () => this.compare() } }, "⚖"),
-        el("button", { type: "button", class: "mini", title: pt("New project"), on: { click: () => this.newProject() } }, "✚")));
-    sec.append(head);
+    const head = el("div", { class: "proj-h" }, el("span", {}, `📁 ${pt("Project")}`));
+    const btns = el("div", { class: "proj-btns" },
+      el("button", { type: "button", class: "mini", title: pt("Project report"), on: { click: () => this.report() } }, pt("📄 Report")),
+      el("button", { type: "button", class: "mini", title: pt("Compare"), on: { click: () => this.compare() } }, pt("⚖ Compare")),
+      el("button", { type: "button", class: "mini", title: pt("New project"), on: { click: () => this.newProject() } }, pt("✚ New")));
+    sec.append(head, btns);
     if (!this.ws.calcs.length) sec.append(el("p", { class: "muted pad small" }, pt("The project is empty — open a calculation and press “+ Add to project”.")));
     for (const c of this.ws.calcs) {
       const m = state.modules.find((x) => x.id === c.module);
@@ -102,9 +137,10 @@ const Proj = {
     if (!box) return;
     box.innerHTML = "";
     if (!state.schema) return;
-    if (state.uid) return;
-    box.append(el("button", { type: "button", class: "ghost", title: pt("Add this calculation to the project"),
+    if (!state.uid) box.append(el("button", { type: "button", class: "ghost", title: pt("Add this calculation to the project"),
       on: { click: () => this.add() } }, pt("+ Add to project")));
+    box.append(el("button", { type: "button", class: "ghost", title: pt("Keep this design and make a copy to try another solution; then compare them"),
+      on: { click: () => this.alternative() } }, pt("⚖ Alternative")));
   },
 
   // ---------------------------------------------------------------- runs
