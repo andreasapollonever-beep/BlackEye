@@ -895,6 +895,28 @@ NOTES: dict[str, dict[str, list[str]]] = {
                "Supports pinned or fixed at any position; loads downward positive."],
         "el": ["Γραμμική ελαστική μέθοδος δυσκαμψίας (πεπερασμένα στοιχεία), δοκός Euler–Bernoulli.",
                "Στηρίξεις αρθρωτές ή πακτώσεις σε οποιαδήποτε θέση· φορτία θετικά προς τα κάτω."]},
+    "ec2_beam_opening": {
+        "en": ["EN 1992-1-1 has no clause for web openings: the opening is a Vierendeel panel. "
+               "Chord forces N = M/z with z between the plastic centroids of the chords "
+               "(compression: concrete + steel, tension: steel), shear shared in proportion to "
+               "the chord areas (or the full shear to each chord), secondary moments V_c l_0/2; "
+               "a circular sleeve is taken as a square D × D.",
+               "Chords: bending with axial force by strain compatibility for both signs (6.1), "
+               "shear with σ_cp (Eq. 6.2) or links (6.2.3, cot θ = 1), ρ_w,min (9.2.2); edge "
+               "links hang the full V_Ed at each edge (tie, 6.5.4); bars over/under the opening "
+               "anchored l_bd beyond each edge (8.4, η_1 = 0.7 over the opening); clear distance "
+               "between layers (8.2); the full section is also checked (6.1)."],
+        "el": ["Ο EN 1992-1-1 δεν έχει άρθρο για ανοίγματα σε κορμό: το άνοιγμα εξετάζεται ως "
+               "φάτνωμα Vierendeel. Δυνάμεις πελμάτων N = M/z με z μεταξύ των πλαστικών κέντρων "
+               "των πελμάτων (θλίψη: σκυρόδεμα + χάλυβας, εφελκυσμός: χάλυβας), τέμνουσα κατά "
+               "την αναλογία των εμβαδών (ή όλη σε κάθε πέλμα), δευτερεύουσες ροπές V_c l_0/2· "
+               "κυκλικό φουρέλι λαμβάνεται ως τετράγωνο D × D.",
+               "Πέλματα: κάμψη με αξονική με συμβιβαστό παραμορφώσεων και για τα δύο πρόσημα "
+               "(6.1), τέμνουσα με σ_cp (Εξ. 6.2) ή συνδετήρες (6.2.3, cot θ = 1), ρ_w,min "
+               "(9.2.2)· συνδετήρες άκρων αναλαμβάνουν όλη την V_Ed σε κάθε πλευρά (ελκυστήρας, "
+               "6.5.4)· ράβδοι πάνω/κάτω από το άνοιγμα με αγκύρωση l_bd πέρα από κάθε άκρο (8.4, "
+               "η_1 = 0,7 πάνω από το άνοιγμα)· ελεύθερη απόσταση στρώσεων (8.2)· ελέγχεται και η "
+               "πλήρης διατομή (6.1)."]},
     "ec2_rc_beam": {
         "en": ["Rectangular stress block (λ = 0.8, η = 1.0), ε_cu3 = 3.5 ‰, x/d ≤ 0.45 for ductility.",
                "Shear with variable strut inclination 1 ≤ cot θ ≤ 2.5 (6.2.3)."],

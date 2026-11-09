@@ -20,6 +20,7 @@ from . import (  # noqa: F401
     ec7_embedded_wall,
     ec7_gabion_wall,
     ec2_rc_beam,
+    ec2_beam_opening,
     ec3_steel_beam,
     ec3_bolted_connection,
     ec3_base_plate,
