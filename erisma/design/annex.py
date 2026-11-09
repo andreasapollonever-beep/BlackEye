@@ -137,6 +137,12 @@ class Annex:
     imposed_A0: float = 10.0  # Eq. 6.1, A0 [m²]
     imposed_alphaA_min_CD: float = 0.6  # Eq. 6.1, categories C and D
     imposed_na: bool = False  # True once a National Annex to EN 1991-1-1 has been entered
+    # EN 1992-1-1 7.3.1(5) Table 7.1N — w_max [mm], reinforced members, quasi-permanent
+    # combination; 7.3.4(3) k3, k4 (recommended values = Table 7.1(CYS), NA 2.41, NA 2.43).
+    crack_wmax: dict = field(default_factory=lambda: {
+        "X0, XC1": 0.4, "XC2, XC3, XC4": 0.3, "XD1, XD2, XS1, XS2, XS3": 0.3})
+    crack_k3: float = 3.4
+    crack_k4: float = 0.425
     notes: tuple = ()
 
     def approach(self, choice: str) -> str:
@@ -163,6 +169,8 @@ EN = Annex("EN", "EN recommended values", "EN 1990/1992/1997/1998 recommended va
 #   NA to CYS EN 1992-1-1 NA 2.5 γc 1.5, γs 1.15; NA 2.8 αcc 1.0; NA 2.72 αcc,pl 0.8;
 #                        NA 2.34(3) v_Rd,max = 0.5 ν f_cd.
 #   NA to CYS EN 1990    Table A1.2(B): Eq. 6.10, γG 1.35/1.00, γQ 1.50.
+#   NA to CYS EN 1992-1-1 NA 2.41 Table 7.1(CYS): w_max 0.4 (X0, XC1), 0.3 (XC2–XC4, XD, XS);
+#                        NA 2.43 k3 = 3.4, k4 = 0.425; NA 2.45 k1 = 1, k2 = 5 mm (= EN).
 CY = Annex(
     "CY", "Cyprus (CYS National Annexes)",
     "NA to CYS EN 1990:2002, EN 1992-1-1:2004, EN 1997-1:2004, EN 1998-1:2004, "

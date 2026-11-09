@@ -109,3 +109,77 @@ def test_reserve_on_the_opening():
     from erisma import reserve as R
     r = R.reserve("ec2_beam_opening", {}, CY, ["G", "Q"])
     assert r["verify"]["at"]["umax"] <= 1 + 1e-9 < (r["verify"]["beyond"]["umax"] or 2)
+
+
+def test_seismic_critical_region():
+    # EN 1998-1: l_cr = h_w (DCM, 5.4.3.1.2), 1.5 h_w (DCH, 5.5.3.1.3)
+    c = M.calculate({"x": 0.7}, CY)                       # left edge at 625 mm ≥ 600
+    assert out(c, "l_cr") == 600 and c.passed
+    c = M.calculate({"x": 0.7, "duct": "DCH (l_cr = 1.5 h_w)"}, CY)
+    assert out(c, "l_cr") == 900 and not c.passed
+    c = M.calculate({"x": 0.7, "seismic": False}, CY)
+    assert "l_cr" not in c.outputs
+    c = M.calculate({"mode": "Given M_Ed and V_Ed at the opening", "x": 5.5, "Lc": 6.0}, CY)
+    assert not c.passed                                   # 425 mm from the right column face
+
+
+def test_envelope_governing_case_is_the_worst_row():
+    rows = [{"name": "A", "M": 150.0, "V": 100.0}, {"name": "B", "M": 120.0, "V": 140.0},
+            {"name": "C", "M": -30.0, "V": -40.0}]
+    c = M.calculate({"mode": "Envelope of actions (several combinations)", "cases": rows,
+                     "sls": False}, CY)
+    worst = 0.0
+    for r in rows:
+        ci = M.calculate({"mode": "Given M_Ed and V_Ed at the opening", "MEd": r["M"],
+                          "VEd": r["V"], "sls": False}, CY)
+        worst = max(worst, max(k.utilisation for k in ci.checks))
+    assert max(k.utilisation for k in c.checks) == pytest.approx(worst)
+    with pytest.raises(InputError):
+        M.calculate({"mode": "Envelope of actions (several combinations)", "cases": []}, CY)
+
+
+def test_several_openings():
+    c = M.calculate({"n_open": 2, "s_open": 900, "x": 2.0, "sls": False}, CY)   # clear 750 ≥ d
+    table = next(it for it in c.items if it.kind == "table" and "U_max" in it.data["headers"])
+    assert len(table.data["rows"]) == 2 and out(c, "l_0") == 150
+    c = M.calculate({"n_open": 2, "s_open": 400, "x": 2.0, "sls": False}, CY)   # clear 250 < d
+    assert out(c, "l_0") == 550                           # one opening (n − 1)s + l0
+
+
+def test_crack_width_hand_calculation():
+    c = M.calculate({}, CY)
+    fck, b, h = 25, 300, 600
+    Ecm = 22000 * ((fck + 8) / 10) ** 0.3
+    ae = 200000 * 3 / Ecm                                 # φ = 2
+    ht = hb = 225
+    lay = [(2 * A12, 44), (2 * A12, 225 - 44), (2 * A12, 375 + 44), (4 * A20, 600 - 48)]
+
+    def fm(x):
+        y = min(x, ht)
+        return b * y * (x - y / 2) + sum(((ae - 1) if d < x else ae) * a * (x - d)
+                                         for a, d in lay)
+    lo, hi = 1, 375
+    for _ in range(200):
+        mid = (lo + hi) / 2
+        lo, hi = (mid, hi) if fm(mid) < 0 else (lo, mid)
+    x = lo
+    assert out(c, "x") == pytest.approx(x, rel=1e-6)
+    y = min(x, ht)
+    Icr = b * y ** 3 / 12 + b * y * (x - y / 2) ** 2 + sum(
+        ((ae - 1) if d < x else ae) * a * (d - x) ** 2 for a, d in lay)
+    wq = 25 + 0.3 * 15
+    Mq = wq * 1.575 * (6 - 1.575) / 2 * 1e6
+    Vq = wq * (3 - 1.425) * 1e3
+    Mc = Vq / 2 * 75
+    s_bot = ae * Mq * (552 - x) / Icr + Mc / (552 - 419) / (4 * A20)
+    s_und = ae * Mq * (419 - x) / Icr + Mc / (552 - 419) / (2 * A12)
+    assert out(c, "σ_s") == pytest.approx(max(s_bot, s_und), rel=1e-6)
+    sig, sig2 = (s_bot, s_und) if s_bot > s_und else (s_und, s_bot)
+    k2 = (sig + sig2) / (2 * sig)
+    hef = min(2.5 * 48, 112.5)
+    rho = 4 * A20 / (b * hef)
+    fctm = 0.30 * fck ** (2 / 3)
+    de = max((sig - 0.4 * fctm / rho * (1 + 200000 / Ecm * rho)) / 2e5, 0.6 * sig / 2e5)
+    sr = 3.4 * 38 + 0.8 * k2 * 0.425 * 20 / rho
+    assert s_bot > s_und and out(c, "w_k") == pytest.approx(sr * de, rel=1e-6)
+    assert out(c, "w_max") == 0.3                          # XC2–XC4, Table 7.1(CYS)

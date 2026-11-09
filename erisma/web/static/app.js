@@ -440,7 +440,12 @@ function renderForm() {
     legend.addEventListener("click", toggle);
     legend.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
     for (const f of fields) {
-      if (f.kind === "table") { fs.append(tableEditor(f)); continue; }
+      if (f.kind === "table") {
+        const w = tableEditor(f);
+        if (f.show_if) w.dataset.showIf = f.show_if;
+        fs.append(w);
+        continue;
+      }
       if (!(f.name in state.inputs)) state.inputs[f.name] = f.default;
       const id = `f-${f.name}`;
       let row;
@@ -479,9 +484,11 @@ function renderForm() {
 // Fields with show_if appear only when their switch is on (keeps the form short).
 function updateVisibility() {
   document.querySelectorAll("#inputs [data-show-if]").forEach((row) => {
-    const cond = row.dataset.showIf;  // "switch" or "field=value"
-    const [k, v] = cond.split("=");
-    const on = v === undefined ? !!state.inputs[k] : String(state.inputs[k]) === v;
+    const cond = row.dataset.showIf;  // "switch", "field=value" or "field!=value"
+    const neg = cond.includes("!=");
+    const [k, v] = cond.split(neg ? "!=" : "=");
+    const on = v === undefined ? !!state.inputs[k]
+      : neg ? String(state.inputs[k]) !== v : String(state.inputs[k]) === v;
     row.hidden = !on;
     row.classList.toggle("sub", on);
   });

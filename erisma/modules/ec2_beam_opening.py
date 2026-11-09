@@ -25,7 +25,10 @@ CONCRETE = ["C20/25", "C25/30", "C30/37", "C35/45", "C40/50", "C45/55", "C50/60"
 BARS = ["8", "10", "12", "14", "16", "20", "25"]
 LINKS = ["6", "8", "10", "12"]
 SHAPES = ["Circular sleeve (diameter D)", "Rectangular opening (a × h0)"]
-MODES = ["Simply supported beam with uniform load", "Given M_Ed and V_Ed at the opening"]
+MODES = ["Simply supported beam with uniform load", "Given M_Ed and V_Ed at the opening",
+         "Envelope of actions (several combinations)"]
+DUCTILITY = ["DCM (l_cr = h_w)", "DCH (l_cr = 1.5 h_w)"]
+EXPOSURE = ["X0, XC1", "XC2, XC3, XC4", "XD1, XD2, XS1, XS2, XS3"]
 SHARE = ["In proportion to the chord areas", "Each chord takes the full shear (conservative)"]
 
 
@@ -74,8 +77,22 @@ class BeamOpeningEC2(DesignModule):
         Field("MEd", "Design moment at the opening centre M_Ed", "kNm", 150.0,
               group="Actions", show_if="mode=Given M_Ed and V_Ed at the opening",
               help="Sagging positive. The moment at the two edges is M_Ed ± V_Ed·l0/2."),
-        Field("VEd", "Design shear at the opening centre V_Ed", "kN", 100.0, min=0,
-              group="Actions", show_if="mode=Given M_Ed and V_Ed at the opening"),
+        Field("VEd", "Design shear at the opening centre V_Ed", "kN", 100.0,
+              group="Actions", show_if="mode=Given M_Ed and V_Ed at the opening",
+              help="With its sign (dM/dx): the edges get M_Ed ± V_Ed·l0/2."),
+        Field("cases", "Combinations at the opening centre", kind="table", group="Actions",
+              show_if="mode=Envelope of actions (several combinations)",
+              default=[{"name": "ULS 6.10", "M": 150.0, "V": 100.0},
+                       {"name": "Seismic +E", "M": 120.0, "V": 140.0},
+                       {"name": "Seismic −E", "M": -30.0, "V": -40.0}],
+              columns=[Field("name", "Combination", kind="text", default="Combination"),
+                       Field("M", "M_Ed (sagging +)", "kNm", 0.0),
+                       Field("V", "V_Ed", "kN", 0.0)],
+              help="Paste the M and V of every combination at the opening from the frame "
+                   "analysis; the edges get M ± V·l0/2. Every row is checked."),
+        Field("Lc", "Clear span between column faces (given actions)", "m", 6.0, min=1, max=30,
+              group="Actions", show_if="mode!=Simply supported beam with uniform load", help="Used with given actions or an envelope for the distance of "
+                                    "the opening from the far column face (EN 1998-1 l_cr)."),
         Field("b", "Width b", "mm", 300.0, min=150, group="Beam"),
         Field("h", "Overall depth h", "mm", 600.0, min=300, group="Beam"),
         Field("cnom", "Nominal cover to links", "mm", 30.0, min=15, group="Beam"),
@@ -106,7 +123,12 @@ class BeamOpeningEC2(DesignModule):
         Field("h0", "Opening height h0", "mm", 150.0, min=20, group="Opening",
               show_if="shape=Rectangular opening (a × h0)"),
         Field("x", "Position of the opening centre from the support", "m", 1.5, min=0,
-              group="Opening"),
+              group="Opening", help="Measured from the face of the left support / column."),
+        Field("n_open", "Number of openings in a row", "", 1, kind="int", min=1, max=6,
+              group="Opening", help="Identical openings at the same height."),
+        Field("s_open", "Centre-to-centre spacing of the openings", "mm", 600.0, min=50,
+              group="Opening", help="Openings closer than d (clear) are checked as one opening "
+                                    "spanning the whole group."),
         Field("e", "Height of the opening centre above mid-depth", "mm", 0.0, group="Opening",
               help="0 = opening at mid-depth; positive upwards."),
         Field("share", "Shear between the chords", kind="choice", choices=SHARE,
@@ -133,18 +155,159 @@ class BeamOpeningEC2(DesignModule):
               group="Reinforcement at the opening"),
         Field("legs", "Legs per edge link", "", 2, kind="int", min=2, max=6,
               group="Reinforcement at the opening"),
+        Field("seismic", "Primary seismic beam (EN 1998-1)", kind="bool", default=True,
+              group="Seismic", help="Openings are not allowed in the critical regions next to "
+                                    "the columns (5.4.3.1.2, 5.5.3.1.3)."),
+        Field("duct", "Ductility class", kind="choice", choices=DUCTILITY, default=DUCTILITY[0],
+              group="Seismic", show_if="seismic"),
+        Field("sls", "Check crack width at the opening (SLS)", kind="bool", default=True,
+              group="Serviceability"),
+        Field("exposure", "Exposure class", kind="choice", choices=EXPOSURE,
+              default="XC2, XC3, XC4", group="Serviceability", show_if="sls",
+              help="w_max of EN 1992-1-1 Table 7.1N / National Annex."),
+        Field("psi2", "ψ2 of the variable load", "", 0.3, min=0, max=1, group="Serviceability",
+              show_if="mode=Simply supported beam with uniform load", help="Used with the simply supported beam: p_qp = g_k + ψ2 q_k "
+                                  "(EN 1990 Table A1.1, category A: 0.3)."),
+        Field("creep", "Creep coefficient φ(∞, t0)", "", 2.0, min=0, max=5,
+              group="Serviceability", show_if="sls",
+              help="Long-term E_c,eff = E_cm/(1 + φ) (Eq. 7.20) for the steel stress; ≈ 2 for "
+                   "indoor members loaded at 28 days (Figure 3.1)."),
+        Field("Mqp", "M at the opening, quasi-permanent combination", "kNm", 70.0,
+              group="Serviceability", show_if="mode!=Simply supported beam with uniform load",
+              help="Used with given actions or an envelope (sagging +)."),
+        Field("Vqp", "V at the opening, quasi-permanent combination", "kN", 45.0,
+              group="Serviceability", show_if="mode!=Simply supported beam with uniform load",
+              help="Used with given actions or an envelope."),
     ]
 
     @classmethod
     def run(cls, calc: Calculation, inp: dict) -> None:
         na = get_annex(calc.project.annex)
+        h = inp["h"]
+        calc.note("EN 1992-1-1 has no clause dedicated to web openings: the opening is designed "
+                  "as a Vierendeel panel / strut-and-tie model (6.5) and every chord is checked "
+                  "with the clauses of EN 1992-1-1 named below.")
+        if inp["shape"] == SHAPES[0]:
+            l0 = h0 = inp["D"]
+        else:
+            l0, h0 = inp["a"], inp["h0"]
+        d_glob = h - (inp["cnom"] + float(inp["dl"]) + float(inp["db"]) / 2)
+
+        # ------------------------------------------------------------ openings
+        n = inp["n_open"]
+        sp = inp["s_open"]
+        centres = [inp["x"] + i * sp for i in range(n)]
+        group = False
+        if n > 1:
+            calc.heading("Several openings")
+            calc.text("{n} openings at {s:.0f} mm centres, clear distance {c:.0f} mm, d = {d:.0f} "
+                      "mm.", n=n, s=sp, c=sp - l0, d=d_glob)
+            if sp - l0 < d_glob:
+                group = True
+                calc.text("Clear distance < d: the edge-link zones (d/2 each side) overlap, so the "
+                          "openings are checked as ONE opening of length (n − 1)·s + l_0 = {L:.0f} mm "
+                          "(conservative).", L=(n - 1) * sp + l0)
+                openings = [(inp["x"] + (n - 1) * sp / 2, (n - 1) * sp + l0)]
+            else:
+                calc.text("Clear distance ≥ d: each opening is checked with its own actions.")
+                openings = [(xc, l0) for xc in centres]
+        else:
+            openings = [(inp["x"], l0)]
+
+        # ------------------------------------------------------------ actions
+        mode = inp["mode"]
+        cases = []
+        if mode == MODES[0]:
+            L = inp["L"]
+            gG, gQ = na.combos["DA1-C1"][0], na.combos["DA1-C1"][2]
+            w = gG * inp["gk"] + gQ * inp["qk"]
+            wq = inp["gk"] + inp["psi2"] * inp["qk"]
+            for i, (xc, lo) in enumerate(openings):
+                x1, x2 = xc - lo / 2, xc + lo / 2
+                if not (0 < x1 and x2 < L):
+                    raise InputError("The opening must lie within the span", "x")
+                lab = calc.tr("Opening {i}", i=i + 1) if len(openings) > 1 else calc.tr("ULS 6.10")
+                cases.append({"label": lab, "xc": xc, "l0": lo,
+                              "M": (w * x1 * (L - x1) / 2, w * x2 * (L - x2) / 2),
+                              "V": (w * (L / 2 - x1), w * (L / 2 - x2)),
+                              "Mqp": max(wq * x1 * (L - x1) / 2, wq * x2 * (L - x2) / 2),
+                              "Vqp": max(abs(wq * (L / 2 - x1)), abs(wq * (L / 2 - x2))),
+                              "w": w, "wq": wq})
+            Lspan = L
+        else:
+            rows = ([{"name": calc.tr("Given"), "M": inp["MEd"], "V": inp["VEd"]}]
+                    if mode == MODES[1] else inp["cases"])
+            if not rows:
+                raise InputError("Add at least one combination", "cases")
+            for r in rows:
+                for i, (xc, lo) in enumerate(openings):
+                    lab = r["name"] + (f" — {calc.tr('Opening {i}', i=i + 1)}"
+                                       if len(openings) > 1 else "")
+                    Mc, Vc = r["M"], r["V"]
+                    cases.append({"label": lab, "xc": xc, "l0": lo,
+                                  "M": (Mc - Vc * lo / 2, Mc + Vc * lo / 2), "V": (Vc, Vc),
+                                  "Mqp": inp["Mqp"] + abs(inp["Vqp"]) * lo / 2 *
+                                  (1 if inp["Mqp"] >= 0 else -1),
+                                  "Vqp": abs(inp["Vqp"])})
+            Lspan = inp["Lc"]
+            for xc, lo in openings:
+                if not (0 < xc - lo / 2 and xc + lo / 2 < Lspan):
+                    raise InputError("The opening must lie within the span", "x")
+
+        # ------------------------------------------------------------ EN 1998-1
+        if inp["seismic"]:
+            calc.heading("Seismic critical regions (EN 1998-1)")
+            dch = inp["duct"] == DUCTILITY[1]
+            lcr = calc.formula("l_cr", "1.5 h_w" if dch else "h_w", (1.5 if dch else 1.0) * h, "mm",
+                               "Length of the critical region at each column face",
+                               ref="EN 1998-1 5.5.3.1.3(1)P" if dch else "EN 1998-1 5.4.3.1.2(1)P",
+                               dp=0)
+            first = min(xc - lo / 2 for xc, lo in openings)
+            last = max(xc + lo / 2 for xc, lo in openings)
+            calc.check_min("Opening outside the critical region (left column face)", first, lcr,
+                           "mm", "EN 1998-1 5.4.3.1.2",
+                           hint="Move the opening away from the column: at least l_cr from its "
+                                "face.")
+            calc.check_min("Opening outside the critical region (right column face)",
+                           Lspan - last, lcr, "mm", "EN 1998-1 5.4.3.1.2",
+                           hint="Move the opening away from the column: at least l_cr from its "
+                                "face.")
+            calc.note("Critical regions also exist on both sides of any other section liable to "
+                      "yield in the seismic design situation (EN 1998-1 5.4.3.1.2(1)P).")
+
+        # ------------------------------------------------------------ all cases
+        if len(cases) > 1:
+            res = []
+            for cs in cases:
+                sub = Calculation(cls.title, cls.id, cls.standard, calc.project, lang=calc.lang)
+                try:
+                    cls._design(sub, inp, cs, detail=False)
+                    u, g = max(((k.utilisation, k.description) for k in sub.checks),
+                               default=(0.0, ""))
+                except InputError as exc:
+                    u, g = math.inf, str(exc)
+                res.append((u, g, cs))
+            calc.heading("All cases")
+            calc.table(["Case", "M_1 [kNm]", "M_2 [kNm]", "V [kN]", "U_max", "Governing check"],
+                       [[cs["label"], f"{cs['M'][0] / 1e6:.1f}", f"{cs['M'][1] / 1e6:.1f}",
+                         f"{max(abs(cs['V'][0]), abs(cs['V'][1])) / 1e3:.1f}", f"{u:.2f}", g]
+                        for u, g, cs in res],
+                       caption="Every combination at every opening; the governing one is shown "
+                               "in full below")
+            gov = max(res, key=lambda r: r[0])[2]
+            calc.heading(calc.tr("Detailed calculation — governing case: {c}", c=gov["label"]))
+        else:
+            gov = cases[0]
+        cls._design(calc, inp, gov, detail=True)
+        calc.model3d = cls._scene(calc, inp, h, l0, h0, openings, group, calc._lens)
+
+    @classmethod
+    def _design(cls, calc: Calculation, inp: dict, cs: dict, detail: bool) -> None:
+        na = get_annex(calc.project.annex)
         gc, gs, acc = na.gamma_c, na.gamma_s, na.alpha_cc
         fck = float(inp["concrete"].split("/")[0][1:])
         b, h, c = inp["b"], inp["h"], inp["cnom"]
         dl, db, dt = float(inp["dl"]), float(inp["db"]), float(inp["dt"])
-        calc.note("EN 1992-1-1 has no clause dedicated to web openings: the opening is designed "
-                  "as a Vierendeel panel / strut-and-tie model (6.5) and every chord is checked "
-                  "with the clauses of EN 1992-1-1 named below.")
 
         # ------------------------------------------------------------- materials
         calc.heading("Materials")
@@ -159,12 +322,13 @@ class BeamOpeningEC2(DesignModule):
 
         # ------------------------------------------------------------- opening
         calc.heading("Opening and chords")
+        l0 = cs["l0"]
         if inp["shape"] == SHAPES[0]:
-            l0 = h0 = inp["D"]
+            h0 = inp["D"]
             calc.input("D", inp["D"], "mm", "Sleeve diameter")
             calc.text("Circular sleeve treated as a square opening D × D (conservative).")
         else:
-            l0, h0 = inp["a"], inp["h0"]
+            h0 = inp["h0"]
         calc.input("l_0", l0, "mm", "Length of the opening")
         calc.input("h_0", h0, "mm", "Height of the opening")
         ht = calc.formula("h_t", "h/2 − e − h_0/2", h / 2 - inp["e"] - h0 / 2, "mm",
@@ -176,32 +340,19 @@ class BeamOpeningEC2(DesignModule):
 
         # ------------------------------------------------------------- actions
         calc.heading("Actions at the edges of the opening")
-        x = inp["x"]
-        x1, x2 = x - l0 / 2, x + l0 / 2
-        if inp["mode"] == MODES[0]:
-            L = inp["L"]
-            if not (0 < x1 and x2 < L):
-                raise InputError("The opening must lie within the span", "x")
-            gG, gQ = na.combos["DA1-C1"][0], na.combos["DA1-C1"][2]
-            w = calc.formula("p_d", f"{gG:g} g_k + {gQ:g} q_k", gG * inp["gk"] + gQ * inp["qk"],
-                             "kN/m", "Design load (EN 1990 Eq. 6.10)",
-                             ref="EN 1990 Table A1.2(B)", dp=2)
-
-            def M(s):
-                return w * s * (L - s) / 2
-
-            def V(s):
-                return w * (L / 2 - s)
+        M1, M2 = cs["M"]
+        V1, V2 = cs["V"]
+        if "w" in cs:
+            calc.formula("p_d", "γ_G g_k + γ_Q q_k", cs["w"], "kN/m",
+                         "Design load (EN 1990 Eq. 6.10)", ref="EN 1990 Table A1.2(B)", dp=2)
             calc.text("Simply supported span L = {L:.2f} m: M(s) = p_d s (L − s)/2, "
-                      "V(s) = p_d (L/2 − s).", L=L / 1000)
-            M1, M2 = M(x1), M(x2)
-            V1, V2 = V(x1), V(x2)
-            dist = min(x1, L - x2)
+                      "V(s) = p_d (L/2 − s).", L=inp["L"] / 1000)
         else:
-            Mc, Vc = inp["MEd"], inp["VEd"]
-            M1, M2 = Mc - Vc * l0 / 2, Mc + Vc * l0 / 2
-            V1 = V2 = Vc
-            dist = x1
+            calc.text("Actions at the opening centre: M ± V·l_0/2 at the two edges.")
+        x1 = cs["xc"] - l0 / 2
+        x2 = cs["xc"] + l0 / 2
+        Lsp = inp["L"] if "w" in cs else inp["Lc"]
+        dist = min(x1, Lsp - x2)
         calc.formula("M_1", "M at the left edge", M1, "kNm", dp=2)
         calc.formula("M_2", "M at the right edge", M2, "kNm", dp=2)
         Mmax = M1 if abs(M1) >= abs(M2) else M2
@@ -381,78 +532,214 @@ class BeamOpeningEC2(DesignModule):
                                       dp=0)
         calc.note("η_1 = 0.7 is taken for the bars over the opening (top half, 8.4.2(2)); the bars "
                   "are anchored straight beyond each edge.")
-        calc.model3d = cls._scene(calc, inp, b, h, c, l0, h0, x, ht, hb, lens)
+        calc._lens = lens
+
+        # ------------------------------------------------------------- SLS crack width
+        if inp["sls"]:
+            cls._crack(calc, inp, cs, na, b, h, ht, hb, l0, fck, top_layers, bot_layers,
+                       (ct1, ct2, cb1, cb2), (dt, da, db, du), fcd, fyd)
+
+    @staticmethod
+    def _crack(calc, inp, cs, na, b, h, ht, hb, l0, fck, top_layers, bot_layers, covers, dias,
+               fcd, fyd) -> None:
+        """EN 1992-1-1 7.3.4 at the opening, quasi-permanent combination.
+
+        Steel stresses from the cracked section at the opening edge (plane sections, concrete in
+        tension and the opening ignored, compression only in the compressed chord, long-term
+        modular ratio from E_c,eff of Eq. 7.20) plus the secondary moment of the tension chord
+        shared by its two bar layers."""
+        ct1, ct2, cb1, cb2 = covers
+        dt, da, db, du = dias
+        calc.heading("Crack width at the opening (7.3.4)")
+        Mq, Vq = cs["Mqp"], cs["Vqp"]
+        if "wq" in cs:
+            calc.formula("p_qp", f"g_k + ψ2 q_k, ψ2 = {inp['psi2']:g}", cs["wq"], "kN/m",
+                         "Quasi-permanent load", ref="EN 1990 Eq. 6.16b", dp=2)
+        calc.formula("M_qp", "M at the more stressed edge (quasi-permanent)", Mq, "kNm", dp=2)
+        calc.formula("V_qp", "V at the opening (quasi-permanent)", Vq, "kN", dp=2)
+        Ecm = 22000 * ((fck + 8) / 10) ** 0.3
+        fctm = 0.30 * fck ** (2 / 3)
+        phi_c = inp["creep"]
+        ae_l = calc.formula("α_e,L", "E_s (1 + φ) / E_cm", 200000 * (1 + phi_c) / Ecm, "",
+                            "Long-term modular ratio (E_c,eff = E_cm/(1 + φ))", ref="Eq. 7.20",
+                            dp=2)
+        sag = Mq >= 0
+        # (area, depth from the compressed face, Ø, key) — compressed face: top if sagging
+        At, Aa = top_layers[0][0], top_layers[1][0]
+        Au, Ab = bot_layers[0][0], bot_layers[1][0]
+        lay = [(At, ct1, dt, "top"), (Aa, ht - ct2, da, "over"),
+               (Au, h - hb + cb2, du, "under"), (Ab, h - cb1, db, "bottom")]
+        hcomp = ht
+        if not sag:
+            lay = [(a, h - d, f, k) for a, d, f, k in lay]
+            hcomp = hb
+        lay = [r for r in lay if r[0] > 0]
+
+        def conc(x):
+            """(first moment, second moment) of the compressed concrete about the neutral axis:
+            only the compressed chord (depth hcomp) — the opening carries nothing."""
+            y = min(x, hcomp)
+            return b * y * (x - y / 2), b * y ** 3 / 12 + b * y * (x - y / 2) ** 2
+
+        def first_moment(x):
+            sm = conc(x)[0]
+            for a, d, _, _ in lay:
+                sm += ((ae_l - 1) if d < x else ae_l) * a * (x - d)
+            return sm
+        lo, hi = 1e-6, h - (hb if sag else ht)
+        for _ in range(100):
+            mid = (lo + hi) / 2
+            lo, hi = (mid, hi) if first_moment(mid) < 0 else (lo, mid)
+        x = (lo + hi) / 2
+        if x > hcomp:
+            calc.text("The neutral axis lies in the opening (x > depth of the compressed chord): "
+                      "the whole compressed chord is in compression, the opening carries nothing.")
+        Icr = conc(x)[1] + sum(((ae_l - 1) if d < x else ae_l) * a * (d - x) ** 2
+                               for a, d, _, _ in lay)
+        calc.formula("x", "Σ first moments = 0 (cracked, transformed; concrete only in the "
+                     "compressed chord)", x, "mm",
+                     "Neutral axis depth from the compressed face", ref="7.3.4(2)", dp=1)
+        calc.formula("I_cr", "I_c (compressed chord) + Σ α_e A (d − x)²", Icr / 1e4, "cm⁴",
+                     "Second moment of the cracked section", dp=0)
+        tens = [r for r in lay if r[1] > x and r[3] in (("under", "bottom") if sag else
+                                                         ("top", "over"))]
+        tens.sort(key=lambda r: r[1])
+        hc = hb if sag else ht
+        Vc = Vq * hc / (ht + hb) if inp["share"] == SHARE[0] else Vq
+        Mc = calc.formula("M_c,qp", "V_c,qp l_0 / 2", Vc * l0 / 2, "kNm",
+                          "Secondary moment in the tension chord", dp=3)
+        rows = []
+        for a, d, phi, key in tens:
+            sg = ae_l * abs(Mq) * (d - x) / Icr
+            if len(tens) == 2:
+                sg += Mc / (tens[1][1] - tens[0][1]) / a
+            else:
+                sg += Mc / (0.9 * hc) / a
+            rows.append((sg, a, d, phi, key))
+        if not rows:
+            calc.text("No tension reinforcement at the opening edge.")
+            return
+        calc.table(["Layer", "A_s [mm²]", "d [mm]", "σ_s [N/mm²]"],
+                   [[calc.tr(k), f"{a:.0f}", f"{d:.0f}", f"{sg:.1f}"] for sg, a, d, _, k in rows],
+                   caption="σ_s = α_e M_qp (d − x)/I_cr + M_c,qp/(lever · A_s) (unfavourable "
+                           "sign of the secondary moment)")
+        worst = max(rows, key=lambda r: r[0])
+        sig, As, d, phi, key = worst
+        other = [r for r in rows if r is not worst]
+        sig2 = other[0][0] if other else 0.0
+        sig = calc.formula("σ_s", calc.tr("layer: {k}", k=calc.tr(key)), sig, "N/mm²", dp=1)
+        k2 = (sig + sig2) / (2 * sig) if sig2 > 0 else 0.5
+        calc.formula("k_2", "(ε_1 + ε_2)/(2 ε_1) from the two layers of the chord (0.5 in "
+                     "bending)", k2, "", ref="7.3.4(3) Eq. 7.13", dp=3)
+        face_dist = (h - d) if sag else d   # distance from the nearer outer face
+        if key in ("over", "under"):        # layer next to the opening face
+            face_dist = (cb2 if key == "under" else ct2)
+        cov = face_dist - phi / 2
+        hef = min(2.5 * face_dist, hc / 2)
+        rho = calc.formula("ρ_p,eff", f"A_s / (b h_c,ef), h_c,ef = min(2.5(c + Ø/2); h_c/2) = "
+                           f"{hef:.0f} mm", As / (b * hef), "", ref="7.3.2(3), Eq. 7.10", dp=4)
+        ae = 200000 / Ecm
+        de = calc.formula("ε_sm − ε_cm", "max([σ_s − k_t f_ct,eff/ρ (1 + α_e ρ)]/E_s; 0.6 σ_s/E_s), "
+                          f"k_t = 0.4, f_ct,eff = f_ctm = {fctm:.2f}, α_e = E_s/E_cm = {ae:.2f}",
+                          max((sig - 0.4 * fctm / rho * (1 + ae * rho)) / 200000,
+                              0.6 * sig / 200000), "", ref="Eq. 7.9", dp=6)
+        cc = inp["cnom"] + float(inp["dl"])
+        nbar = {"top": inp["nt"], "over": inp["na"], "under": inp["nu"], "bottom": inp["nb"]}[key]
+        spacing = (b - 2 * cc - phi) / max(nbar - 1, 1)
+        if spacing <= 5 * (cov + phi / 2):
+            sr = calc.formula("s_r,max", f"k_3 c + k_1 k_2 k_4 Ø/ρ, k_3 = {na.crack_k3:g}, "
+                              f"k_1 = 0.8, k_4 = {na.crack_k4:g}, c = {cov:.0f} mm",
+                              na.crack_k3 * cov + 0.8 * k2 * na.crack_k4 * phi / rho, "mm",
+                              ref="Eq. 7.11", dp=0)
+        else:
+            sr = calc.formula("s_r,max", "1.3 (h − x), h − x = depth of the tension chord",
+                              1.3 * hc, "mm", ref="Eq. 7.14", dp=0)
+        wk = calc.formula("w_k", "s_r,max (ε_sm − ε_cm)", sr * de, "mm", "Crack width",
+                          ref="Eq. 7.8", dp=3)
+        wmax = calc.formula("w_max", calc.tr("exposure {e}", e=inp["exposure"]),
+                            na.crack_wmax[inp["exposure"]], "mm", ref="7.3.1(5), Table 7.1N",
+                            dp=2)
+        calc.check("Crack width at the opening: w_k ≤ w_max", wk, wmax, "mm", "7.3.1, 7.3.4",
+                   hint="More or smaller bars in the tension chord (lower steel stress and "
+                        "closer cracks), or a deeper chord.")
 
     # ------------------------------------------------------------------ 3D
     @staticmethod
-    def _scene(calc, inp, b, h, c, l0, h0, x, ht, hb, lens) -> dict:
+    def _scene(calc, inp, h, l0, h0, openings, group, lens) -> dict:
         m = lambda v: v / 1000  # noqa: E731
         sc = Scene3D("beam_opening", calc.tr)
         for key, label in (("concrete", "Concrete"), ("main", "Main reinforcement"),
                            ("opening", "Reinforcement at the opening")):
             sc.layer(key, label, toggle=key != "concrete")
-        # a segment of the beam centred on the opening, long enough for the extra bars
-        L = max(4 * m(h), m(max(lens.values(), default=l0)) + 4 * m(inp["sl"]), 2.0)
-        x0 = L / 2  # opening centre in the scene
+        b = inp["b"]
         bm, hm = m(b), m(h)
+        n, sp = inp["n_open"], inp["s_open"]
+        holes = [inp["x"] + i * sp for i in range(n)]          # actual sleeves (mm)
+        first = min(xc - lo / 2 for xc, lo in openings)
+        last = max(xc + lo / 2 for xc, lo in openings)
+        lmax = max(lens.values(), default=0.0)
+        pad = max(m(lmax) / 2, 2 * m(h), 0.6)
+        x_shift = m(first) - pad
+        L = m(last) - m(first) + 2 * pad
+        X = lambda xmm: m(xmm) - x_shift  # noqa: E731
         yc = hm / 2 + m(inp["e"])
         sc.box("concrete", (L / 2, hm / 2, 0), (L, hm, bm), PALETTE["concrete"], opacity=0.22)
-        if inp["shape"] == SHAPES[0]:
-            sc.cylinder("concrete", (x0, yc, -bm / 2 - 0.02), (x0, yc, bm / 2 + 0.02),
-                        m(inp["D"]) / 2, "#2f8fd8", opacity=0.75)
-        else:
-            sc.box("concrete", (x0, yc, 0), (m(l0), m(h0), bm + 0.04), "#2f8fd8", opacity=0.6)
+        for xh in holes:
+            if inp["shape"] == SHAPES[0]:
+                sc.cylinder("concrete", (X(xh), yc, -bm / 2 - 0.02), (X(xh), yc, bm / 2 + 0.02),
+                            m(inp["D"]) / 2, "#2f8fd8", opacity=0.75)
+            else:
+                sc.box("concrete", (X(xh), yc, 0), (m(inp["a"]), m(h0), bm + 0.04), "#2f8fd8",
+                       opacity=0.6)
         cc = m(inp["cnom"] + float(inp["dl"]))
 
-        def bars(layer, n, d, y, x_a, x_b, color):
-            for i in range(n):
-                zz = -bm / 2 + cc + m(d) / 2 + i * (bm - 2 * cc - m(d)) / max(n - 1, 1)
+        def bars(layer, nb, d, y, x_a, x_b, color):
+            for i in range(nb):
+                zz = -bm / 2 + cc + m(d) / 2 + i * (bm - 2 * cc - m(d)) / max(nb - 1, 1)
                 sc.cylinder(layer, (x_a, y, zz), (x_b, y, zz), m(d) / 2, color)
         db, dt = float(inp["db"]), float(inp["dt"])
         bars("main", inp["nb"], db, cc + m(db) / 2, 0.03, L - 0.03, "#8a5a2b")
         bars("main", inp["nt"], dt, hm - cc - m(dt) / 2, 0.03, L - 0.03, "#8a5a2b")
         hot = "#e03b3b"
-        if "a" in lens:
-            y = yc + m(h0) / 2 + m(inp["cnom"] + float(inp["dc"]) + float(inp["da"]) / 2)
-            bars("opening", inp["na"], float(inp["da"]), y, x0 - m(lens["a"]) / 2,
-                 x0 + m(lens["a"]) / 2, hot)
-        if "u" in lens:
-            y = yc - m(h0) / 2 - m(inp["cnom"] + float(inp["dc"]) + float(inp["du"]) / 2)
-            bars("opening", inp["nu"], float(inp["du"]), y, x0 - m(lens["u"]) / 2,
-                 x0 + m(lens["u"]) / 2, hot)
         o = m(inp["cnom"] + float(inp["dl"]) / 2)
 
         def link(layer, xx, y0, y1, color):
             sc.line(layer, [(xx, y0, -bm / 2 + o), (xx, y0, bm / 2 - o), (xx, y1, bm / 2 - o),
                             (xx, y1, -bm / 2 + o)], color, closed=True)
-        # main links outside the opening zone (+ edge-link zone)
         ne, se = inp["ne"], 0.05
-        clear = m(l0) / 2 + ne * se + 0.03
+        busy = []
+        for xc, lo in openings:
+            x0 = X(xc)
+            for key, sgn in (("a", 1), ("u", -1)):
+                if key not in lens:
+                    continue
+                dd = float(inp["d" + key])
+                y = yc + sgn * (m(h0) / 2 + m(inp["cnom"] + float(inp["dc"]) + dd / 2))
+                Lmm = lens[key] - l0 + lo
+                bars("opening", inp["n" + key], dd, y, x0 - m(Lmm) / 2, x0 + m(Lmm) / 2, hot)
+                sc.label("opening", f"{inp['n' + key]}Ø{inp['d' + key]} L = {Lmm:.0f} mm",
+                         (x0 + m(Lmm) / 2, hm * (0.85 if sgn > 0 else 0.12), bm / 2 + 0.1), "")
+            for k in range(ne):
+                for sgn in (-1, 1):
+                    link("opening", x0 + sgn * (m(lo) / 2 + 0.025 + k * se), o, hm - o, "#d97706")
+            sc.label("opening", calc.tr("{n} × Ø{d} each side", n=ne, d=inp["de"]),
+                     (x0 - m(lo) / 2 - 0.1, hm + 0.05, bm / 2), "")
+            n_c = max(int(m(lo) / m(inp["sc"])) + 1, 2)
+            for k in range(n_c):
+                xx = x0 - m(lo) / 2 + k * m(lo) / (n_c - 1)
+                link("opening", xx, yc + m(h0) / 2 + o, hm - o, "#2e9b5f")
+                link("opening", xx, o, yc - m(h0) / 2 - o, "#2e9b5f")
+            busy.append((x0 - m(lo) / 2 - ne * se - 0.03, x0 + m(lo) / 2 + ne * se + 0.03))
         s = m(inp["sl"])
         xx = s / 2
         while xx < L:
-            if abs(xx - x0) > clear:
+            if not any(a < xx < b_ for a, b_ in busy):
                 link("main", xx, o, hm - o, "#5a6b7d")
             xx += s
-        for k in range(ne):
-            for sgn in (-1, 1):
-                link("opening", x0 + sgn * (m(l0) / 2 + 0.025 + k * se), o, hm - o, "#d97706")
-        # chord links over the opening length
-        sc_ = m(inp["sc"])
-        n_c = max(int(m(l0) / sc_) + 1, 2)
-        for k in range(n_c):
-            xx = x0 - m(l0) / 2 + k * m(l0) / (n_c - 1)
-            link("opening", xx, yc + m(h0) / 2 + o, hm - o, "#2e9b5f")
-            link("opening", xx, o, yc - m(h0) / 2 - o, "#2e9b5f")
-        sc.label("opening", calc.tr("Opening {a:.0f} × {b:.0f} mm", a=l0, b=h0),
-                 (x0, hm + 0.15, 0), "result")
-        for key, xb in (("a", None), ("u", None)):
-            if key in lens:
-                yy = hm * (0.85 if key == "a" else 0.12)
-                sc.label("opening", f"{inp['n' + key]}Ø{inp['d' + key]} L = {lens[key]:.0f} mm",
-                         (x0 + m(lens[key]) / 2, yy, bm / 2 + 0.1), "")
-        sc.label("opening", calc.tr("{n} × Ø{d} each side", n=inp["ne"], d=inp["de"]),
-                 (x0 - m(l0) / 2 - 0.1, hm + 0.05, bm / 2), "")
+        txt = calc.tr("Opening {a:.0f} × {b:.0f} mm", a=l0, b=h0)
+        if n > 1:
+            txt += f" ×{n}" + (" — " + calc.tr("checked as one opening") if group else "")
+        sc.label("opening", txt, (X((first + last) / 2), hm + 0.15, 0), "result")
         sc.legend_item(hot, calc.tr("Extra bars over/under the opening"))
         sc.legend_item("#2e9b5f", calc.tr("Chord links"))
         sc.legend_item("#d97706", calc.tr("Edge links (hang the shear)"))

@@ -905,7 +905,14 @@ NOTES: dict[str, dict[str, list[str]]] = {
                "shear with σ_cp (Eq. 6.2) or links (6.2.3, cot θ = 1), ρ_w,min (9.2.2); edge "
                "links hang the full V_Ed at each edge (tie, 6.5.4); bars over/under the opening "
                "anchored l_bd beyond each edge (8.4, η_1 = 0.7 over the opening); clear distance "
-               "between layers (8.2); the full section is also checked (6.1)."],
+               "between layers (8.2); the full section is also checked (6.1).",
+               "Seismic beams: the opening must lie outside l_cr = h_w (DCM) or 1.5 h_w (DCH) "
+               "from both column faces (EN 1998-1 5.4.3.1.2, 5.5.3.1.3). Envelope: every "
+               "combination at every opening is checked, the governing one is printed in full. "
+               "Openings with a clear distance < d are checked as one opening.",
+               "Crack width (7.3.4) at the opening edge: cracked section (concrete only in the "
+               "compressed chord, E_c,eff = E_cm/(1 + φ), Eq. 7.20) plus the secondary moment of "
+               "the tension chord; w_max from Table 7.1N / Table 7.1(CYS)."],
         "el": ["Ο EN 1992-1-1 δεν έχει άρθρο για ανοίγματα σε κορμό: το άνοιγμα εξετάζεται ως "
                "φάτνωμα Vierendeel. Δυνάμεις πελμάτων N = M/z με z μεταξύ των πλαστικών κέντρων "
                "των πελμάτων (θλίψη: σκυρόδεμα + χάλυβας, εφελκυσμός: χάλυβας), τέμνουσα κατά "
@@ -916,7 +923,14 @@ NOTES: dict[str, dict[str, list[str]]] = {
                "(9.2.2)· συνδετήρες άκρων αναλαμβάνουν όλη την V_Ed σε κάθε πλευρά (ελκυστήρας, "
                "6.5.4)· ράβδοι πάνω/κάτω από το άνοιγμα με αγκύρωση l_bd πέρα από κάθε άκρο (8.4, "
                "η_1 = 0,7 πάνω από το άνοιγμα)· ελεύθερη απόσταση στρώσεων (8.2)· ελέγχεται και η "
-               "πλήρης διατομή (6.1)."]},
+               "πλήρης διατομή (6.1).",
+               "Σεισμικές δοκοί: το άνοιγμα πρέπει να βρίσκεται εκτός l_cr = h_w (ΚΠΜ) ή 1,5 h_w "
+               "(ΚΠΥ) από τις παρειές των υποστυλωμάτων (EN 1998-1 5.4.3.1.2, 5.5.3.1.3). "
+               "Περιβάλλουσα: ελέγχεται κάθε συνδυασμός σε κάθε άνοιγμα και τυπώνεται αναλυτικά ο "
+               "κρίσιμος. Ανοίγματα με καθαρή απόσταση < d ελέγχονται ως ένα άνοιγμα.",
+               "Εύρος ρωγμών (7.3.4) στο άκρο του ανοίγματος: ρηγματωμένη διατομή (σκυρόδεμα μόνο "
+               "στο θλιβόμενο πέλμα, E_c,eff = E_cm/(1 + φ), Εξ. 7.20) συν τη δευτερεύουσα ροπή του "
+               "εφελκυόμενου πέλματος· w_max από τον Πίνακα 7.1N / Πίνακα 7.1(CYS)."]},
     "ec2_rc_beam": {
         "en": ["Rectangular stress block (λ = 0.8, η = 1.0), ε_cu3 = 3.5 ‰, x/d ≤ 0.45 for ductility.",
                "Shear with variable strut inclination 1 ≤ cot θ ≤ 2.5 (6.2.3)."],

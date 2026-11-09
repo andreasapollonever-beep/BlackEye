@@ -29,7 +29,8 @@ GROUP_LABELS = {G: "Permanent loads G", Q: "Variable loads Q", E: "Seismic actio
 LOADS: dict[str, list[tuple[str, str]]] = {
     "ec2_pile_cap": [("NEd", A), ("Mx", A), ("My", A)],
     "ec2_rc_beam": [("MEd", A), ("VEd", A)],
-    "ec2_beam_opening": [("gk", G), ("qk", Q), ("MEd", A), ("VEd", A)],
+    "ec2_beam_opening": [("gk", G), ("qk", Q), ("MEd", A), ("VEd", A), ("cases.M", A),
+                         ("cases.V", A)],
     "ec2_rc_column": [("NEd", A), ("Mh_top", A), ("Mh_bot", A), ("Mb_top", A), ("Mb_bot", A),
                       ("VEd", A)],
     "ec8_rc_wall": [("NEd", A), ("MEd", A), ("VEd", A)],
