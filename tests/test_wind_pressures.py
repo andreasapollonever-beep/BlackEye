@@ -139,3 +139,19 @@ def test_values_of_the_final_standard():
     assert out(c, "F_w,min") == pytest.approx(0.05 * qp(c) * 20 * 12)  # 7.2.7(4) A1
     assert W.dominant_factor(2) == 0.75 and W.dominant_factor(3) == 0.90  # Eq. 7.1, 7.2
     assert "2005" in W.SOURCE and W.VERIFIED
+
+
+def test_canopy_on_a_roof():
+    base = {"kind": "Canopy roof (no walls)", "alpha": 10, "L": 5, "Wd": 4, "h": 2.8}
+    g = M.calculate(base, CY)
+    r = M.calculate({**base, "c_roof": True, "c_hb": 9}, CY)
+    assert out(r, "z_e") == pytest.approx(11.8)
+    assert qp(r) > qp(g)                                   # q_p at 11.8 m, not 2.8 m
+    mx0, mn0 = W.canopy(W.CANOPY_MONO, 10, 0.0)
+    _, mn1 = W.canopy(W.CANOPY_MONO, 10, 1.0)
+    cf_min = min(mn0[0], mn1[0])                           # more onerous of φ = 0 and φ = 1
+    assert out(r, "w_f,min") == pytest.approx(cf_min * qp(r))
+    F = cf_min * qp(r) * 5 * 4
+    assert out(r, "N_up") == pytest.approx(0.75 * abs(F) / 2)   # resultant at d/4, 4 columns
+    assert r.passed                                        # 1.5 m ≥ e/10 = 1.2 m
+    assert not M.calculate({**base, "c_roof": True, "c_edge": 0.5}, CY).passed

@@ -100,6 +100,18 @@ class WindPressuresEC1(DesignModule):
               show_if="kind=Canopy roof (no walls)",
               help="0 = empty, 1 = fully blocked to the downwind eaves by stored goods "
                    "(Figure 7.15)."),
+        Field("c_roof", "Canopy on the roof of a building (roof terrace, pergola)", kind="bool",
+              default=False, group="Canopy", show_if="kind=Canopy roof (no walls)",
+              help="Then h is the height of the canopy above the roof slab and z_e = h_b + h."),
+        Field("c_hb", "Height of the building roof above ground h_b", "m", 9.0, min=1, max=200,
+              group="Canopy", show_if="c_roof"),
+        Field("c_bb", "Smaller plan dimension of the building", "m", 12.0, min=1, group="Canopy",
+              show_if="c_roof", help="For e = min(b, 2h) and the roof edge zone e/10."),
+        Field("c_edge", "Distance of the canopy from the nearest roof edge", "m", 1.5, min=0,
+              group="Canopy", show_if="c_roof"),
+        Field("c_cols", "Number of columns / anchors of the canopy", "", 4, kind="int", min=2,
+              max=100, group="Canopy", show_if="kind=Canopy roof (no walls)",
+              help="Two rows along the long sides; gives the uplift per anchor."),
         Field("bays", "Number of bays (multibay duopitch canopy)", "", 1, kind="int", min=1,
               max=20, group="Canopy", show_if="canopy=Duopitch canopy",
               help="Reduction factors ψ_mc of Table 7.8 for the end, second and inner bays."),
@@ -168,6 +180,8 @@ class WindPressuresEC1(DesignModule):
         sign_wall = kind == KINDS[3] and inp["zg"] < inp["h"] / 4 and inp["L"] > inp["h"]
         if kind == KINDS[3]:
             ze = (inp["zg"] / 1000 + h) if sign_wall else inp["zg"] / 1000 + h / 2
+        if kind == KINDS[1] and inp["c_roof"]:
+            ze = inp["c_hb"] / 1000 + h
         qp = site_qp(calc, inp, ze * 1000)
         calc.heading("Geometry")
         if kind in (KINDS[0], KINDS[1]):
@@ -515,11 +529,37 @@ class WindPressuresEC1(DesignModule):
         if not lo <= a <= hi:
             raise InputError(calc.tr("Canopy pitch outside Table {t}: {lo:g}° to {hi:g}°",
                                      t="7.6" if mono else "7.7", lo=lo, hi=hi), "alpha")
-        mx, mn = W.canopy(tab, a, phi)
+        on_roof = inp["c_roof"]
+        if on_roof:
+            hb = inp["c_hb"] / 1000
+            calc.heading("Canopy on a building roof")
+            calc.input("h_b", inp["c_hb"], "m", "Height of the building roof above ground")
+            calc.formula("z_e", "h_b + h", (hb + h) * 1000, "m",
+                         "Reference height (top of the canopy above ground)", ref="7.3(8)", dp=2)
+            calc.note("EN 1991-1-4 7.3 gives c_f and c_p,net for canopies in free flow; it has no "
+                      "values for a canopy standing on a roof. They are applied here with q_p at "
+                      "z_e = h_b + h and, because the parapets and the roof below change the flow "
+                      "under the canopy, the more onerous of φ = 0 and φ = 1 is used for the "
+                      "upward values (conservative engineering approach).")
+            e = calc.formula("e", "min(b, 2 h_b)", min(inp["c_bb"], 2 * inp["c_hb"]), "m",
+                             "Edge-zone parameter of the building roof", ref="Figure 7.6", dp=2)
+            calc.check_min("Canopy outside the roof edge zone: distance ≥ e/10", inp["c_edge"],
+                           e / 10, "m", "Figure 7.6",
+                           hint="Set the canopy back from the roof edge by at least e/10: the "
+                                "flow separating at the edge causes the highest suctions there.")
+            mx, mn0 = W.canopy(tab, a, 0.0)
+            _, mn1 = W.canopy(tab, a, 1.0)
+            mn = tuple(min(u, v) for u, v in zip(mn0, mn1))
+        else:
+            mx, mn = W.canopy(tab, a, phi)
         b, d = L, Wd
         calc.heading("Monopitch canopy — Table 7.6" if mono else "Duopitch canopy — Table 7.7")
-        calc.text("Blockage φ = {p:g}; minimum values interpolated between φ = 0 and φ = 1 "
-                  "(7.3(3)). Downwind of the maximum blockage use φ = 0 (7.3(4)).", p=phi)
+        if on_roof:
+            calc.text("Upward (minimum) values: the more onerous of φ = 0 and φ = 1 for each "
+                      "coefficient.")
+        else:
+            calc.text("Blockage φ = {p:g}; minimum values interpolated between φ = 0 and φ = 1 "
+                      "(7.3(3)). Downwind of the maximum blockage use φ = 0 (7.3(4)).", p=phi)
         zones = "ABC" if mono else "ABCD"
         calc.table(["", "c_f"] + [calc.tr("Zone {z}", z=z) for z in zones],
                    [[calc.tr("Maximum (downward)")] + [f"{v:+.2f}" for v in mx],
@@ -548,6 +588,18 @@ class WindPressuresEC1(DesignModule):
                      "Local net pressure, downward (roofing, fixings)", dp=3)
         calc.formula("w_net,min", "min c_p,net · q_p", min(mn[1:]) * qp, "kN/m²",
                      "Local net pressure, upward (roofing, fixings)", dp=3)
+        n = inp["c_cols"]
+        share = 0.75 if mono else 0.5
+        calc.formula("N_up", f"{share:g} · |F_w,min| / (n/2), n = {n}",
+                     share * abs(min(mn[0], 0.0)) * qp * b * d * 1e6 / (n / 2), "kN",
+                     "Uplift per column / anchor (windward row" + (", resultant at d/4)"
+                                                                  if mono else ")"),
+                     ref="Figure 7.16" if mono else "Figure 7.17", dp=2)
+        calc.formula("N_down", f"{share:g} · F_w,max / (n/2)",
+                     share * mx[0] * qp * b * d * 1e6 / (n / 2), "kN",
+                     "Downward wind force per column / anchor", dp=2)
+        calc.note("Add the permanent load (favourable γ_G = 1.0) to the uplift for the anchor "
+                  "design; the horizontal components and friction act on the anchors as well.")
         calc.note("Double-skin canopies: the impermeable skin and its fixings with c_p,net, the "
                   "permeable skin with 1/3 c_p,net (7.3(6)).")
         calc.formula("F_fr", f"c_fr·q_p·2·d·b = {fr:g}·q_p·2·{d:.2f}·{b:.2f}",
@@ -563,7 +615,9 @@ class WindPressuresEC1(DesignModule):
                              f"{kpa(fmax * mx[0] * qp):+.3f}", f"{kpa(fmin * mn[0] * qp):+.3f}"])
             calc.table(["Bay", "ψ_mc (max)", "ψ_mc (min)", "w_f,max [kN/m²]", "w_f,min [kN/m²]"],
                        rows, caption="Table 7.8 — multibay duopitch canopy (Figure 7.18)")
-        calc.model3d = cls._canopy_scene(calc, mono, L, Wd, h, alpha, mn[0])
+        calc.model3d = cls._canopy_scene(calc, mono, L, Wd, h, alpha, mn[0],
+                                         inp["c_hb"] / 1000 if on_roof else 0.0,
+                                         inp["c_bb"] / 1000, inp["c_edge"] / 1000)
 
     # ------------------------------------------------------------- free walls
     @classmethod
@@ -818,10 +872,15 @@ class WindPressuresEC1(DesignModule):
         return [((u0, v0), (u1, v1))]
 
     @staticmethod
-    def _canopy_scene(calc, mono, L, Wd, h, alpha, cf_min) -> dict:
+    def _canopy_scene(calc, mono, L, Wd, h, alpha, cf_min, hb=0.0, bb=0.0, edge=0.0) -> dict:
         sc = Scene3D("wind_canopy", calc.tr)
         sc.layer("roof", "Roof")
         sc.layer("wind", "Wind")
+        if hb > 0:
+            sc.layer("building", "Building")
+            Bx, Bz = max(L + 2 * edge, bb), max(Wd + 2 * edge, bb)
+            cz = -Wd / 2 - edge + Bz / 2
+            sc.box("building", (0, hb / 2, cz), (Bx, hb, Bz), "#cfd5dc", opacity=0.35)
         t = math.tan(math.radians(alpha))
         if mono:
             ys = (h - Wd * abs(t), h)
@@ -834,11 +893,12 @@ class WindPressuresEC1(DesignModule):
             verts = [(-L / 2, he, -Wd / 2), (L / 2, he, -Wd / 2), (L / 2, hr, 0), (-L / 2, hr, 0),
                      (L / 2, he, Wd / 2), (-L / 2, he, Wd / 2)]
             faces = [(0, 1, 2), (0, 2, 3), (3, 2, 4), (3, 4, 5)]
+        verts = [(x, y + hb, z) for x, y, z in verts]
         sc.mesh("roof", verts, faces, heat_color(0.15), opacity=0.9)
         for x in (-L / 2 + 0.2, L / 2 - 0.2):
             for z in (-Wd / 2 + 0.2, Wd / 2 - 0.2):
-                top = min(v[1] for v in verts)
-                sc.box("roof", (x, top / 2, z), (0.25, top, 0.25), "#7d8b99")
-        sc.arrow("wind", (0, h * 0.7, -Wd / 2 - 4), (0, 0, 1), 3, "#2a6f97")
-        sc.label("roof", f"c_f,min = {cf_min:+.2f}", (0, h + 0.8, 0), "result")
+                top = min(v[1] for v in verts) - hb
+                sc.box("roof", (x, hb + top / 2, z), (0.25, top, 0.25), "#7d8b99")
+        sc.arrow("wind", (0, hb + h * 0.7, -Wd / 2 - 4), (0, 0, 1), 3, "#2a6f97")
+        sc.label("roof", f"c_f,min = {cf_min:+.2f}", (0, hb + h + 0.8, 0), "result")
         return sc.to_dict()

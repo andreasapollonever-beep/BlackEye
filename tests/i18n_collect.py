@@ -45,6 +45,8 @@ SCENARIOS = {
                            {"internal": "From the opening ratio μ (Figure 7.13)"},
                            {"internal": "None (no openings)", "A": 1, "L": 5, "h": 20},
                            {"kind": "Canopy roof (no walls)"},
+                           {"kind": "Canopy roof (no walls)", "c_roof": True, "c_edge": 0.5},
+                           {"kind": "Canopy roof (no walls)", "c_roof": True, "canopy": "Duopitch canopy", "alpha": 10},
                            {"kind": "Canopy roof (no walls)", "canopy": "Duopitch canopy", "alpha": -10, "bays": 4},
                            {"roof": "Vaulted (cylindrical)", "f": 3}, {"roof": "Vaulted (cylindrical)", "f": 1, "view": "θ = 90°"},
                            {"roof": "Monopitch", "alpha": 15, "spans": 3}, {"roof": "Duopitch", "spans": 2},

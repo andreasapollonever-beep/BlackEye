@@ -1074,6 +1074,10 @@ NOTES: dict[str, dict[str, list[str]]] = {
                "or −0.4); vaulted roofs by Figure 7.11 (A, B, C = ¼, ½, ¼ of the arc); dominant "
                "openings c_pi = 0.75 … 0.90 c_pe at the opening (Eq. 7.1/7.2); friction "
                "c_fr q_p A_fr beyond min(2b, 4h) (7.5).",
+               "Canopy on a roof (pergola, roof terrace): z_e = h_b + h; EN 1991-1-4 has no values "
+               "for canopies on roofs, so 7.3 is applied with the more onerous of φ = 0 and φ = 1 "
+               "for uplift and the canopy is checked to stand outside the roof edge zone e/10; "
+               "uplift and downward force per column/anchor.",
                "Free-standing walls and parapets c_p,net of Table 7.9 (l/h, φ, return corners) "
                "with shelter ψ_s (Figure 7.20); signboards c_f = 1.8 at z_g + h/2, e = ±0.25 b.",
                "Coefficients: EN 1991-1-4:2005 + A1:2010 (incorporating corrigendum January "
@@ -1089,6 +1093,10 @@ NOTES: dict[str, dict[str, list[str]]] = {
                "0,6 ή −0,4)· θολωτές κατά Σχήμα 7.11 (A, B, C = ¼, ½, ¼ του τόξου)· κυρίαρχα "
                "ανοίγματα c_pi = 0,75 … 0,90 c_pe στο άνοιγμα (Εξ. 7.1/7.2)· τριβή c_fr q_p A_fr "
                "πέρα από min(2b, 4h) (7.5).",
+               "Στέγαστρο σε δώμα (πέργκολα, ταράτσα): z_e = h_b + h· ο EN 1991-1-4 δεν δίνει τιμές "
+               "για στέγαστρα σε δώματα, οπότε εφαρμόζεται το 7.3 με το δυσμενέστερο από φ = 0 και "
+               "φ = 1 για την ανύψωση, και ελέγχεται ότι το στέγαστρο είναι εκτός της ζώνης άκρου "
+               "e/10 του δώματος· ανύψωση και θλίψη ανά υποστύλωμα/αγκύρωση.",
                "Ελεύθεροι τοίχοι και στηθαία c_p,net του Πίνακα 7.9 (l/h, φ, γωνιακές επιστροφές) "
                "με συντελεστή προφύλαξης ψ_s (Σχήμα 7.20)· πινακίδες c_f = 1,8 σε z_g + h/2, "
                "e = ±0,25 b.",
