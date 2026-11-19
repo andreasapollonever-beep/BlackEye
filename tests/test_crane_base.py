@@ -7,7 +7,7 @@ import pytest
 from erisma.core import InputError, get_module
 from erisma.design.annex import get_annex
 from erisma.design.geotech import bearing_factors
-from erisma.modules.ec7_crane_base import (contact_pressure, mean_radius,
+from erisma.modules.ec7_crane_base import (contact_pressure, mean_radius, perimeter_points,
                                            rounded_square_length)
 
 M = get_module("ec7_crane_base")
@@ -171,3 +171,61 @@ def test_input_errors():
         M.calculate({"B": 2.2, "a": 2.0, "cl": 0.4}, CY)
     with pytest.raises(InputError):
         M.calculate({"cases": []}, CY)
+
+
+HEAVY = {"size": False, "B": 9, "h": 0.8, "a": 2.4, "cl": 0.35, "concrete": "C25/30",
+         "db": "20", "sb": 200,
+         "cases": [{"name": "In service", "N": 2500, "M": 6000, "H": 60, "Mt": 500},
+                   {"name": "Out of service", "N": 2200, "M": 7500, "H": 150, "Mt": 0}]}
+
+
+def test_perimeter_points_are_on_the_control_perimeter():
+    pts = perimeter_points(0, 0, 2000, 500, 40)
+    assert len(pts) == 40
+    for x, y in pts:   # distance from the square = r
+        assert math.hypot(max(abs(x) - 1000, 0), max(abs(y) - 1000, 0)) == pytest.approx(500)
+    gaps = [math.dist(p, q) for p, q in zip(pts, pts[1:])]
+    assert max(gaps) == pytest.approx((4 * 2000 + 2 * math.pi * 500) / 40, rel=0.02)
+
+
+def test_no_links_when_concrete_alone_resists():
+    c = M.calculate(NOSIZE, CY)
+    assert not chk(c, "Punching with links") and "A_sw,req" not in c.outputs
+    assert chk(c, "Punching of the mast base")[0].passed
+
+
+def test_punching_links_hand_calculation():
+    c = M.calculate(HEAVY, CY)
+    # without links the same base fails punching
+    c0 = M.calculate({**HEAVY, "links": False}, CY)
+    assert not chk(c0, "Punching of the mast base")[0].passed
+    assert not chk(c0, "Punching under a leg")[0].passed
+    d = 800 - 50 - 20
+    fywd = 500 / 1.15
+    assert out(c, "f_ywd,ef") == pytest.approx(min(250 + 0.25 * d, fywd))       # Eq. 6.53
+    sr, s0 = math.floor(0.75 * d / 25) * 25, math.floor(0.5 * d / 25) * 25     # 9.4.3
+    assert out(c, "s_r") == sr and out(c, "s_0") == s0 and 0.3 * d <= s0 <= 0.5 * d
+    # leg: A_sw = (v_Ed − 0.75 v_Rd,c 2d/a_p) u s_r / (1.5 f_ywd,ef)   (Eq. 6.52, sin α = 1)
+    vEd, vRd, u = out(c, "v_Ed,leg"), out(c, "v_Rd,leg"), out(c, "u_leg")
+    req = (vEd - 0.75 * vRd) * u * sr / (1.5 * out(c, "f_ywd,ef"))
+    assert out(c, "A_sw,req,leg") == pytest.approx(req, rel=1e-6)
+    A1 = math.pi * 12 ** 2 / 4
+    n = out(c, "n_sw,leg") / 4 / 2          # legs per perimeter (4 legs, 2 perimeters)
+    assert n * A1 >= req
+    vRdcs = 0.75 * vRd + 1.5 * d / sr * (n * A1) * out(c, "f_ywd,ef") / (u * d)
+    assert out(c, "v_Rd,cs,leg") == pytest.approx(vRdcs, rel=0.02)
+    assert vEd <= out(c, "v_Rd,cs,leg")
+    # mast base: outermost perimeter within k d = 1.5 d of u_out (6.4.5(4), CY NA 2.34(4))
+    assert out(c, "r_last,min") == pytest.approx(out(c, "a_out") - 1.5 * d)
+    for name in ("Punching with links", "Punching under a leg with links", "Link leg area",
+                 "Last link perimeter"):
+        assert all(x.passed for x in chk(c, name)) and chk(c, name)
+    # link legs drawn in the 3D view
+    assert any(o.get("layer") == "links" for o in c.model3d["objects"])
+
+
+def test_links_allow_a_thinner_base():
+    heavy = {**HEAVY, "size": True, "hmin": 0.8, "db": "25", "sb": 125}
+    with_links = M.calculate(heavy, CY)
+    without = M.calculate({**heavy, "links": False}, CY)
+    assert out(with_links, "h_min") <= out(without, "h_min")

@@ -1023,6 +1023,11 @@ NOTES: dict[str, dict[str, list[str]]] = {
                "bars); beam shear at d from the mast base (6.2.2); punching of the mast base as "
                "a column c = a + c_l (6.4.4(2), Eq. 6.51) and under the most compressed leg; "
                "leg face v_Rd,max (6.4.5(3)).",
+               "Punching links (optional): where v_Ed > v_Rd,c, vertical links by Eq. 6.52 "
+               "(f_ywd,ef = 250 + 0.25d), perimeters from 0.5d with s_r ≤ 0.75d, tangential "
+               "spacing ≤ 1.5d (≤ 2d outside 2d), A_sw,min by Eq. 9.11, the outermost perimeter "
+               "within k d of u_out (6.4.5(4), k from the National Annex). The concrete term keeps "
+               "the 2d/a enhancement of 6.4.4(2) — an interpretation for column bases.",
                "Sizing: for every h (from the minimum, step 0.05 m) the smallest B (step 0.1 m) "
                "is found and the least concrete volume is kept; also the smallest B for the "
                "thickness entered. The manufacturer's own limits must also be met."],
@@ -1040,6 +1045,12 @@ NOTES: dict[str, dict[str, list[str]]] = {
                "(πάνω οπλισμός)· τέμνουσα σε απόσταση d από τη βάση του ιστού (6.2.2)· διάτρηση "
                "της βάσης του ιστού ως υποστύλωμα c = a + c_l (6.4.4(2), Εξ. 6.51) και κάτω από "
                "το πιο θλιβόμενο πόδι· v_Rd,max στην παρειά του ποδιού (6.4.5(3)).",
+               "Οπλισμός διάτρησης (προαιρετικός): όπου v_Ed > v_Rd,c, κατακόρυφοι συνδετήρες "
+               "κατά την Εξ. 6.52 (f_ywd,ef = 250 + 0.25d), περίμετροι από 0.5d με s_r ≤ 0.75d, "
+               "εφαπτομενική απόσταση ≤ 1.5d (≤ 2d έξω από τα 2d), A_sw,min κατά την Εξ. 9.11, η "
+               "εξωτερική περίμετρος σε απόσταση ≤ k d από την u_out (6.4.5(4), k από το Εθνικό "
+               "Προσάρτημα). Ο όρος του σκυροδέματος κρατά την αύξηση 2d/a του 6.4.4(2) — "
+               "ερμηνεία για πέδιλα υποστυλωμάτων.",
                "Διαστασιολόγηση: για κάθε h (από το ελάχιστο, βήμα 0.05 m) βρίσκεται το "
                "μικρότερο B (βήμα 0.1 m) και κρατείται ο ελάχιστος όγκος σκυροδέματος· επίσης το "
                "μικρότερο B για το πάχος που δόθηκε. Πρέπει να τηρούνται και τα όρια του "

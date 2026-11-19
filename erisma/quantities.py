@@ -81,7 +81,10 @@ def _crane(i, c):
     Ab = _bar(float(i["db"])) * B / i["sb"]
     At = _bar(float(i["dt"])) * B / i["st"]
     # two layers each way, bottom and top mesh
-    return {"concrete": m3(B, B, h), "rebar": 2 * _kg(Ab, B) + 2 * _kg(At, B),
+    n = sum(c.outputs[k]["value"] for k in ("n_sw", "n_sw,leg") if k in c.outputs)
+    links = _kg(_bar(float(i.get("dsw", 12))), n * (h - 2 * i["cover"] + 2 * 12 * float(
+        i.get("dsw", 12)))) if n else 0.0
+    return {"concrete": m3(B, B, h), "rebar": 2 * _kg(Ab, B) + 2 * _kg(At, B) + links,
             "formwork": 4 * B * h / 1e6, "excavation": m3(B + 600, B + 600, D)}, "per base"
 
 

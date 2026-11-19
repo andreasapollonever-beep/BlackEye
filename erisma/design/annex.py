@@ -44,6 +44,7 @@ class Annex:
     alpha_cc: float = 1.0
     alpha_cc_pl: float = 0.8
     punch_vmax: float = 0.4  # v_Rd,max = k ν f_cd at the column face (EN 1992-1-1 6.4.5(3))
+    punch_kout: float = 1.5  # outermost link perimeter ≤ k d inside u_out (EN 1992-1-1 6.4.5(4))
     # EN 1997-1 8.6(4): ULS anchor load ≥ factor × SLS load (None = not required)
     anchor_sls_factor: float | None = None
     # Slopes: "M2" = factored strength (DA1-C2 / DA3); "DA2" = factored effects + γR,e
@@ -167,7 +168,8 @@ EN = Annex("EN", "EN recommended values", "EN 1990/1992/1997/1998 recommended va
 #   NA to CYS EN 1998-1  zonation map: Zone 1 0.15 g, Zone 2 0.20 g, Zone 3 0.25 g;
 #                        NA 2.12 γI 0.8/1.0/1.2/1.4; Type 1 spectrum, S as EN Table 3.2.
 #   NA to CYS EN 1992-1-1 NA 2.5 γc 1.5, γs 1.15; NA 2.8 αcc 1.0; NA 2.72 αcc,pl 0.8;
-#                        NA 2.34(3) v_Rd,max = 0.5 ν f_cd.
+#                        NA 2.34(3) v_Rd,max = 0.5 ν f_cd; NA 2.34(4) k = 1.5 (= EN);
+#                        NA 2.52 (9.5CYS) ρ_w,min = 0.08 √f_ck / f_yk (= EN).
 #   NA to CYS EN 1990    Table A1.2(B): Eq. 6.10, γG 1.35/1.00, γQ 1.50.
 #   NA to CYS EN 1992-1-1 NA 2.41 Table 7.1(CYS): w_max 0.4 (X0, XC1), 0.3 (XC2–XC4, XD, XS);
 #                        NA 2.43 k3 = 3.4, k4 = 0.425; NA 2.45 k1 = 1, k2 = 5 mm (= EN).
@@ -251,6 +253,7 @@ def record_annex(calc) -> None:
         ["EN 1992-1-1 2.4.2.4", "γ_c / γ_s", f"{na.gamma_c:g} / {na.gamma_s:g}"],
         ["EN 1992-1-1 3.1.6, 12.3.1", "α_cc / α_cc,pl", f"{na.alpha_cc:g} / {na.alpha_cc_pl:g}"],
         ["EN 1992-1-1 6.4.5(3)", "v_Rd,max", f"{na.punch_vmax:g} ν f_cd"],
+        ["EN 1992-1-1 6.4.5(4)", "k (u_out)", f"{na.punch_kout:g}"],
     ]
     if na.anchor_sls_factor:
         rows.append(["EN 1997-1 8.6(4)", calc.tr("Anchor design load"),

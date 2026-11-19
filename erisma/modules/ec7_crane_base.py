@@ -33,7 +33,8 @@ BARS = ["12", "14", "16", "20", "25", "32"]
 LOADS = ["Characteristic (factors applied here)", "Design values (factors already included)"]
 SOILS = ["Soil parameters (EN 1997-1 Annex D)", "Given design bearing resistance q_Rd"]
 DIRS = (("axis", 1.0, 0.0), ("diagonal", 1 / math.sqrt(2), 1 / math.sqrt(2)))
-HINT_PUNCH = "Thicker base (most effective), larger leg base plates or a higher concrete class."
+HINT_PUNCH = ("Thicker base (most effective), allow punching links, larger leg base plates or a "
+              "higher concrete class.")
 GC = 25e-6  # reinforced concrete, N/mm³ (EN 1991-1-1 Table A.1)
 
 
@@ -199,6 +200,12 @@ class CraneBaseEC7(DesignModule):
               group="Sizing", help="Searches B (step 0.1 m) and h (step 0.05 m) for the least "
                                    "concrete volume that passes every check with the bars "
                                    "entered."),
+        Field("links", "Allow punching reinforcement (links)", kind="bool", default=True,
+              group="Reinforcement", help="Where the concrete alone does not resist punching, "
+                                          "vertical links are designed (EN 1992-1-1 6.4.5, "
+                                          "9.4.3). Off: the base must pass without them."),
+        Field("dsw", "Punching link Ø", kind="choice", choices=["8", "10", "12", "14", "16"],
+              default="12", group="Reinforcement", show_if="links"),
         Field("hmin", "Minimum thickness in the search", "m", 1.0, min=0.5, max=3, group="Sizing",
               show_if="size", help="Lower bound for h — the embedment of the mast anchors or "
                                    "the manufacturer's minimum usually govern."),
@@ -219,10 +226,10 @@ class CraneBaseEC7(DesignModule):
         calc.note("The loads come from the crane manufacturer. Check also any limits the "
                   "manufacturer sets (minimum base size and weight, eccentricity, anchorage of "
                   "the mast anchors) — they may be stricter than the Eurocodes.")
-        cls._analyse(calc, inp, inp["B"], inp["h"], na)
+        links = cls._analyse(calc, inp, inp["B"], inp["h"], na)
         if inp["size"]:
             cls._sizing(calc, inp, na)
-        calc.model3d = cls._scene(calc, inp)
+        calc.model3d = cls._scene(calc, inp, links)
 
     # ------------------------------------------------------------------ sizing
     @classmethod
@@ -322,7 +329,8 @@ class CraneBaseEC7(DesignModule):
         for name in na.combinations(inp["approach"]):
             cls._geo(calc, inp, B, h, D, W, na, name, quiet)
         if part == "all":
-            cls._str(calc, inp, B, h, W, na, quiet)
+            return cls._str(calc, inp, B, h, W, na, quiet)
+        return None
 
     # --------------------------------------------------------------------- EQU
     @staticmethod
@@ -486,7 +494,7 @@ class CraneBaseEC7(DesignModule):
         x0 = a / 2
         xs = c / 2 + d
         gov = {"mb": (0.0, ""), "mt": (0.0, ""), "v": (0.0, ""), "leg": (0.0, ""),
-               "ten": (-math.inf, ""), "pun": None}
+               "ten": (-math.inf, ""), "pun_all": []}
         k = min(1 + math.sqrt(200 / d), 2.0)
         rho = min(Asb / (1000 * d), 0.02)
         vmin = 0.035 * k ** 1.5 * math.sqrt(fck)
@@ -525,10 +533,8 @@ class CraneBaseEC7(DesignModule):
                     T = Md * lev / (a * a) - g * cs["N"] / 4
                     if T > gov["ten"][0]:
                         gov["ten"] = (T, lab)
-                    p = cls._punch_frame(g * cs["N"], Md, fx, fy, X, Y, dA, net, c, d, B, vrc)
-                    if p and (gov["pun"] is None or p["r"] > gov["pun"]["r"]):
-                        p["case"] = lab
-                        gov["pun"] = p
+                    gov["pun_all"].append((lab, g * cs["N"], Md * (fx + fy), cls._punch_rows(
+                        g * cs["N"], Md * (fx + fy), X, Y, dA, net, c, d, B)))
         Mb, Mh, Vb = gov["mb"][0] * 1000, gov["mt"][0] * 1000, gov["v"][0] * 1000  # per 1 m
         # ---- bottom bars
         if not quiet:
@@ -587,34 +593,102 @@ class CraneBaseEC7(DesignModule):
                          vrc * d, "kN/m", ref="Eq. 6.2", dp=1)
         calc.check("Beam shear: v_Ed ≤ V_Rd,c", Vb / 1000, vrc * d, "kN/m", "6.2.2",
                    hint="Thicker base.")
-        # ---- punching: mast base as a column
+        # ---- punching (mast base as a column and the most compressed leg), links if needed
         nu = 0.6 * (1 - fck / 250)
         vmax = na.punch_vmax * nu * fcd
-        p = gov["pun"]
+        links = cls._punching(calc, quiet, inp, gov, na, B, c, d, vrc, vmax, fck, fyk)
+        # ---- anchors
+        if not quiet:
+            calc.heading("Mast anchors", 2)
+            T = gov["ten"][0]
+            if T > 0:
+                calc.formula("T_leg", "M_d s_max / Σs² − γ_G,fav N/4", T, "kN",
+                             "Design tension in the most stressed mast anchor", dp=1)
+                calc.note("Anchor the mast anchors (manufacturer's anchor frame or cast-in "
+                          "anchors) below the bottom bars, or tie them with hanger bars for "
+                          "T_leg, following the manufacturer's details.")
+            else:
+                calc.text("No tension in the mast anchors.")
+        return links
+
+    @staticmethod
+    def _punch_rows(VN, Mb, X, Y, dA, net, c, d, B):
+        """Control perimeters around the mast base (square c) at a = 0.05d, 0.10d, … up to the
+        edge of the base: (a, u, V_Ed,red, β, v_Ed).  M_b is the moment that enters β (the
+        two components added for the diagonal)."""
+        rows = []
+        dist = np.hypot(np.clip(np.abs(X) - c / 2, 0, None), np.clip(np.abs(Y) - c / 2, 0, None))
+        k = 1
+        while c / 2 + 0.05 * d * k <= B / 2:
+            ap = 0.05 * d * k
+            u = 4 * c + 2 * math.pi * ap
+            Vred = max(VN - float((net * (dist <= ap)).sum() * dA), 0.0)
+            W1 = c * c / 2 + c * c + 4 * c * ap + 4 * ap * ap + math.pi * ap * c
+            beta = 1 + 0.6 * Mb / Vred * u / W1 if Vred > 0 else 1.0
+            rows.append((ap, u, Vred, beta, beta * Vred / (u * d)))
+            k += 1
+        return rows
+
+    @classmethod
+    def _punching(cls, calc, quiet, inp, gov, na, B, c, d, vrc, vmax, fck, fyk) -> dict:
+        """EN 1992-1-1 6.4.4(2) without links; with links Eq. 6.52, 6.4.5(4), 9.4.3."""
+        a, cl = inp["a"], inp["cl"]
+        vR = lambda ap: vrc * 2 * d / ap if ap <= 2 * d else vrc  # noqa: E731
+        use = inp["links"]
+        dsw = float(inp["dsw"])
+        A1 = bar_area(dsw)
+        fywd = fyk / na.gamma_s
+        fywef = min(250 + 0.25 * d, fywd)
+        sr = math.floor(0.75 * d / 25) * 25
+        s0 = math.floor(0.5 * d / 25) * 25
+        rmin = 0.08 * math.sqrt(fck) / fyk
+        cs_term = lambda Asw, u: 1.5 * d / sr * Asw * fywef / (u * d)  # noqa: E731
+        out = {"frame": None, "leg": None, "c": c, "d": d}
+        # ---------------------------------------------------------- mast base
+        worst, req, aout = None, 0.0, 0.0
+        for lab, VN, Mb, rows in gov["pun_all"]:
+            for ap, u, Vred, beta, vEd in rows:
+                r = vEd / vR(ap)
+                if ap <= 2 * d and (worst is None or r > worst[0]):
+                    worst = (r, lab, ap, u, Vred, beta, vEd, vR(ap))
+                if r > 1:
+                    aout = max(aout, ap)
+                    if ap <= 2 * d:
+                        req = max(req, (vEd - 0.75 * vR(ap)) * u * sr / (1.5 * fywef))
+        edge = B / 2 - c / 2
         if not quiet:
             calc.heading("Punching of the mast base (6.4.4(2))", 2)
             calc.text("The mast base is taken as a square column c = a + c_l. Control perimeters "
                       "0 < a_p ≤ 2d inside the base are searched; the net soil reaction inside "
                       "each one is deducted (Eq. 6.48) and the moment is taken with Eq. 6.51 "
                       "(k = 0.6, both components added — conservative).")
-        if p:
+        if worst is None:
             if not quiet:
-                calc.text("Governing: {c}.", c=p["case"])
-                calc.formula("a_crit", "critical distance, 0 < a_p ≤ 2d", p["a"], "mm", dp=0)
-                calc.formula("u", "4c + 2πa_p", p["u"], "mm", "Control perimeter", dp=0)
-                calc.formula("V_Ed,red", "γ N − Σ (q − w) ΔA inside u", p["Vred"], "kN",
+                calc.text("Every control perimeter within 2d of the mast base lies outside the "
+                          "base — punching of the mast base is not critical; beam shear governs.")
+        else:
+            r, lab, ap, u, Vred, beta, vEd, vRd = worst
+            if not quiet:
+                calc.text("Governing: {c}.", c=lab)
+                calc.formula("a_crit", "critical distance, 0 < a_p ≤ 2d", ap, "mm", dp=0)
+                calc.formula("u", "4c + 2πa_p", u, "mm", "Control perimeter", dp=0)
+                calc.formula("V_Ed,red", "γ N − Σ (q − w) ΔA inside u", Vred, "kN",
                              ref="Eq. 6.48", dp=1)
-                calc.formula("β", "1 + k (M_x + M_y)/V_Ed,red · u/W_1", p["beta"], "",
+                calc.formula("β", "1 + k (M_x + M_y)/V_Ed,red · u/W_1", beta, "",
                              ref="Eq. 6.51", dp=3)
-                calc.formula("v_Ed,p", "β V_Ed,red / (u d)", p["vEd"], "N/mm²", dp=3)
-                calc.formula("v_Rd,p", "max(C_Rd,c k (100ρ f_ck)^(1/3), v_min) 2d/a_p", p["vRd"],
+                calc.formula("v_Ed,p", "β V_Ed,red / (u d)", vEd, "N/mm²", dp=3)
+                calc.formula("v_Rd,p", "max(C_Rd,c k (100ρ f_ck)^(1/3), v_min) 2d/a_p", vRd,
                              "N/mm²", ref="Eq. 6.50", dp=3)
-            calc.check("Punching of the mast base: v_Ed ≤ v_Rd", p["vEd"], p["vRd"], "N/mm²",
-                       "6.4.4(2)", hint=HINT_PUNCH)
-        elif not quiet:
-            calc.text("Every control perimeter within 2d of the mast base lies outside the base — "
-                      "punching of the mast base is not critical; beam shear governs.")
-        # ---- punching under the most compressed leg
+            if r <= 1 or not use:
+                calc.check("Punching of the mast base: v_Ed ≤ v_Rd", vEd, vRd, "N/mm²",
+                           "6.4.4(2)", hint=HINT_PUNCH)
+                if r <= 1 and not quiet:
+                    calc.text("No punching reinforcement is needed around the mast base.")
+            else:
+                out["frame"] = cls._links(calc, quiet, "frame", req, aout, edge, worst, d, sr,
+                                          s0, A1, dsw, fywd, fywef, rmin, na, c, gov, vR,
+                                          cs_term, inp)
+        # ---------------------------------------------------------- one leg
         F = gov["leg"][0]
         ce = B / 2 - a / 2 - cl / 2                 # clear distance plate → base edge
         amax = min(2 * d, (a - cl) / 2)             # the perimeter must not reach the next leg
@@ -633,10 +707,19 @@ class CraneBaseEC7(DesignModule):
             calc.formula("a_p", "min(2d, (a − c_l)/2)", amax, "mm", dp=0)
             calc.formula("u_leg", "4c_l + 2πa_p (inside the base)", u_leg, "mm", dp=0)
             calc.formula("v_Ed,leg", "F_leg / (u_leg d)", vEd_l, "N/mm²", dp=3)
-            calc.formula("v_Rd,leg", "max(C_Rd,c k (100ρ f_ck)^(1/3), v_min) 2d/a_p", vRd_l, "N/mm²",
-                         ref="Eq. 6.50", dp=3)
-        calc.check("Punching under a leg: v_Ed ≤ v_Rd", vEd_l, vRd_l, "N/mm²", "6.4.4(2)",
-                   hint=HINT_PUNCH)
+            calc.formula("v_Rd,leg", "max(C_Rd,c k (100ρ f_ck)^(1/3), v_min) 2d/a_p", vRd_l,
+                         "N/mm²", ref="Eq. 6.50", dp=3)
+        if vEd_l <= vRd_l or not use:
+            calc.check("Punching under a leg: v_Ed ≤ v_Rd", vEd_l, vRd_l, "N/mm²", "6.4.4(2)",
+                       hint=HINT_PUNCH)
+            if vEd_l <= vRd_l and not quiet:
+                calc.text("No punching reinforcement is needed around the legs.")
+        else:
+            req_l = (vEd_l - 0.75 * vRd_l) * u_leg * sr / (1.5 * fywef)
+            out["leg"] = cls._links(calc, quiet, "leg", req_l, amax, amax,
+                                    (vEd_l / vRd_l, gov["leg"][1], amax, u_leg, F, 1.0, vEd_l,
+                                     vRd_l), d, sr, s0, A1, dsw, fywd, fywef, rmin, na, cl, gov,
+                                    vR, cs_term, inp)
         v0 = F / (4 * cl * d)
         if not quiet:
             calc.formula("v_Ed,0", "F_leg / (4 c_l d)", v0, "N/mm²",
@@ -644,50 +727,92 @@ class CraneBaseEC7(DesignModule):
             calc.formula("v_Rd,max", f"{na.punch_vmax:g} ν f_cd, ν = 0.6(1 − f_ck/250)", vmax,
                          "N/mm²", ref="6.4.5(3)", dp=3)
         calc.check("Leg face: v_Ed,0 ≤ v_Rd,max", v0, vmax, "N/mm²", "6.4.5(3)",
-                   hint="Larger leg base plates or a higher concrete class.")
-        # ---- anchors
-        if not quiet:
-            calc.heading("Mast anchors", 2)
-            T = gov["ten"][0]
-            if T > 0:
-                calc.formula("T_leg", "M_d s_max / Σs² − γ_G,fav N/4", T, "kN",
-                             "Design tension in the most stressed mast anchor", dp=1)
-                calc.note("Anchor the mast anchors (manufacturer's anchor frame or cast-in "
-                          "anchors) below the bottom bars, or tie them with hanger bars for "
-                          "T_leg, following the manufacturer's details.")
-            else:
-                calc.text("No tension in the mast anchors.")
+                   hint="Larger leg base plates or a higher concrete class — links cannot "
+                        "raise this limit.")
+        return out
 
     @staticmethod
-    def _punch_frame(VN, Md, fx, fy, X, Y, dA, net, c, d, B, vrc):
-        best = None
-        dx = np.clip(np.abs(X) - c / 2, 0, None)
-        dy = np.clip(np.abs(Y) - c / 2, 0, None)
-        dist = np.hypot(dx, dy)
-        for ap in np.linspace(0.1 * d, 2 * d, 20):
-            if c / 2 + ap > B / 2:
-                break
-            u = 4 * c + 2 * math.pi * ap
-            Vred = VN - float((net * (dist <= ap)).sum() * dA)
-            if Vred <= 0:
-                continue
-            W1 = c * c / 2 + c * c + 4 * c * ap + 4 * ap * ap + math.pi * ap * c
-            beta = 1 + 0.6 * Md * (fx + fy) / Vred * u / W1
-            vEd = beta * Vred / (u * d)
-            vRd = vrc * 2 * d / ap
-            if best is None or vEd / vRd > best["r"]:
-                best = {"r": vEd / vRd, "a": ap, "u": u, "Vred": Vred, "beta": beta, "vEd": vEd,
-                        "vRd": vRd}
-        return best
+    def _links(calc, quiet, where, req, aout, edge, worst, d, sr, s0, A1, dsw, fywd, fywef,
+               rmin, na, c, gov, vR, cs_term, inp) -> dict:
+        """Perimeters of vertical link legs (α = 90°) for one loaded area (square c)."""
+        r, lab, ap, u, Vred, beta, vEd, vRd = worst
+        frame = where == "frame"
+        kd = na.punch_kout * d
+        if frame:
+            n_per = max(2, math.ceil((aout - kd - s0) / sr - 1e-9) + 1)
+            # the perimeters stay inside the base (cover 75 mm to the edge)
+            n_max = max(int((edge - 75 - s0) // sr) + 1, 1)
+            capped = n_per > n_max
+            n_per = min(n_per, n_max) if capped else n_per
+        else:
+            n_per, capped = 2, False
+        radii = [s0 + i * sr for i in range(n_per)]
+        legs, rowsout = [], []
+        for ri in radii:
+            ui = 4 * c + 2 * math.pi * ri
+            st_max = min(1.5 * d if ri <= 2 * d else 2 * d, A1 * 1.5 / (rmin * sr))
+            n = max(math.ceil(req / A1 - 1e-9), math.ceil(ui / st_max - 1e-9), 4)
+            legs.append(n)
+            rowsout.append([f"{ri:.0f}", f"{ui / 1000:.2f}", str(n), f"{ui / n:.0f}"])
+        Asw = min(legs) * A1
+        vRdcs = 0.75 * vRd + cs_term(Asw, u)
+        if not quiet:
+            calc.heading("Punching reinforcement around the mast base (6.4.5, 9.4.3)" if frame
+                         else "Punching reinforcement around each leg (6.4.5, 9.4.3)", 2)
+            calc.text("Vertical links Ø{dsw:.0f} (α = 90°). Eq. 6.52 with the concrete term "
+                      "0.75 v_Rd,c taken with the 2d/a_p enhancement of 6.4.4(2), as in the check "
+                      "without links (interpretation for column bases); u_out where v_Ed ≤ v_Rd,c "
+                      "again (6.4.5(4)).", dsw=dsw)
+            calc.formula("f_ywd,ef", "250 + 0.25 d ≤ f_ywd", fywef, "N/mm²", ref="Eq. 6.53",
+                         dp=0)
+            calc.formula("s_r", "≤ 0.75 d (rounded to 25 mm)", sr, "mm", ref="9.4.3(1)", dp=0)
+            calc.formula("s_0", "0.3d ≤ s_0 ≤ 0.5d", s0, "mm",
+                         "First perimeter from the face", ref="9.4.3(4)", dp=0)
+            calc.formula("A_sw,req" if frame else "A_sw,req,leg",
+                         "(v_Ed − 0.75 v_Rd,c) u s_r / (1.5 f_ywd,ef)", req, "mm²",
+                         "Links per perimeter (most onerous perimeter)", ref="Eq. 6.52", dp=0)
+            if frame:
+                calc.formula("a_out", "last perimeter with v_Ed > v_Rd,c, + 0.05d", aout, "mm",
+                             "u_out,ef from the face", ref="Eq. 6.54", dp=0)
+                calc.formula("r_last,min", f"a_out − {na.punch_kout:g} d", aout - kd, "mm",
+                             ref="6.4.5(4)", dp=0)
+            calc.table(["Perimeter r [mm]", "u [m]", "Link legs", "s_t [mm]"], rowsout,
+                       "Perimeters of link legs, measured from the face of the loaded area")
+            calc.formula("v_Rd,cs" if frame else "v_Rd,cs,leg",
+                         "0.75 v_Rd,c + 1.5 (d/s_r) A_sw f_ywd,ef / (u d)", vRdcs, "N/mm²",
+                         ref="Eq. 6.52", dp=3)
+            if not frame:
+                calc.text("Two perimeters of link legs around each of the four legs (9.4.3(1)), "
+                          "inside a_p; where they overlap the links of the mast base, the denser "
+                          "arrangement governs.")
+            if capped:
+                calc.note("u_out reaches the edge of the base: the link perimeters run up to the "
+                          "edge — a thicker base is usually the better solution.")
+        calc.check("Punching with links: v_Ed ≤ v_Rd,cs" if frame
+                   else "Punching under a leg with links: v_Ed ≤ v_Rd,cs", vEd, vRdcs, "N/mm²",
+                   "6.4.5(1)", hint="Larger or more link legs, or a thicker base.")
+        if frame and not capped:
+            calc.check_min("Last link perimeter ≥ a_out − k d", radii[-1], aout - kd, "mm",
+                           "6.4.5(4)", hint="Add a perimeter of links.")
+        st = max(float(x[3]) for x in rowsout)
+        calc.check_min("Link leg area ≥ A_sw,min", A1,
+                       rmin * sr * st / 1.5, "mm²", "Eq. 9.11",
+                       hint="Larger link diameter or closer link legs.")
+        if not quiet:
+            calc.formula("n_sw" if frame else "n_sw,leg",
+                         "Σ link legs" if frame else "4 legs × Σ link legs", sum(legs) * (
+                             1 if frame else 4), "", "Number of link legs", dp=0)
+        return {"radii": radii, "legs": legs, "dsw": dsw}
 
     # ------------------------------------------------------------------- 3D
     @staticmethod
-    def _scene(calc, inp) -> dict:
+    def _scene(calc, inp, links=None) -> dict:
         m = lambda v: v / 1000  # noqa: E731
         B, h, a, cl = m(inp["B"]), m(inp["h"]), m(inp["a"]), m(inp["cl"])
         sc = Scene3D("crane_base", calc.tr)
-        for key, label in (("base", "Base"), ("bars", "Reinforcement"), ("mast", "Mast"),
-                           ("soil", "Soil"), ("loads", "Loads")):
+        for key, label in (("base", "Base"), ("bars", "Reinforcement"),
+                           ("links", "Punching links"), ("mast", "Mast"), ("soil", "Soil"),
+                           ("loads", "Loads")):
             sc.layer(key, label, toggle=key != "base")
         top = -m(inp["ts"])
         sc.box("base", (0, top - h / 2, 0), (B, h, B), PALETTE["concrete"], opacity=0.45)
@@ -705,6 +830,22 @@ class CraneBaseEC7(DesignModule):
                             "#8a5a2b")
                 sc.cylinder("bars", (p, y + dia, -B / 2 + cov), (p, y + dia, B / 2 - cov),
                             dia / 2, "#8a5a2b")
+        y1, y2 = top - h + cov, top - cov
+        for key, cx, cy, size in (("frame", 0.0, 0.0, a + cl),
+                                  *(("leg", sx * a / 2, sz * a / 2, cl)
+                                    for sx in (-1, 1) for sz in (-1, 1))):
+            lk = (links or {}).get(key)
+            if not lk:
+                continue
+            for ri, n in zip(lk["radii"], lk["legs"]):
+                ring = [(px, top + 0.01, pz) for px, pz in perimeter_points(cx, cy, size, m(ri), 96)
+                        if max(abs(px), abs(pz)) <= B / 2 - cov]
+                if len(ring) > 2:
+                    sc.line("links", ring + ring[:1], PALETTE["punch"], dashed=True)
+                for px, pz in perimeter_points(cx, cy, size, m(ri), n):
+                    if max(abs(px), abs(pz)) <= B / 2 - cov:
+                        sc.cylinder("links", (px, y1, pz), (px, y2, pz), m(lk["dsw"]) / 2,
+                                    PALETTE["punch"])
         H = 3.0
         for sx in (-1, 1):
             for sz in (-1, 1):
@@ -724,6 +865,33 @@ class CraneBaseEC7(DesignModule):
         sc.label("base", f"B = {B:.2f} m, h = {h:.2f} m", (B / 2 + 0.3, top - h / 2, B / 2),
                  "result")
         return sc.to_dict()
+
+
+def perimeter_points(cx, cy, c, r, n):
+    """n points equally spaced along the rounded square at distance r around a square c."""
+    h = c / 2
+    segs = []
+    for k in range(4):
+        ang0 = k * math.pi / 2
+        ux, uy = math.cos(ang0), math.sin(ang0)
+        vx, vy = -uy, ux
+        segs.append(("line", (cx + ux * (h + r) - vx * h, cy + uy * (h + r) - vy * h),
+                     (vx, vy), c))
+        segs.append(("arc", (cx + (ux + vx) * h, cy + (uy + vy) * h), ang0, math.pi / 2 * r))
+    total = 4 * c + 2 * math.pi * r
+    pts = []
+    for i in range(n):
+        t = (i + 0.5) * total / n
+        for kind, p0, dirn, length in segs:
+            if t <= length or (kind, p0) == segs[-1][:2]:
+                if kind == "line":
+                    pts.append((p0[0] + dirn[0] * t, p0[1] + dirn[1] * t))
+                else:
+                    ang = dirn + (t / r if r > 0 else 0)
+                    pts.append((p0[0] + r * math.cos(ang), p0[1] + r * math.sin(ang)))
+                break
+            t -= length
+    return pts
 
 
 def _as_req(M, d, fcd, fyd):
