@@ -19,6 +19,8 @@ SPECS: dict[str, list[dict[str, Any]]] = {
     "ec7_pad_footing": [{"name": "Bx", "lo": 1.0, "hi": 5.0, "step": 0.1},
                         {"name": "By", "lo": 1.0, "hi": 5.0, "step": 0.1},
                         {"name": "h", "lo": 0.3, "hi": 1.5, "step": 0.05}],
+    "ec7_crane_base": [{"name": "B", "lo": 3.0, "hi": 12.0, "step": 0.1},
+                       {"name": "h", "lo": 0.8, "hi": 2.5, "step": 0.05}],
     "ec7_strip_footing": [{"name": "B", "lo": 0.5, "hi": 4.0, "step": 0.05},
                           {"name": "h", "lo": 0.25, "hi": 1.2, "step": 0.05}],
     "ec7_retaining_wall": [{"name": "toe", "lo": 0.3, "hi": 3.0, "step": 0.1},

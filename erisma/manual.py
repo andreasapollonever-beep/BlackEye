@@ -1008,6 +1008,42 @@ NOTES: dict[str, dict[str, list[str]]] = {
                "critical perimeter search between 0 and 2d (6.4.4)."],
         "el": ["Ενεργό εμβαδόν B'×L' για διαξονική εκκεντρότητα (Παράρτημα D)· διάτρηση με "
                "αναζήτηση της κρίσιμης περιμέτρου μεταξύ 0 και 2d (6.4.4)."]},
+    "ec7_crane_base": {
+        "en": ["Loads from the crane manufacturer (in service / out of service). Every case is "
+               "checked with M along the axis and along the diagonal of the base and with the "
+               "maximum and minimum vertical load.",
+               "EQU: γ_Q,dst (M + H h) ≤ γ_G,stb (N + W) B/2 (EN 1997-1 2.4.7.2). GEO: "
+               "eccentricity inside the middle-third ellipse (6.5.4), bearing on B'×L' (Annex D "
+               "or a given q_Rd), sliding V tan φ'_d / γ_R,h (Eq. 6.3a).",
+               "Slewing torque: friction over the effective area with lever r_m (mean distance "
+               "from its centroid) and the linear interaction H/R_h + M_t/R_t ≤ 1 — an "
+               "engineering approach, not an EN 1997-1 clause.",
+               "STR: linear contact pressure without tension (lift-off), per metre averaged over "
+               "B; bending at the leg centre line (bottom bars) and on the lifted side (top "
+               "bars); beam shear at d from the mast base (6.2.2); punching of the mast base as "
+               "a column c = a + c_l (6.4.4(2), Eq. 6.51) and under the most compressed leg; "
+               "leg face v_Rd,max (6.4.5(3)).",
+               "Sizing: for every h (from the minimum, step 0.05 m) the smallest B (step 0.1 m) "
+               "is found and the least concrete volume is kept; also the smallest B for the "
+               "thickness entered. The manufacturer's own limits must also be met."],
+        "el": ["Φορτία από τον κατασκευαστή του γερανού (σε λειτουργία / εκτός λειτουργίας). Κάθε "
+               "περίπτωση ελέγχεται με τη ροπή M κατά τον άξονα και κατά τη διαγώνιο της βάσης "
+               "και με το μέγιστο και ελάχιστο κατακόρυφο φορτίο.",
+               "EQU: γ_Q,dst (M + H h) ≤ γ_G,stb (N + W) B/2 (EN 1997-1 2.4.7.2). GEO: "
+               "εκκεντρότητα μέσα στην έλλειψη του μεσαίου τρίτου (6.5.4), φέρουσα ικανότητα στο "
+               "B'×L' (Παράρτημα D ή δοσμένο q_Rd), ολίσθηση V tan φ'_d / γ_R,h (Εξ. 6.3a).",
+               "Ροπή περιστροφής: τριβή στο ενεργό εμβαδόν με μοχλοβραχίονα r_m (μέση απόσταση "
+               "από το κέντρο βάρους του) και γραμμική αλληλεπίδραση H/R_h + M_t/R_t ≤ 1 — "
+               "μηχανική προσέγγιση, όχι άρθρο του EN 1997-1.",
+               "STR: γραμμική τάση εδάφους χωρίς εφελκυσμό (αποκόλληση), ανά μέτρο ως μέσος όρος "
+               "στο B· κάμψη στον άξονα των ποδιών (κάτω οπλισμός) και στην ανασηκωμένη πλευρά "
+               "(πάνω οπλισμός)· τέμνουσα σε απόσταση d από τη βάση του ιστού (6.2.2)· διάτρηση "
+               "της βάσης του ιστού ως υποστύλωμα c = a + c_l (6.4.4(2), Εξ. 6.51) και κάτω από "
+               "το πιο θλιβόμενο πόδι· v_Rd,max στην παρειά του ποδιού (6.4.5(3)).",
+               "Διαστασιολόγηση: για κάθε h (από το ελάχιστο, βήμα 0.05 m) βρίσκεται το "
+               "μικρότερο B (βήμα 0.1 m) και κρατείται ο ελάχιστος όγκος σκυροδέματος· επίσης το "
+               "μικρότερο B για το πάχος που δόθηκε. Πρέπει να τηρούνται και τα όρια του "
+               "κατασκευαστή."]},
     "ec7_strip_footing": {
         "en": ["Strip bearing per metre run with load inclination; tie-beam force ±k α S N "
                "(EN 1998-5 5.4.1.2) with the minimum sections of EN 1998-1 5.8.2."],

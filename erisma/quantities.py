@@ -75,6 +75,16 @@ def _pad(i, c):
             "excavation": m3(Bx + 600, By + 600, D)}, "per footing"
 
 
+@quantity("ec7_crane_base")
+def _crane(i, c):
+    B, h, D = i["B"], i["h"], i["h"] + i["ts"]
+    Ab = _bar(float(i["db"])) * B / i["sb"]
+    At = _bar(float(i["dt"])) * B / i["st"]
+    # two layers each way, bottom and top mesh
+    return {"concrete": m3(B, B, h), "rebar": 2 * _kg(Ab, B) + 2 * _kg(At, B),
+            "formwork": 4 * B * h / 1e6, "excavation": m3(B + 600, B + 600, D)}, "per base"
+
+
 @quantity("ec7_strip_footing")
 def _strip(i, c):
     B, h, D = i["B"], i["h"], i["D"]

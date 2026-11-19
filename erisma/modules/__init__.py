@@ -28,6 +28,7 @@ from . import (  # noqa: F401
     ec5_timber_beam,
     ec6_masonry_wall,
     ec7_gravity_wall,
+    ec7_crane_base,
     ec7_pad_footing,
     ec7_pile,
     ec7_raft,

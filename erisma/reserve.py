@@ -28,6 +28,7 @@ GROUP_LABELS = {G: "Permanent loads G", Q: "Variable loads Q", E: "Seismic actio
 # module -> [(field, group)] or [("table.column", group)]; only applied loads / actions.
 LOADS: dict[str, list[tuple[str, str]]] = {
     "ec2_pile_cap": [("NEd", A), ("Mx", A), ("My", A)],
+    "ec7_crane_base": [("cases.N", A), ("cases.M", A), ("cases.H", A), ("cases.Mt", A)],
     "ec2_rc_beam": [("MEd", A), ("VEd", A)],
     "ec2_beam_opening": [("gk", G), ("qk", Q), ("MEd", A), ("VEd", A), ("cases.M", A),
                          ("cases.V", A)],
