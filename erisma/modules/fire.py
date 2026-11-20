@@ -311,10 +311,13 @@ class ConcreteFireEC2(DesignModule):
             calc.table(["b_min [mm]", "a [mm]"], [[str(x), str(y)] for x, y in combos],
                        caption=calc.tr("EN 1992-1-2 Table 5.5, {r} (web b_w ≥ {w} mm)", r=R, w=bw))
             areq = calc.formula("a_req", "Table 5.5 interpolated for b", areq, "mm", dp=0)
-            if inp["layers"]:
+            if inp["layers"] and inp["b"] <= bmins[2]:
                 calc.formula("a_sd", "a_req + 10 mm (corner bars, one layer)", areq + 10, "mm",
-                             ref="5.6.3(5)", dp=0)
+                             ref="Table 5.5, note", dp=0)
                 areq += 10
+            elif inp["layers"]:
+                calc.text("b > b_min of Column 4 ({b4} mm): no increase of a_sd is required "
+                          "(Table 5.5, note).", b4=bmins[2])
             calc.check_min(calc.tr("Axis distance a ≥ a_req ({r})", r=R), a, areq, "mm",
                            "EN 1992-1-2 5.6", hint=HINT_C)
         else:
@@ -324,6 +327,10 @@ class ConcreteFireEC2(DesignModule):
                            "EN 1992-1-2 Table 5.8", hint=HINT_C)
             calc.check_min(calc.tr("Axis distance a ≥ a_min ({r})", r=R), a, areq, "mm",
                            "EN 1992-1-2 Table 5.8", hint=HINT_C)
+        if beam:
+            calc.text("Web thickness b_w of Class WA (the largest, Table 5.5 Column 6); the "
+                      "Cyprus National Annex (NA 2.11) allows Class WA, WB or WC. Linear "
+                      "interpolation between the columns: 5.2(12).")
         calc.note("Tabulated data apply to normal-weight concrete with siliceous aggregate and "
                   "the reinforcement stress level of EN 1992-1-2 5.2(5); continuous members: "
                   "Tables 5.6 / 5.8 continuous columns.")

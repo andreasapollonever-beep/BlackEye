@@ -86,3 +86,18 @@ def test_slope_nails_raise_the_factor():
     nails = [{"z": z, "angle": 15, "L": 9, "sh": 1.5, "Td": 150, "bond": 40} for z in (1.5, 3, 4.5)]
     f1 = m.calculate({"slope": 40, "nails": nails}, {"annex": "CY"}).values["F_d"]
     assert f1 > f0 * 1.3
+
+
+def test_concrete_fire_tables_en_1992_1_2():
+    """EN 1992-1-2:2004 Table 5.5 / 5.8 values and the a_sd note of Table 5.5."""
+    from erisma.modules.fire import T55, T58
+    assert T55["R90"] == ([(150, 55), (200, 45), (300, 40), (400, 35)], 110)
+    assert T55["R240"] == ([(280, 90), (350, 80), (500, 75), (700, 70)], 170)
+    assert T58["R120"] == (120, 40, 20, 25) and T58["R60"] == (80, 20, 10, 15)
+    m = get_module("ec2_fire")
+    # R90, b = 250: a = 45 + (40 − 45)·50/100 = 42.5 (linear interpolation, 5.2(12))
+    c = m.calculate({"R": "R90", "b": 250, "layers": True})
+    assert c.values["a_req"] == pytest.approx(42.5) and c.values["a_sd"] == pytest.approx(52.5)
+    # b > Column 4 (300 mm): no increase of a_sd
+    c = m.calculate({"R": "R90", "b": 350, "layers": True})
+    assert "a_sd" not in c.values and c.values["a_req"] == pytest.approx(37.5)

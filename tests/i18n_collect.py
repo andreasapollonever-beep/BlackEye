@@ -132,7 +132,7 @@ SCENARIOS = {
                            {"zw": 30}],
     "ec3_fire": [{}, {"protection": "None"}, {"exposure": "4 sides (column)", "U": 0.3, "R": "R30"}],
     "ec5_fire": [{}, {"R": "R60", "sides": "4 sides"}, {"cls": "C24", "b": 100, "h": 200}],
-    "ec2_fire": [{}, {"member": "One-way slab", "b": 70}, {"member": "Two-way slab (l_y/l_x ≤ 1.5)"},
+    "ec2_fire": [{}, {"b": 350}, {"member": "One-way slab", "b": 70}, {"member": "Two-way slab (l_y/l_x ≤ 1.5)"},
                  {"member": "Two-way slab (1.5 < l_y/l_x ≤ 2)", "R": "R240"}, {"b": 60, "R": "R240"},
                  {"layers": False}],
     "ec7_slope_stability": [{}, {"slope": 45, "c": 0}, {"slope": 40, "nails": [

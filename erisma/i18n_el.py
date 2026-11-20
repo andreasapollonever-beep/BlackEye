@@ -3484,4 +3484,6 @@ EL: dict[str, str] = {
     's_t [mm]': 's_t [mm]',
     'u [m]': 'u [m]',
     'u_out,ef from the face': 'u_out,ef από την παρειά',
+    'Web thickness b_w of Class WA (the largest, Table 5.5 Column 6); the Cyprus National Annex (NA 2.11) allows Class WA, WB or WC. Linear interpolation between the columns: 5.2(12).': 'Πάχος κορμού b_w της Κλάσης WA (το μεγαλύτερο, Πίνακας 5.5 Στήλη 6)· το Κυπριακό Εθνικό Προσάρτημα (NA 2.11) επιτρέπει Κλάση WA, WB ή WC. Γραμμική παρεμβολή μεταξύ των στηλών: 5.2(12).',
+    'b > b_min of Column 4 ({b4} mm): no increase of a_sd is required (Table 5.5, note).': 'b > b_min της Στήλης 4 ({b4} mm): δεν απαιτείται αύξηση του a_sd (Πίνακας 5.5, σημείωση).',
 }
