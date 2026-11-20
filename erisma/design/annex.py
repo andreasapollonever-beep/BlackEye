@@ -138,6 +138,7 @@ class Annex:
     imposed_A0: float = 10.0  # Eq. 6.1, A0 [m²]
     imposed_alphaA_min_CD: float = 0.6  # Eq. 6.1, categories C and D
     imposed_na: bool = False  # True once a National Annex to EN 1991-1-1 has been entered
+    imposed_ref: str = ""     # the National Annex tables the imposed loads come from
     # EN 1992-1-1 7.3.1(5) Table 7.1N — w_max [mm], reinforced members, quasi-permanent
     # combination; 7.3.4(3) k3, k4 (recommended values = Table 7.1(CYS), NA 2.41, NA 2.43).
     crack_wmax: dict = field(default_factory=lambda: {
@@ -182,6 +183,15 @@ CY = Annex(
     # NA to CYS EN 1997-1 NA 2.35 Tables A.6–A.8(CYS): R2 γb = γs = γt = 1.1, γs,t = 1.15;
     # NA 2.36 Tables A.9–A.11(CYS) = EN ξ values; NA 2.19: model factor ≥ 1.25.
     pile_model_min=1.25,
+    # NA to CYS EN 1991-1-1:2002 (approved 11/06/2010): NA 2.4 Table 6.2(CYS) — A stairs
+    # 3.0/2.0, A balconies 4.0/2.0, B 3.0/4.0, D1 5.0/7.0 (others = EN); NA 2.5 Eq. 6.1, 6.2
+    # adopted; NA 2.6 Table 6.4(CYS) E1 7.5/7.0; NA 2.7 Table 6.8(CYS) F 2.5/20, G 5.0/90;
+    # NA 2.8 Table 6.10(CYS) H 0.4/1.0; NA 2.9 Table 6.12(CYS) = EN values.
+    imposed={"A_floor": (2.0, 2.0), "A_stairs": (3.0, 2.0), "A_balcony": (4.0, 2.0),
+             "B": (3.0, 4.0), "C1": (3.0, 4.0), "C2": (4.0, 4.0), "C3": (5.0, 4.0),
+             "C4": (5.0, 7.0), "C5": (5.0, 4.5), "D1": (5.0, 7.0), "D2": (5.0, 7.0),
+             "E1": (7.5, 7.0), "F": (2.5, 20.0), "G": (5.0, 90.0), "H": (0.4, 1.0)},
+    imposed_na=True, imposed_ref="NA to CYS EN 1991-1-1, Table 6.2(CYS)–6.12(CYS)",
     # NA to CYS EN 1998-3: NA 2.2 return periods 2475/475/225 years, NA 2.3 partial factors
     # of CYS EN 1998-1 for brittle primary elements, NA 2.4 Table 3.1(CYS) CF 1.35/1.20/1.00,
     # NA 3.1 Annex A may be used.

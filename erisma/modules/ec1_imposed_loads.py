@@ -201,11 +201,11 @@ class ImposedLoadsEN1991(DesignModule):
             Qk = calc.input("Q_k", Qk, "kN", "Concentrated load (user value)")
         else:
             q0, Q0 = na.imposed[key]
+            ref = f"{CLAUSE[key]} — {na.imposed_ref}" if na.imposed_ref else CLAUSE[key]
             qk = calc.formula("q_k", CLAUSE[key], to_base(q0, "kN/m²"), "kN/m²",
-                              "Uniformly distributed imposed load", ref=CLAUSE[key], dp=2)
+                              "Uniformly distributed imposed load", ref=ref, dp=2)
             Qk = calc.formula("Q_k", CLAUSE[key], to_base(Q0, "kN"), "kN",
-                              "Concentrated load (local checks, acting alone)", ref=CLAUSE[key],
-                              dp=1)
+                              "Concentrated load (local checks, acting alone)", ref=ref, dp=1)
         area = {"F": "100 × 100 mm", "G": "200 × 200 mm"}.get(key, "50 × 50 mm")
         calc.note("Q_k acts alone on a square of {a} at the most unfavourable position, and is "
                   "not combined with q_k (6.2.1(3)P, 6.3.1.2(5)P, 6.3.3.2(2)).", a=area)

@@ -32,8 +32,23 @@ def test_default_residential_floor_hand_calc():
     ("F — garages, vehicles ≤ 30 kN", 2.5, 20.0), ("G — traffic areas, vehicles 30–160 kN", 5.0, 90.0),
     ("H — roofs not accessible except for maintenance", 0.4, 1.0)])
 def test_recommended_values(cat, qk, Qk):
+    c = M.calculate({"cat": cat}, {"annex": "EN"})
+    assert (out(c, "q_k"), out(c, "Q_k")) == (qk, Qk)
+
+
+@pytest.mark.parametrize("cat,qk,Qk", [
+    # NA to CYS EN 1991-1-1 Table 6.2(CYS) — the values that differ from the EN recommendation
+    ("A — residential: stairs", 3.0, 2.0), ("A — residential: balconies", 4.0, 2.0),
+    ("B — offices", 3.0, 4.0), ("D1 — general retail shops", 5.0, 7.0),
+    # and some that are equal
+    ("A — residential: floors", 2.0, 2.0), ("C5 — large crowds (concert halls, stands, terraces)",
+                                            5.0, 4.5),
+    ("E1 — storage (incl. books and documents)", 7.5, 7.0),
+    ("G — traffic areas, vehicles 30–160 kN", 5.0, 90.0)])
+def test_cyprus_national_annex_values(cat, qk, Qk):
     c = M.calculate({"cat": cat}, CY)
     assert (out(c, "q_k"), out(c, "Q_k")) == (qk, Qk)
+    assert not any("No National Annex" in w for w in c.warnings)
 
 
 def test_alpha_A_lower_limit_for_C_and_D():
