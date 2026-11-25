@@ -3614,4 +3614,6 @@ EL: dict[str, str] = {
     'Length in contact (lift-off, e > B/6)': 'Μήκος επαφής (αποκόλληση, e > B/6)',
     'Hand check of m_Ed (trapezoid on the cantilever)': 'Έλεγχος με το χέρι της m_Ed (τραπέζιο στον πρόβολο)',
     'The resultant lies outside the base (e ≥ B/2): no effective area — the base overturns; enlarge it.': 'Η συνισταμένη βρίσκεται έξω από τη βάση (e ≥ B/2): δεν υπάρχει ενεργό εμβαδόν — η βάση ανατρέπεται· μεγαλώστε την.',
+    '{n}: {fk:+.0f} kN (design {fd:+.0f}), H {hk:.0f} kN': '{n}: {fk:+.0f} kN (σχεδ. {fd:+.0f}), H {hk:.0f} kN',
+    'Leg forces: {c}, M along the diagonal (+ compression)': 'Δυνάμεις ποδιών: {c}, M κατά τη διαγώνιο (+ θλίψη)',
 }

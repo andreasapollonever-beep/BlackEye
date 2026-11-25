@@ -1321,24 +1321,28 @@ class CraneBaseEC7(DesignModule):
                 ring = [(-a / 2, y0, -a / 2), (a / 2, y0, -a / 2), (a / 2, y0, a / 2),
                         (-a / 2, y0, a / 2), (-a / 2, y0, -a / 2)]
                 sc.line("mast", ring, PALETTE["steel"])
-        # force on each leg: the case with the largest M, M along the diagonal towards leg 1
-        cs = max(inp["cases"], key=lambda r: r["M"])
-        if cs.get("legs"):
-            Fk = cs["legs"]
-        else:
-            f = (cs["M"] + cs["H"] * (inp["hemb"] if emb else 0.0)) / (math.sqrt(2) * inp["a"])
-            Fk = [cs["N"] / 4 + f, cs["N"] / 4, cs["N"] / 4 - f, cs["N"] / 4]
-        for (i, j), F, num in zip(LEGXY, Fk, range(1, 5)):
-            sc.label("loads", f"{num}: {F / 1e3:+.0f} kN", (i * a / 2, top + 0.5, -j * a / 2),
-                     "force" if F >= 0 else "result")
+        # force on each leg: the governing case of the summary (largest design compression),
+        # M along the diagonal towards leg 1; vertical (characteristic / design) and horizontal
+        key = getattr(calc, "crane_key", None)
+        if key:
+            name, Fk, Fd, hk, hd = key["legs"]
+            for (i, j), fk, fd, num in zip(LEGXY, Fk, Fd, range(1, 5)):
+                sc.label("loads", calc.tr("{n}: {fk:+.0f} kN (design {fd:+.0f}), H {hk:.0f} kN",
+                                          n=num, fk=fk / 1e3, fd=fd / 1e3, hk=hk / 1e3),
+                         (i * (a / 2 + 0.9), top + 0.3 + 0.35 * num, -j * (a / 2 + 0.9)),
+                         "force" if fk >= 0 else "result")
+            sc.label("loads", calc.tr("Leg forces: {c}, M along the diagonal (+ compression)",
+                                      c=name), (0, top + 0.15, a / 2 + 0.6), "")
         for y0 in range(int(H)):
             for (x1, z1), (x2, z2) in (((-1, -1), (1, -1)), ((1, -1), (1, 1)), ((1, 1), (-1, 1)),
                                        ((-1, 1), (-1, -1))):
                 sc.line("mast", [(x1 * a / 2, top + y0, z1 * a / 2),
                                  (x2 * a / 2, top + y0 + 1, z2 * a / 2)], "#e0a800")
+        cs = next((r for r in inp["cases"] if key and r["name"] == key["legs"][0]),
+                  max(inp["cases"], key=lambda r: r["M"]))
         sc.arrow("loads", (0, top + H + 1.5, 0), (0, -1, 0), 1.2, PALETTE["load"])
-        sc.label("loads", f"{cs['name']}: N = {cs['N'] / 1e3:.0f} kN, M = {cs['M'] / 1e6:.0f} kNm",
-                 (0, top + H + 1.8, 0), "force")
+        sc.label("loads", f"{cs['name']}: N = {cs['N'] / 1e3:.0f} kN, M = {cs['M'] / 1e6:.0f} kNm, "
+                          f"H = {cs['H'] / 1e3:.0f} kN", (0, top + H + 1.8, 0), "force")
         sc.label("base", f"B = {B:.2f} m, h = {h:.2f} m", (B / 2 + 0.3, top - h / 2, B / 2),
                  "result")
         return sc.to_dict()

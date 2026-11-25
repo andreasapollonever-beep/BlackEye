@@ -386,3 +386,17 @@ def test_report_shows_the_arithmetic():
     assert f["H_leg,k"]["value"] == pytest.approx(7.7 * T / 4, abs=0.01)
     # hand check of the bottom moment (trapezoid, M along the axis) = numerical value
     assert f["m_hand"]["value"] == pytest.approx(f["m_Ed"]["value"], rel=0.005)
+
+
+def test_3d_leg_labels_follow_the_loads():
+    def labels(rows):
+        c = M.calculate({"size": False, "a": 2.0, "cases": rows}, CY)
+        return [o["text"] for o in c.model3d["objects"]
+                if o.get("t") == "label" and o["text"][:2] in ("1:", "2:", "3:", "4:")]
+    a = labels([{"name": "c", "N": 1000, "M": 2000, "H": 40, "Mt": 0}])
+    assert a[0].startswith("1: +957 kN") and "H 10 kN" in a[0]           # 250 + 2000/(√2·2)
+    assert labels([{"name": "c", "N": 1000, "M": 2000, "H": 80, "Mt": 0}])[0].endswith("H 20 kN")
+    # two cases: the labels follow the governing one, whichever row changes
+    b = labels([{"name": "small", "N": 1000, "M": 500, "H": 10, "Mt": 0},
+                {"name": "big", "N": 1000, "M": 3000, "H": 10, "Mt": 0}])
+    assert b[0].startswith(f"1: +{250 + 3000 / (math.sqrt(2) * 2):.0f} kN")
