@@ -386,11 +386,17 @@ class CraneBaseEC7(DesignModule):
         calc.table(["Check group", "Result", "Max. utilisation", "Governing check"], rows)
         key = getattr(calc, "crane_key", None)
         if key:
-            name, Fk, Fd = key["legs"]
+            name, Fk, Fd, hk, hd = key["legs"]
             calc.heading("Forces on each leg", 2)
+            calc.text("Vertical: F = N/4 ± M s / Σs² (legs at ±a/2, a = {a:.2f} m). Horizontal "
+                      "(shear) on every leg: H/4 + M_t / (2√2 a) — H shared equally, the slewing "
+                      "torque M_t taken by the four legs at radius a/√2.", a=inp["a"] / 1000)
             calc.table(["Leg", "1 (+x, +y)", "2 (−x, +y)", "3 (−x, −y)", "4 (+x, −y)"],
                        [[calc.tr("Characteristic [kN]"), *(f"{f / 1e3:+.1f}" for f in Fk)],
-                        [calc.tr("Design [kN]"), *(f"{f / 1e3:+.1f}" for f in Fd)]],
+                        [calc.tr("Design [kN]"), *(f"{f / 1e3:+.1f}" for f in Fd)],
+                        [calc.tr("Horizontal, characteristic [kN]"),
+                         *([f"{hk / 1e3:.1f}"] * 4)],
+                        [calc.tr("Horizontal, design [kN]"), *([f"{hd / 1e3:.1f}"] * 4)]],
                        calc.tr("{c}, M along the diagonal towards leg 1 (the most onerous); "
                                "compression +, tension −", c=name))
             o = calc.outputs
@@ -822,8 +828,11 @@ class CraneBaseEC7(DesignModule):
                 Fk = [cs["N"] / 4 + fk, cs["N"] / 4, cs["N"] / 4 - fk, cs["N"] / 4]
                 Fd = [gG * cs["N"] / 4 + gQ * fk, gG * cs["N"] / 4,
                       gGf * cs["N"] / 4 - gQ * fk, gG * cs["N"] / 4]
+                # horizontal force per leg: H/4 plus the slewing torque on the four legs at
+                # radius a/√2 (M_t / (4 a/√2)), added as if parallel (conservative)
+                hk = cs["H"] / 4 + cs["Mt"] / (2 * math.sqrt(2) * a)
                 if best is None or Fd[0] > best[2][0]:
-                    best = (cs["name"], Fk, Fd)
+                    best = (cs["name"], Fk, Fd, hk, gQ * hk)
             calc.crane_key = {"legs": best, "mb": Mb, "mt": Mh, "vb": Vb, "VRc": vrc * d * 1000,
                               "Asb": Asb, "Ast": Ast}
         # ---- bottom bars

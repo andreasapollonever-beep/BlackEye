@@ -359,3 +359,15 @@ def test_summary_shows_leg_forces_moments_and_shear():
     mom = next(t for t in tables if t["rows"][0][0].startswith("Bending, bottom"))
     assert mom["rows"][0][1] == f"m_Ed = {out(c, 'm_Ed'):.1f} kNm/m"
     assert mom["rows"][2][1] == f"v_Ed = {out(c, 'v_Ed'):.1f} kN/m"
+
+
+def test_horizontal_force_per_leg():
+    c = M.calculate({"size": False, "a": 2.0,
+                     "cases": [{"name": "c", "N": 1000, "M": 2000, "H": 80, "Mt": 400}]}, CY)
+    legs = next(it.data for it in c.items[:20] if it.kind == "table"
+                and it.data["rows"][0][0] == "Characteristic [kN]")
+    hk = 80 / 4 + 400 / (2 * math.sqrt(2) * 2)          # H/4 + M_t/(4 · a/√2)
+    assert float(legs["rows"][2][1]) == pytest.approx(hk, abs=0.05)
+    assert float(legs["rows"][3][1]) == pytest.approx(1.5 * hk, abs=0.05)
+    # vertical: N/4 ± M/(√2 a)
+    assert float(legs["rows"][0][1]) == pytest.approx(250 + 2000 / (math.sqrt(2) * 2), abs=0.05)

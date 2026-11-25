@@ -3595,4 +3595,7 @@ EL: dict[str, str] = {
     '2 (−x, +y)': '2 (−x, +y)',
     '3 (−x, −y)': '3 (−x, −y)',
     '4 (+x, −y)': '4 (+x, −y)',
+    'Horizontal, characteristic [kN]': 'Οριζόντια, χαρακτηριστική [kN]',
+    'Horizontal, design [kN]': 'Οριζόντια, σχεδιασμού [kN]',
+    'Vertical: F = N/4 ± M s / Σs² (legs at ±a/2, a = {a:.2f} m). Horizontal (shear) on every leg: H/4 + M_t / (2√2 a) — H shared equally, the slewing torque M_t taken by the four legs at radius a/√2.': 'Κατακόρυφη: F = N/4 ± M s / Σs² (πόδια σε ±a/2, a = {a:.2f} m). Οριζόντια (τέμνουσα) σε κάθε πόδι: H/4 + M_t / (2√2 a) — η H μοιράζεται εξίσου, η ροπή περιστροφής M_t παραλαμβάνεται από τα τέσσερα πόδια σε ακτίνα a/√2.',
 }
