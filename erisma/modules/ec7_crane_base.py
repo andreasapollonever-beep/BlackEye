@@ -685,13 +685,17 @@ class CraneBaseEC7(DesignModule):
                     calc.input("q_Rd", g["qRd"], "kN/m²", "Given design bearing resistance")
             g = worst["slide"]
             calc.heading(calc.tr("Governing sliding case: {c}", c=g["case"]), 2)
-            calc.formula("R_h,d", "V_d tan φ'_d / γ_R,h", g["Rh"], "kN", "Sliding resistance",
+            if g["A"] <= 0:
+                calc.text("The resultant lies outside the base (e ≥ B/2): no effective area — "
+                          "the base overturns; enlarge it.")
+            else:
+              calc.formula("R_h,d", "V_d tan φ'_d / γ_R,h", g["Rh"], "kN", "Sliding resistance",
                          ref="EN 1997-1 Eq. 6.3a", dp=1)
-            calc.formula("r_m", "mean distance of A' from its centroid", g["rm"], "m", dp=3)
-            calc.formula("R_t,d", "R_h,d r_m", g["Rt"], "kNm",
-                         "Friction resistance to the slewing torque", dp=1)
-            calc.formula("u_slide", "H_d/R_h,d + M_t,d/R_t,d", g["u_slide"], "",
-                         "Linear interaction of sliding and torsion (conservative)", dp=3)
+              calc.formula("r_m", "mean distance of A' from its centroid", g["rm"], "m", dp=3)
+              calc.formula("R_t,d", "R_h,d r_m", g["Rt"], "kNm",
+                           "Friction resistance to the slewing torque", dp=1)
+              calc.formula("u_slide", "H_d/R_h,d + M_t,d/R_t,d", g["u_slide"], "",
+                           "Linear interaction of sliding and torsion (conservative)", dp=3)
         g = worst["ecc"]
         calc.check_limit(calc.tr("{n} eccentricity (e_x/B)² + (e_y/B)² ≤ 1/9 — {c}", n=name,
                                  c=g["case"]), g["ecc"], 1 / 9, "", "EN 1997-1 6.5.4",
@@ -798,7 +802,7 @@ class CraneBaseEC7(DesignModule):
                     hog = float((-net * (-coord - x0) * (coord < -x0)).sum() * dA / B)
                     vv = float((net * (coord > xs)).sum() * dA / B)
                     if sag > gov["mb"][0]:
-                        gov["mb"] = (sag, lab)
+                        gov["mb"] = (sag, lab, V, Md, dname, w)
                     if hog > gov["mt"][0]:
                         gov["mt"] = (hog, lab)
                     if vv > gov["v"][0]:
@@ -839,6 +843,8 @@ class CraneBaseEC7(DesignModule):
         if not quiet:
             calc.heading("Bottom reinforcement — sagging at x = a/2", 2)
             calc.text("Governing: {c}.", c=gov["mb"][1])
+            if len(gov["mb"]) > 2:
+                cls._pressure_steps(calc, B, x0, *gov["mb"][2:])
             calc.formula("m_Ed", "Σ (q − w)(x − a/2) ΔA / B,  x > a/2", Mb / 1000, "kNm/m", dp=1)
             res = design_flexure(calc, 1000, d, Mb, fck, fcd, fyk, fyd, h,
                                  allow_compression=False, per_metre=True)
@@ -940,6 +946,72 @@ class CraneBaseEC7(DesignModule):
                              f"{(gGf * cs['N'] / 4 - gQ * fk) / 1e3:.1f}"])
         calc.table(["Case", "M along", "F_max,k [kN]", "F_min,k [kN]", "F_max,d [kN]",
                     "F_min,d [kN]"], rows, "Forces on the mast legs (characteristic and design)")
+        k = lambda v: v / 1e3   # noqa: E731
+        am = a / 1e3
+        for cs in inp["cases"]:
+            calc.text("Step by step — {c}:", c=cs["name"])
+            N, Mk0, H, Mt = cs["N"], cs["M"], cs["H"], cs["Mt"]
+            n4 = calc.formula("N/4", f"{k(N):.1f} / 4", N / 4, "kN", dp=1)
+            Mk = Mk0 + H * hl
+            if hl:
+                calc.formula("M_feet", f"{k(Mk0) / 1e3:.1f} + {k(H):.1f} × {hl / 1e3:.2f}", Mk,
+                             "kNm", "Moment at the level of the feet", dp=1)
+            ml = k(Mk) / 1e3
+            dfd = calc.formula("ΔF_diag", f"{ml:.1f} / (√2 × {am:.2f})", Mk / (math.sqrt(2) * a),
+                               "kN", "M along the diagonal: one leg", dp=1)
+            dfa = calc.formula("ΔF_axis", f"{ml:.1f} / (2 × {am:.2f})", Mk / (2 * a), "kN",
+                               "M along the axis: two legs", dp=1)
+            calc.formula("F_max,k", f"{k(n4):.1f} + {k(dfd):.1f}", n4 + dfd, "kN",
+                         "Most compressed leg (diagonal)", dp=1)
+            calc.formula("F_min,k", f"{k(n4):.1f} − {k(dfd):.1f}", n4 - dfd, "kN",
+                         "Opposite leg (diagonal); − = tension", dp=1)
+            calc.formula("F_axis,k", f"{k(n4):.1f} ± {k(dfa):.1f}", n4 + dfa, "kN",
+                         "Two legs (axis); the other two: N/4 − ΔF_axis", dp=1)
+            calc.formula("F_max,d", f"{gG:g} × {k(n4):.1f} + {gQ:g} × {k(dfd):.1f}",
+                         gG * n4 + gQ * dfd, "kN", "Design, compression", dp=1)
+            calc.formula("F_min,d", f"{gGf:g} × {k(n4):.1f} − {gQ:g} × {k(dfd):.1f}",
+                         gGf * n4 - gQ * dfd, "kN", "Design, tension (−)", dp=1)
+            hk = H / 4 + Mt / (2 * math.sqrt(2) * a)
+            calc.formula("H_leg,k", f"{k(H):.1f} / 4 + {k(Mt) / 1e3:.1f} / (2√2 × {am:.2f})", hk,
+                         "kN", "Horizontal force on each leg", dp=1)
+            calc.formula("H_leg,d", f"{gQ:g} × {k(hk):.1f}", gQ * hk, "kN", dp=1)
+
+    @staticmethod
+    def _pressure_steps(calc, B, x0, V, Md, dname, w) -> None:
+        """Contact pressure of the governing bending case, by hand where M is along the axis."""
+        e = Md / V
+        Bm = B / 1e3
+        calc.formula("V_b", "γ_G (N + W)", V, "kN", dp=1)
+        calc.formula("M_b", "γ_Q (M + H h)", Md, "kNm", dp=1)
+        calc.formula("e_b", f"{Md / 1e6:.1f} / {V / 1e3:.1f}", e, "m", dp=3)
+        calc.formula("w", f"γ_G W / B² = γ_G W / {Bm:.2f}²", w, "kN/m²", "Self-weight per m²",
+                     dp=1)
+        if dname != "axis":
+            q = peak_pressure(V, Md, 1 / math.sqrt(2), 1 / math.sqrt(2), B)
+            calc.formula("q_max", "plane through the contact area (corner)", q, "kN/m²",
+                         "M along the diagonal — computed numerically", dp=1)
+            return
+        L = B / 2 - x0
+        if e <= B / 6:
+            qmax = V / B ** 2 * (1 + 6 * e / B)
+            qmin = V / B ** 2 * (1 - 6 * e / B)
+            calc.formula("q_max", f"{V / 1e3:.1f} / {Bm:.2f}² × (1 + 6 × {e / 1e3:.3f} / {Bm:.2f})",
+                         qmax, "kN/m²", "Full contact (e ≤ B/6)", dp=1)
+            q0 = qmin + (qmax - qmin) * (x0 + B / 2) / B
+        else:
+            Lc = 3 * (B / 2 - e)
+            calc.formula("L_c", f"3 × ({Bm:.2f}/2 − {e / 1e3:.3f})", Lc, "m",
+                         "Length in contact (lift-off, e > B/6)", dp=3)
+            qmax = 2 * V / (B * Lc)
+            calc.formula("q_max", f"2 × {V / 1e3:.1f} / ({Bm:.2f} × {Lc / 1e3:.3f})", qmax,
+                         "kN/m²", dp=1)
+            q0 = max(qmax * (1 - L / Lc), 0.0)
+        calc.formula("q_0", "q at x = a/2", q0, "kN/m²", dp=1)
+        if q0 > 0:
+            m = (q0 - w) * L * L / 2 + (qmax - q0) * L * L / 3
+            calc.formula("m_hand", f"({q0 * 1e3:.1f} − {w * 1e3:.1f}) × {L / 1e3:.3f}²/2 + "
+                                   f"({qmax * 1e3:.1f} − {q0 * 1e3:.1f}) × {L / 1e3:.3f}²/3",
+                         m, "kNm/m", "Hand check of m_Ed (trapezoid on the cantilever)", dp=1)
 
     @staticmethod
     def _embedded(calc, quiet, inp, gov, B, h, fcd, fck, na) -> None:

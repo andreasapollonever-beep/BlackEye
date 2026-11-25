@@ -371,3 +371,18 @@ def test_horizontal_force_per_leg():
     assert float(legs["rows"][3][1]) == pytest.approx(1.5 * hk, abs=0.05)
     # vertical: N/4 ± M/(√2 a)
     assert float(legs["rows"][0][1]) == pytest.approx(250 + 2000 / (math.sqrt(2) * 2), abs=0.05)
+
+
+def test_report_shows_the_arithmetic():
+    """Saez S46: P = 22.6 t, M = 197.4 t·m, T = 7.7 t, legs at a = 1.2 m."""
+    c = M.calculate({"size": False, "lunit": "t, t·m", "a": 1.2, "cl": 0.3, "B": 7, "h": 1.4,
+                     "cases_t": [{"name": "S46", "N": 22.6, "M": 197.4, "H": 7.7, "Mt": 0}]}, CY)
+    f = {it.data["symbol"]: it.data for it in c.items if it.kind == "formula"}
+    assert f["N/4"]["expression"] == "221.6 / 4" and f["N/4"]["value"] == pytest.approx(55.41, abs=0.01)
+    assert f["ΔF_diag"]["expression"] == "1935.8 / (√2 × 1.20)"
+    assert f["F_max,k"]["value"] == pytest.approx(1196.1, abs=0.05)
+    assert f["F_min,k"]["value"] == pytest.approx(-1085.3, abs=0.05)
+    assert f["F_max,d"]["value"] == pytest.approx(1.35 * 55.41 + 1.5 * 1140.70, abs=0.05)
+    assert f["H_leg,k"]["value"] == pytest.approx(7.7 * T / 4, abs=0.01)
+    # hand check of the bottom moment (trapezoid, M along the axis) = numerical value
+    assert f["m_hand"]["value"] == pytest.approx(f["m_Ed"]["value"], rel=0.005)
