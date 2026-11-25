@@ -484,11 +484,13 @@ function renderForm() {
 // Fields with show_if appear only when their switch is on (keeps the form short).
 function updateVisibility() {
   document.querySelectorAll("#inputs [data-show-if]").forEach((row) => {
-    const cond = row.dataset.showIf;  // "switch", "field=value" or "field!=value"
-    const neg = cond.includes("!=");
-    const [k, v] = cond.split(neg ? "!=" : "=");
-    const on = v === undefined ? !!state.inputs[k]
-      : neg ? String(state.inputs[k]) !== v : String(state.inputs[k]) === v;
+    // "switch", "field=value" or "field!=value"; several joined with "&" must all hold
+    const on = row.dataset.showIf.split("&").every((cond) => {
+      const neg = cond.includes("!=");
+      const [k, v] = cond.split(neg ? "!=" : "=");
+      return v === undefined ? !!state.inputs[k]
+        : neg ? String(state.inputs[k]) !== v : String(state.inputs[k]) === v;
+    });
     row.hidden = !on;
     row.classList.toggle("sub", on);
   });

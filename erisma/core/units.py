@@ -21,9 +21,11 @@ UNIT_FACTORS: dict[str, float] = {
     # force
     "N": 1.0,
     "kN": 1e3,
+    "t": 9806.65,      # tonne-force (crane manufacturers' tables), g = 9.80665 m/s²
     # moment
     "Nmm": 1.0,
     "kNm": 1e6,
+    "t·m": 9.80665e6,  # tonne-force metre
     "kNm/m": 1e3,  # moment per metre run -> Nmm/mm
     # line load / stiffness per length
     "N/mm": 1.0,
@@ -73,8 +75,8 @@ def from_base(value: float, unit: str) -> float:
 # units that measure the same quantity (a link may convert between them)
 DIMENSIONS: dict[str, str] = {
     "mm": "L", "cm": "L", "m": "L",
-    "N": "F", "kN": "F",
-    "Nmm": "M", "kNm": "M",
+    "N": "F", "kN": "F", "t": "F",
+    "Nmm": "M", "kNm": "M", "t·m": "M",
     "kNm/m": "M/L",
     "N/mm": "F/L", "kN/m": "F/L",
     "N/mm²": "P", "MPa": "P", "GPa": "P", "kN/m²": "P", "kPa": "P",

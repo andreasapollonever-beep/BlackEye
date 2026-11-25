@@ -7,7 +7,8 @@ import pytest
 from erisma.core import InputError, get_module
 from erisma.design.annex import get_annex
 from erisma.design.geotech import bearing_factors
-from erisma.modules.ec7_crane_base import (contact_pressure, mean_radius, perimeter_points,
+from erisma.modules.ec7_crane_base import (contact_pressure, mean_radius, peak_pressure,
+                                           perimeter_points, rounded_rect_length,
                                            rounded_square_length)
 
 M = get_module("ec7_crane_base")
@@ -117,8 +118,9 @@ def test_default_structural():
     m = max(strip_moment(g * (N + W), 1.5 * (Mk + H * 1.4), 6, g * W / 36, 1.0)
             for N, Mk, H in ((1100, 2400, 35), (950, 2800, 95)) for g in (1.35, 1.0))
     assert out(c, "m_Ed") == pytest.approx(m, rel=0.01)
-    # most compressed leg: 1.35 N/4 + M_d/(√2 a); anchor tension: M_d/(√2 a) − N/4
-    Md = 1.5 * (2800 + 95 * 1.4)
+    # most compressed leg: 1.35 N/4 + M_d/(√2 a); anchor tension: M_d/(√2 a) − N/4, with M at
+    # the level of the leg feet (top of the base for a bolted mast)
+    Md = 1.5 * 2800
     assert out(c, "F_leg") == pytest.approx(1.35 * 950 / 4 + Md / (math.sqrt(2) * 2))
     assert out(c, "T_leg") == pytest.approx(Md / (math.sqrt(2) * 2) - 950 / 4)
     # leg punching: d = 1400 − 50 − 25, a_p = min(2d, (a − c_l)/2) = 800 mm
@@ -229,3 +231,91 @@ def test_links_allow_a_thinner_base():
     with_links = M.calculate(heavy, CY)
     without = M.calculate({**heavy, "links": False}, CY)
     assert out(with_links, "h_min") <= out(without, "h_min")
+
+
+EMB = "Embedded anchor section (cast in, built-in mast)"
+T = 9.80665   # kN per tonne
+
+
+def test_peak_pressure_closed_forms():
+    B, V = 5000.0, 900e3
+    # axis, full contact (e = 0.6 m ≤ B/6): q = V/B² (1 + 6e/B)
+    assert peak_pressure(V, V * 600, 1, 0, B) == pytest.approx(V / B**2 * (1 + 6 * 600 / B),
+                                                              rel=2e-3)
+    # axis, lift-off (e = 1.2 m): q = 2V / (3B(B/2 − e))
+    assert peak_pressure(V, V * 1200, 1, 0, B) == pytest.approx(2 * V / (3 * B * 1300), rel=5e-3)
+    # diagonal, full contact (e = 0.4 m ≤ B/(6√2)): q = V/B² (1 + 6√2 e/B)
+    f = 1 / math.sqrt(2)
+    assert peak_pressure(V, V * 400, f, f, B) == pytest.approx(
+        V / B**2 * (1 + 6 * math.sqrt(2) * 400 / B), rel=5e-3)
+
+
+def test_rounded_rectangle_perimeter():
+    assert rounded_rect_length(0, 0, 400, 1600, 300, 9000) == pytest.approx(
+        2 * (400 + 1600) + 2 * math.pi * 300, rel=1e-4)
+    assert rounded_rect_length(0, 0, 500, 500, 200, 9000) == pytest.approx(
+        rounded_square_length(0, 0, 500, 200, 9000), rel=1e-6)
+
+
+def test_loads_in_tonnes_and_leg_forces_give_the_same_result():
+    base = {"size": False, "B": 5, "h": 1.2, "a": 1.2, "cl": 0.3}
+    kn = M.calculate({**base, "cases": [{"name": "c", "N": 19 * T, "M": 106.4 * T,
+                                         "H": 4.9 * T, "Mt": 0}]}, CY)
+    t = M.calculate({**base, "lunit": "t, t·m",
+                     "cases_t": [{"name": "c", "N": 19, "M": 106.4, "H": 4.9, "Mt": 0}]}, CY)
+    # the same crane given as leg forces along the diagonal: F1 = C, F3 = −T, F2 = F4 = N/4
+    f = 106.4 / (math.sqrt(2) * 1.2)
+    legs = M.calculate({**base, "lunit": "t, t·m", "input": "Forces on each leg",
+                        "legs_t": [{"name": "c", "F1": 19 / 4 + f, "F2": 19 / 4, "F3": 19 / 4 - f,
+                                    "F4": 19 / 4, "H": 4.9, "Mt": 0}]}, CY)
+    for x, y, z in zip(kn.checks, t.checks, legs.checks):
+        assert x.utilisation == pytest.approx(y.utilisation, rel=1e-6)
+        assert x.utilisation == pytest.approx(z.utilisation, rel=1e-6)
+
+
+def test_manufacturer_check_saez_s46():
+    """Saez S46 4T, H = 23.9 m (P = 19 t, M = 106.4 t·m, T = 4.9 t), base 5 × 5 × 1.2 m as on the
+    Saez built-in foundation drawing, allowable 1.6 kg/cm²: unfactored check by hand."""
+    c = M.calculate({"size": False, "lunit": "t, t·m", "mfr": True, "qall": 1.6 * T * 10,
+                     "cases_t": [{"name": "S46", "N": 19, "M": 106.4, "H": 4.9, "Mt": 0}],
+                     "B": 5, "h": 1.2, "a": 1.2, "cl": 0.3, "fixing": EMB}, CY)
+    V = 19 * T + 25 * 5 * 5 * 1.2
+    Mk = 106.4 * T + 4.9 * T * 1.2
+    e = Mk / V
+    ecc = chk(c, "Manufacturer: (e_x/B)²")[0]
+    assert ecc.demand == pytest.approx((e / 5) ** 2) and ecc.passed       # e ≤ B/3
+    # peak pressure: the corner with M along the diagonal governs; along the axis
+    # q = 2V / (3B(B/2 − e)) = 94 kN/m²
+    q_axis = 2 * V / (3 * 5 * (2.5 - e))
+    assert q_axis == pytest.approx(94.3, abs=0.5)
+    q = chk(c, "Manufacturer: q_max")[0]
+    assert q.demand * 1e3 > q_axis and q.passed
+    assert q.capacity * 1e3 == pytest.approx(156.9, abs=0.1)
+    # the Eurocode check with γ_Q = 1.5 on the whole M is stricter than the data sheet
+    assert not chk(c, "DA2 eccentricity")[0].passed
+
+
+def test_embedded_anchor_hand_calculation():
+    c = M.calculate({"size": False, "lunit": "t, t·m", "fixing": EMB, "hemb": 1.1,
+                     "cases_t": [{"name": "S46", "N": 19, "M": 106.4, "H": 4.9, "Mt": 0}],
+                     "B": 5, "h": 1.2, "a": 1.2, "cl": 0.3, "cover": 40, "db": "16",
+                     "dt": "12", "st": 200, "concrete": "C25/30"}, CY)
+    # feet above the bottom bars: h ≥ 1100 + 40 + 2·16
+    fits = chk(c, "Embedded anchor fits")[0]
+    assert (fits.demand, fits.capacity) == (pytest.approx(1172), pytest.approx(1200))
+    # leg force with M + H h_emb at the level of the feet
+    f = (106.4 + 4.9 * 1.1) * T / (math.sqrt(2) * 1.2)
+    assert out(c, "F_leg") == pytest.approx(1.35 * 19 * T / 4 + 1.5 * f, rel=1e-6)
+    # bearing (6.7): b2 = min(c + (h − h_emb), 3c) = 400 mm → F_Rdu = A_c0 f_cd b2/b1
+    assert out(c, "b_2") == pytest.approx(400)
+    assert out(c, "F_Rdu") == pytest.approx(0.3**2 * 25 / 1.5 * 1e3 * 400 / 300, rel=1e-6)
+    # pull-out: d_up = 1100 − 40 − 12; perimeters at 2 d_up
+    dup = 1100 - 40 - 12
+    assert out(c, "d_up") == pytest.approx(dup)
+    tdiag = 1.5 * f - 19 * T / 4
+    u1 = out(c, "u_up,1")
+    assert u1 <= 4 * 300 + 4 * math.pi * dup + 1
+    assert out(c, "v_up,1") == pytest.approx(tdiag * 1e3 / (u1 * dup), rel=1e-6)
+    taxis = 1.5 * (106.4 + 4.9 * 1.1) * T / (2 * 1.2) - 19 * T / 4
+    assert out(c, "v_up,2") == pytest.approx(2 * taxis * 1e3 / (out(c, "u_up,2") * dup),
+                                             rel=1e-6)

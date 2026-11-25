@@ -33,6 +33,11 @@ BARS = ["12", "14", "16", "20", "25", "32"]
 LOADS = ["Characteristic (factors applied here)", "Design values (factors already included)"]
 SOILS = ["Soil parameters (EN 1997-1 Annex D)", "Given design bearing resistance q_Rd"]
 DIRS = (("axis", 1.0, 0.0), ("diagonal", 1 / math.sqrt(2), 1 / math.sqrt(2)))
+INPUTS = ["Resultants N, M, H, M_t", "Forces on each leg"]
+LUNITS = ["kN, kNm", "t, t·m"]
+FIXING = ["Bolted to the top of the base (anchor bolts / base plates)",
+          "Embedded anchor section (cast in, built-in mast)"]
+LEGXY = ((1, 1), (-1, 1), (-1, -1), (1, -1))   # legs 1–4 at (±a/2, ±a/2), anticlockwise
 HINT_PUNCH = ("Thicker base (most effective), allow punching links, larger leg base plates or a "
               "higher concrete class.")
 GC = 25e-6  # reinforced concrete, N/mm³ (EN 1991-1-1 Table A.1)
@@ -103,12 +108,80 @@ def contact_pressure(V, M, fx, fy, B, n=40):
     return X, Y, dA, p * V / (p.sum() * dA)
 
 
+def normalise(inp: dict) -> dict:
+    """The selected load table as resultants {name, N, M, H, M_t} [N, Nmm]; with leg forces
+    N = ΣF and M = √((ΣF x)² + (ΣF y)²), legs at (±a/2, ±a/2)."""
+    if inp.get("_norm"):
+        return inp
+    tons = inp.get("lunit") == LUNITS[1]
+    if inp.get("input", INPUTS[0]) == INPUTS[0]:
+        key = "cases_t" if tons else "cases"
+        cases = [dict(r) for r in inp[key]]
+    else:
+        key = "legs_t" if tons else "legs"
+        cases = []
+        for r in inp[key]:
+            F = [r["F1"], r["F2"], r["F3"], r["F4"]]
+            sx = sum(f * i * inp["a"] / 2 for f, (i, _) in zip(F, LEGXY))
+            sy = sum(f * j * inp["a"] / 2 for f, (_, j) in zip(F, LEGXY))
+            cases.append({"name": r["name"], "N": sum(F), "M": math.hypot(sx, sy), "H": r["H"],
+                          "Mt": r["Mt"], "legs": F, "sx": sx, "sy": sy})
+    if not cases:
+        raise InputError("Add at least one load case", key)
+    for cs in cases:
+        if cs["N"] <= 0:
+            raise InputError("The vertical load N must be positive", key)
+    return {**inp, "cases": cases, "_norm": True, "_table": key}
+
+
+def peak_pressure(V, M, fx, fy, B, n=60):
+    """Peak contact pressure at the most compressed corner/edge (linear, no tension), from the
+    neutral line of :func:`contact_pressure` extrapolated exactly to s_max."""
+    res = contact_pressure(V, M, fx, fy, B, n)
+    if res is None:
+        return math.inf
+    X, Y, dA, q = res
+    s = X * fx + Y * fy
+    i = np.unravel_index(np.argmax(q), q.shape)
+    j = np.unravel_index(np.argmin(np.where(q > 0, s, np.inf)), q.shape)
+    smax = B / 2 * (fx + fy)
+    if q[i] == q[j] or s[i] == s[j]:
+        return float(q.max())
+    grad = (q[i] - q[j]) / (s[i] - s[j])
+    return float(q[i] + grad * (smax - s[i]))
+
+
 def mean_radius(Bp, Lp, n=24):
     """Mean distance of a B' × L' rectangle from its centroid (friction against torsion)."""
     c1 = (np.arange(n) + 0.5) / n * Bp - Bp / 2
     c2 = (np.arange(n) + 0.5) / n * Lp - Lp / 2
     X, Y = np.meshgrid(c1, c2)
     return float(np.hypot(X, Y).mean())
+
+
+def rounded_rect_length(cx, cy, w, l, r, B, m=800):
+    """Length of the perimeter at distance r around a w × l rectangle centred at (cx, cy) that
+    lies inside the square base B × B centred at the origin."""
+    pts = []
+    hw, hl = w / 2, l / 2
+    for k in range(4):
+        ang0 = k * math.pi / 2
+        ux, uy = round(math.cos(ang0)), round(math.sin(ang0))
+        vx, vy = -uy, ux
+        half_n = hw if ux else hl           # half-length of the side facing (ux, uy)
+        half_t = hl if ux else hw           # half-length along the side
+        for t in np.linspace(-half_t, half_t, m // 8 + 1)[:-1]:
+            pts.append((cx + ux * (half_n + r) + vx * t, cy + uy * (half_n + r) + vy * t))
+        corner = (cx + ux * half_n + vx * half_t, cy + uy * half_n + vy * half_t)
+        for t in np.linspace(0, math.pi / 2, m // 8 + 1)[:-1]:
+            a = ang0 + t
+            pts.append((corner[0] + r * math.cos(a), corner[1] + r * math.sin(a)))
+    pts.append(pts[0])
+    L = 0.0
+    for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
+        if max(abs(x1), abs(x2), abs(y1), abs(y2)) <= B / 2 + 1e-6:
+            L += math.hypot(x2 - x1, y2 - y1)
+    return L
 
 
 def rounded_square_length(cx, cy, c, r, B, m=800):
@@ -149,8 +222,15 @@ class CraneBaseEC7(DesignModule):
                    "passes.")
 
     fields = [
+        Field("input", "Crane loads given as", kind="choice", choices=INPUTS, default=INPUTS[0],
+              group="Crane loads",
+              help="Resultants at the top of the base, or the force on each of the four mast "
+                   "legs — whichever the manufacturer's data sheet gives."),
+        Field("lunit", "Units of the loads", kind="choice", choices=LUNITS, default=LUNITS[0],
+              group="Crane loads", help="Many manufacturers (e.g. Saez) give t and t·m: "
+                                        "1 t = 9.80665 kN."),
         Field("cases", "Loads at the top of the base (from the crane manufacturer)",
-              kind="table", group="Crane loads",
+              kind="table", group="Crane loads", show_if=f"input={INPUTS[0]}&lunit={LUNITS[0]}",
               default=[{"name": "In service", "N": 1100.0, "M": 2400.0, "H": 35.0, "Mt": 300.0},
                        {"name": "Out of service", "N": 950.0, "M": 2800.0, "H": 95.0,
                         "Mt": 0.0}],
@@ -161,6 +241,41 @@ class CraneBaseEC7(DesignModule):
                        Field("Mt", "Slewing torque M_t", "kNm", 0.0, min=0)],
               help="Copy them from the crane's foundation data sheet. M may act in any "
                    "direction: the base is checked with M along its axis and its diagonal."),
+        Field("cases_t", "Loads at the top of the base (from the crane manufacturer)",
+              kind="table", group="Crane loads", show_if=f"input={INPUTS[0]}&lunit={LUNITS[1]}",
+              default=[{"name": "H = 35.7 m", "N": 21.5, "M": 160.0, "H": 6.5, "Mt": 0.0}],
+              columns=[Field("name", "Case", kind="text", default="Case"),
+                       Field("N", "Vertical N (P)", "t", 20.0, min=0),
+                       Field("M", "Overturning moment M", "t·m", 100.0, min=0),
+                       Field("H", "Horizontal H (T)", "t", 5.0, min=0),
+                       Field("Mt", "Slewing torque M_t", "t·m", 0.0, min=0)],
+              help="As printed in the manufacturer's table, in t and t·m (e.g. Saez: P, M, T)."),
+        Field("legs", "Force on each mast leg (compression +, tension −)", kind="table",
+              group="Crane loads", show_if=f"input={INPUTS[1]}&lunit={LUNITS[0]}",
+              default=[{"name": "Out of service", "F1": 1227.5, "F2": 237.5, "F3": -752.5,
+                        "F4": 237.5, "H": 95.0, "Mt": 0.0}],
+              columns=[Field("name", "Case", kind="text", default="Case"),
+                       Field("F1", "Leg 1 (+x, +y)", "kN", 250.0),
+                       Field("F2", "Leg 2 (−x, +y)", "kN", 250.0),
+                       Field("F3", "Leg 3 (−x, −y)", "kN", 250.0),
+                       Field("F4", "Leg 4 (+x, −y)", "kN", 250.0),
+                       Field("H", "Horizontal H", "kN", 50.0, min=0),
+                       Field("Mt", "Slewing torque M_t", "kNm", 0.0, min=0)],
+              help="Legs numbered anticlockwise from the corner (+x, +y), at ±a/2. Gives N = ΣF "
+                   "and M = √((ΣF x)² + (ΣF y)²). For the manufacturer's maximum compression C "
+                   "and tension T along the diagonal: F1 = C, F3 = −T, F2 = F4 = (C − T)/2."),
+        Field("legs_t", "Force on each mast leg (compression +, tension −)", kind="table",
+              group="Crane loads", show_if=f"input={INPUTS[1]}&lunit={LUNITS[1]}",
+              default=[{"name": "Case", "F1": 99.7, "F2": 5.4, "F3": -88.9, "F4": 5.4, "H": 6.5,
+                        "Mt": 0.0}],
+              columns=[Field("name", "Case", kind="text", default="Case"),
+                       Field("F1", "Leg 1 (+x, +y)", "t", 25.0),
+                       Field("F2", "Leg 2 (−x, +y)", "t", 25.0),
+                       Field("F3", "Leg 3 (−x, −y)", "t", 25.0),
+                       Field("F4", "Leg 4 (+x, −y)", "t", 25.0),
+                       Field("H", "Horizontal H", "t", 5.0, min=0),
+                       Field("Mt", "Slewing torque M_t", "t·m", 0.0, min=0)],
+              help="Legs numbered anticlockwise from the corner (+x, +y), at ±a/2; in t."),
         Field("loadtype", "The loads are", kind="choice", choices=LOADS, default=LOADS[0],
               group="Crane loads",
               help="Characteristic: N and the self-weight × γ_G (unfavourable / favourable), M, "
@@ -170,7 +285,15 @@ class CraneBaseEC7(DesignModule):
               group="Mast", help="The four legs / anchors of the mast base at the corners of a "
                                  "square a × a."),
         Field("cl", "Leg base plate size", "m", 0.40, min=0.1, max=1.5, group="Mast",
-              help="Square loaded area under each leg (punching, face shear)."),
+              help="Square loaded area under each leg (punching, face shear); for an embedded "
+                   "anchor, the foot plate of each leg."),
+        Field("fixing", "Mast fixing", kind="choice", choices=FIXING, default=FIXING[0],
+              group="Mast", help="Embedded: the manufacturer's anchor section (e.g. Saez S51) is "
+                                 "cast into the base and the legs end near the bottom bars."),
+        Field("hemb", "Embedment depth of the anchor section", "m", 1.1, min=0.3, max=3.5,
+              group="Mast", show_if=f"fixing={FIXING[1]}",
+              help="From the top of the base to the feet of the anchor (manufacturer's "
+                   "drawing)."),
         Field("B", "Base size B (square)", "m", 6.0, min=1.5, max=20, group="Base"),
         Field("h", "Base thickness h", "m", 1.40, min=0.4, max=4, group="Base"),
         Field("ts", "Soil above the base", "m", 0.0, min=0, max=5, group="Base",
@@ -186,6 +309,15 @@ class CraneBaseEC7(DesignModule):
               help="From the geotechnical report, already divided by γ_R,v."),
         Field("approach", "Design approach", kind="choice", choices=APPROACH_CHOICES,
               default="National Annex", group="Ground"),
+        Field("mfr", "Also check the manufacturer's criteria (unfactored)", kind="bool",
+              default=False, group="Ground",
+              help="Manufacturer-type check with the loads as given (no partial factors): "
+                   "resultant within the middle-third ellipse (e ≤ B/3) and peak soil pressure "
+                   "≤ the allowable value. For comparison with the manufacturer's data sheet; "
+                   "not a Eurocode verification."),
+        Field("qall", "Allowable soil pressure (manufacturer)", "kN/m²", 157.0, min=20,
+              group="Ground", show_if="mfr",
+              help="E.g. Saez: \"minimum land pressure 1.6 kg/cm²\" = 157 kN/m²."),
         Field("concrete", "Concrete class", kind="choice", choices=CONCRETE, default="C30/37",
               group="Concrete"),
         Field("fyk", "Reinforcement f_yk", "N/mm²", 500.0, min=400, max=600, group="Concrete"),
@@ -214,11 +346,7 @@ class CraneBaseEC7(DesignModule):
     # ----------------------------------------------------------------------- run
     @classmethod
     def run(cls, calc: Calculation, inp: dict) -> None:
-        if not inp["cases"]:
-            raise InputError("Add at least one load case", "cases")
-        for cs in inp["cases"]:
-            if cs["N"] <= 0:
-                raise InputError("The vertical load N must be positive", "cases")
+        inp = normalise(inp)
         if inp["a"] + inp["cl"] >= inp["B"]:
             raise InputError("The mast base does not fit on the base — increase B", "B")
         na = get_annex(calc.project.annex)
@@ -226,14 +354,34 @@ class CraneBaseEC7(DesignModule):
         calc.note("The loads come from the crane manufacturer. Check also any limits the "
                   "manufacturer sets (minimum base size and weight, eccentricity, anchorage of "
                   "the mast anchors) — they may be stricter than the Eurocodes.")
+        if inp["input"] == INPUTS[1]:
+            cls._leg_input(calc, inp)
         links = cls._analyse(calc, inp, inp["B"], inp["h"], na)
         if inp["size"]:
             cls._sizing(calc, inp, na)
         calc.model3d = cls._scene(calc, inp, links)
 
+    @staticmethod
+    def _leg_input(calc, inp) -> None:
+        calc.heading("Loads from the forces on each leg")
+        u = "t" if inp["lunit"] == LUNITS[1] else "kN"
+        um = "t·m" if u == "t" else "kNm"
+        f = 9806.65 if u == "t" else 1e3
+        rows = []
+        for cs in inp["cases"]:
+            rows.append([cs["name"], *(f"{x / f:.1f}" for x in cs["legs"]),
+                         f"{cs['N'] / f:.1f}", f"{cs['sx'] / f / 1e3:.1f}",
+                         f"{cs['sy'] / f / 1e3:.1f}", f"{cs['M'] / f / 1e3:.1f}"])
+        calc.table(["Case", f"F1 [{u}]", f"F2 [{u}]", f"F3 [{u}]", f"F4 [{u}]", f"N [{u}]",
+                    f"ΣF x [{um}]", f"ΣF y [{um}]", f"M [{um}]"], rows,
+                   "N = ΣF_i, M = √((ΣF_i x_i)² + (ΣF_i y_i)²), legs at x_i, y_i = ±a/2")
+        calc.text("The crane slews, so M is then checked along the axis and the diagonal of the "
+                  "base, whatever its direction in the data sheet.")
+
     # ------------------------------------------------------------------ sizing
     @classmethod
     def passes(cls, inp, B, h, na, part="all") -> bool:
+        inp = normalise(inp)
         q = _Quiet()
         try:
             cls._analyse(q, inp, B, h, na, part=part)
@@ -245,10 +393,14 @@ class CraneBaseEC7(DesignModule):
     def search(cls, inp, na, hs=None):
         """Least volume B × h.  For every h the smallest B that passes GEO and EQU is found by
         bisection (these checks only improve with B), then B is stepped up until STR passes."""
+        inp = normalise(inp)
         Bmin = math.ceil((inp["a"] + inp["cl"] + 200) / 100) * 100
         best = None
         if hs is None:
-            h0 = math.ceil(inp["hmin"] / 50 - 1e-9) * 50
+            hlo = inp["hmin"]
+            if inp["fixing"] == FIXING[1]:
+                hlo = max(hlo, inp["hemb"] + inp["cover"] + 2 * float(inp["db"]))
+            h0 = math.ceil(hlo / 50 - 1e-9) * 50
             hs = [h0 + 50 * i for i in range(max(int(round((3500 - h0) / 50)) + 1, 1))]
         for h in hs:
             if best and Bmin ** 2 * h >= best[0]:
@@ -328,9 +480,46 @@ class CraneBaseEC7(DesignModule):
         cls._equ(calc, inp, B, h, W, na, quiet)
         for name in na.combinations(inp["approach"]):
             cls._geo(calc, inp, B, h, D, W, na, name, quiet)
+        if inp["mfr"]:
+            cls._manufacturer(calc, inp, B, h, W, quiet)
         if part == "all":
             return cls._str(calc, inp, B, h, W, na, quiet)
         return None
+
+    # ------------------------------------------------------------ manufacturer
+    @staticmethod
+    def _manufacturer(calc, inp, B, h, W, quiet):
+        """Unfactored check in the form of crane data sheets (not EN 1997-1)."""
+        rows, worst_e, worst_q = [], None, None
+        for cs in inp["cases"]:
+            V, M = cs["N"] + W, cs["M"] + cs["H"] * h
+            for dname, fx, fy in DIRS:
+                e = M / V
+                ecc = (e * fx / B) ** 2 + (e * fy / B) ** 2
+                qmax = peak_pressure(V, M, fx, fy, B, 30 if quiet else 60)
+                lab = f"{cs['name']}, {calc.tr(dname)}"
+                rows.append([lab, f"{V / 1e3:.0f}", f"{M / 1e6:.0f}", f"{e / 1e3:.3f}",
+                             f"{qmax * 1e3:.0f}"])
+                if worst_e is None or ecc > worst_e[0]:
+                    worst_e = (ecc, lab)
+                if worst_q is None or qmax > worst_q[0]:
+                    worst_q = (qmax, lab)
+        if not quiet:
+            calc.heading("Manufacturer-type check (unfactored loads — not EN 1997-1)")
+            calc.text("The loads as given, the weight W, and M + H h at the underside, without "
+                      "partial factors — the form in which crane data sheets state their "
+                      "foundation requirements. Linear soil pressure without tension; the peak "
+                      "is at the edge (M along the axis) or at the corner (M along the "
+                      "diagonal).")
+            calc.table(["Case", "V = N + W [kN]", "M + H h [kNm]", "e [m]",
+                        "q_max [kN/m²]"], rows)
+            calc.input("q_all", inp["qall"], "kN/m²", "Allowable soil pressure (manufacturer)")
+        calc.check_limit(calc.tr("Manufacturer: (e_x/B)² + (e_y/B)² ≤ 1/9 (e ≤ B/3) — {c}",
+                                 c=worst_e[1]), worst_e[0], 1 / 9, "", "Manufacturer data sheet",
+                         hint="Enlarge the base or make it heavier.")
+        calc.check(calc.tr("Manufacturer: q_max ≤ q_all — {c}", c=worst_q[1]), worst_q[0],
+                   inp["qall"], "kN/m²", "Manufacturer data sheet",
+                   hint="Enlarge the base.")
 
     # --------------------------------------------------------------------- EQU
     @staticmethod
@@ -494,7 +683,9 @@ class CraneBaseEC7(DesignModule):
         x0 = a / 2
         xs = c / 2 + d
         gov = {"mb": (0.0, ""), "mt": (0.0, ""), "v": (0.0, ""), "leg": (0.0, ""),
-               "ten": (-math.inf, ""), "pun_all": []}
+               "ten": (-math.inf, ""), "ten2": (-math.inf, ""), "pun_all": []}
+        emb = inp["fixing"] == FIXING[1]
+        hl = inp["hemb"] if emb else 0.0          # level of the leg feet below the top
         k = min(1 + math.sqrt(200 / d), 2.0)
         rho = min(Asb / (1000 * d), 0.02)
         vmin = 0.035 * k ** 1.5 * math.sqrt(fck)
@@ -525,17 +716,25 @@ class CraneBaseEC7(DesignModule):
                         gov["mt"] = (hog, lab)
                     if vv > gov["v"][0]:
                         gov["v"] = (vv, lab)
-                    # leg forces: legs at (±a/2, ±a/2), Σs² = a² in both directions
+                    # leg forces: legs at (±a/2, ±a/2), Σs² = a² in both directions; the
+                    # moment at the level of the leg feet (top of the base, or the foot of an
+                    # embedded anchor)
                     lev = (a / 2) * (fx + fy)
-                    F = g * cs["N"] / 4 + Md * lev / (a * a)
+                    Ml = gQ * (cs["M"] + cs["H"] * hl)
+                    F = g * cs["N"] / 4 + Ml * lev / (a * a)
                     if F > gov["leg"][0]:
                         gov["leg"] = (F, lab)
-                    T = Md * lev / (a * a) - g * cs["N"] / 4
-                    if T > gov["ten"][0]:
-                        gov["ten"] = (T, lab)
+                    T = Ml * lev / (a * a) - g * cs["N"] / 4
+                    key = "ten" if dname == "diagonal" else "ten2"
+                    if T > gov[key][0]:
+                        gov[key] = (T, lab)
                     gov["pun_all"].append((lab, g * cs["N"], Md * (fx + fy), cls._punch_rows(
                         g * cs["N"], Md * (fx + fy), X, Y, dA, net, c, d, B)))
         Mb, Mh, Vb = gov["mb"][0] * 1000, gov["mt"][0] * 1000, gov["v"][0] * 1000  # per 1 m
+        if not quiet:
+            cls._leg_table(calc, inp, gG, gGf, gQ, hl)
+        if emb:
+            cls._embedded(calc, quiet, inp, gov, h, fcd, fck, na)
         # ---- bottom bars
         if not quiet:
             calc.heading("Bottom reinforcement — sagging at x = a/2", 2)
@@ -601,7 +800,10 @@ class CraneBaseEC7(DesignModule):
         if not quiet:
             calc.heading("Mast anchors", 2)
             T = gov["ten"][0]
-            if T > 0:
+            if T > 0 and emb:
+                calc.text("The tension is anchored at the feet of the embedded section; the "
+                          "pull-out through the concrete is checked above.")
+            elif T > 0:
                 calc.formula("T_leg", "M_d s_max / Σs² − γ_G,fav N/4", T, "kN",
                              "Design tension in the most stressed mast anchor", dp=1)
                 calc.note("Anchor the mast anchors (manufacturer's anchor frame or cast-in "
@@ -610,6 +812,90 @@ class CraneBaseEC7(DesignModule):
             else:
                 calc.text("No tension in the mast anchors.")
         return links
+
+    @staticmethod
+    def _leg_table(calc, inp, gG, gGf, gQ, hl) -> None:
+        a = inp["a"]
+        calc.heading("Forces on each leg", 2)
+        calc.text("Leg force F = N/4 ± M s / Σs² with M at the level of the leg feet{lv}: along "
+                  "the axis two legs carry ±M/(2a), along the diagonal one leg +M/(√2 a) and "
+                  "the opposite one −M/(√2 a), the other two N/4. Compression +, tension −. "
+                  "Design: γ_G N/4 + γ_Q M… (compression), γ_G,fav N/4 − γ_Q M… (tension).",
+                  lv=calc.tr(" (M + H h_emb, embedded anchor)") if hl else "")
+        rows = []
+        for cs in inp["cases"]:
+            for dname, lev in (("axis", a / 2), ("diagonal", a / math.sqrt(2))):
+                Mk = cs["M"] + cs["H"] * hl
+                fk = Mk * lev / (a * a)
+                rows.append([cs["name"], calc.tr(dname), f"{(cs['N'] / 4 + fk) / 1e3:.1f}",
+                             f"{(cs['N'] / 4 - fk) / 1e3:.1f}",
+                             f"{(gG * cs['N'] / 4 + gQ * fk) / 1e3:.1f}",
+                             f"{(gGf * cs['N'] / 4 - gQ * fk) / 1e3:.1f}"])
+        calc.table(["Case", "M along", "F_max,k [kN]", "F_min,k [kN]", "F_max,d [kN]",
+                    "F_min,d [kN]"], rows, "Forces on the mast legs (characteristic and design)")
+
+    @staticmethod
+    def _embedded(calc, quiet, inp, gov, h, fcd, fck, na) -> None:
+        """Embedded anchor section: fits in the base, bearing under the feet (6.7), pull-out of
+        the tension legs through the concrete above the feet (6.4.4 on an upward perimeter)."""
+        a, cl, B = inp["a"], inp["cl"], inp["B"]
+        hemb, cov = inp["hemb"], inp["cover"]
+        db, dt = float(inp["db"]), float(inp["dt"])
+        if not quiet:
+            calc.heading("Embedded anchor section", 2)
+            calc.text("The manufacturer's anchor section is cast into the base and its feet sit "
+                      "just above the bottom bars. The anchor itself and its connection to the "
+                      "mast are the manufacturer's responsibility; here the concrete around it "
+                      "is checked.")
+        hreq = hemb + cov + 2 * db
+        calc.check_min("Embedded anchor fits: h ≥ h_emb + c + 2Ø", h, hreq, "m",
+                       "Manufacturer drawing", hint="Thicker base (the feet must stay above the "
+                                                    "bottom bars).")
+        # bearing under one foot (6.7): the load spreads through the concrete below the foot,
+        # depth h − h_emb ≥ b2 − b1, b2 ≤ 3 b1 (Figure 6.29)
+        F = gov["leg"][0]
+        b2 = min(cl + max(h - hemb, 0.0), 3 * cl)
+        FRdu = min(cl * cl * fcd * b2 / cl, 3 * cl * cl * fcd)
+        if not quiet:
+            calc.formula("b_2", "min(c_l + (h − h_emb), 3c_l)", b2, "mm",
+                         "Spread of the load below the foot", ref="6.7(2), Fig. 6.29", dp=0)
+            calc.formula("F_Rdu", "A_c0 f_cd √(A_c1/A_c0) ≤ 3 f_cd A_c0", FRdu, "kN",
+                         "Bearing resistance under one foot", ref="EN 1992-1-1 Eq. 6.63", dp=1)
+        calc.check("Bearing under the foot: F_leg ≤ F_Rdu", F, FRdu, "kN", "6.7",
+                   hint="Larger foot plates or a higher concrete class.")
+        # pull-out: the tension is resisted by a cone through the concrete above the feet,
+        # with the top bars as the tension reinforcement of that (upside-down) slab
+        dup = hemb - cov - dt
+        if dup <= 0:
+            calc.check("Pull-out: concrete above the feet", 1.0, 0.0, "", "6.4.4",
+                       hint="Deeper embedment.")
+            return
+        Ast = bar_area(dt) * 1000 / inp["st"]
+        k = min(1 + math.sqrt(200 / dup), 2.0)
+        rho = min(Ast / (1000 * dup), 0.02)
+        vrc = max(0.18 / na.gamma_c * k * (100 * rho * fck) ** (1 / 3),
+                  0.035 * k ** 1.5 * math.sqrt(fck))
+        r = 2 * dup
+        u1 = rounded_rect_length(a / 2, a / 2, cl, cl, r, B)
+        u2 = rounded_rect_length(a / 2, 0.0, cl, a + cl, r, B)
+        T1, T2 = max(gov["ten"][0], 0.0), 2 * max(gov["ten2"][0], 0.0)
+        v1, v2 = T1 / (u1 * dup), T2 / (u2 * dup)
+        if not quiet:
+            calc.text("Pull-out of the tension legs: control perimeter at 2d_up around one foot "
+                      "(M along the diagonal) or around the two feet of one side (M along the "
+                      "axis), clipped at the edges of the base; v_Rd,c without the 2d/a "
+                      "enhancement and without the weight of the concrete (conservative).")
+            calc.formula("d_up", "h_emb − c − Ø_top", dup, "mm", dp=0)
+            calc.formula("v_Rd,c,up", "max(0.18/γ_c k (100ρ f_ck)^(1/3), v_min)", vrc,
+                         "N/mm²", ref="Eq. 6.47", dp=3)
+            calc.formula("u_up,1", "4c_l + 4πd_up (inside the base)", u1, "mm", dp=0)
+            calc.formula("v_up,1", "T_diag / (u d_up)", v1, "N/mm²", dp=3)
+            calc.formula("u_up,2", "2(a + 2c_l) + 4πd_up (inside the base)", u2, "mm", dp=0)
+            calc.formula("v_up,2", "2 T_axis / (u d_up)", v2, "N/mm²", dp=3)
+        calc.check("Pull-out of one leg: v_up ≤ v_Rd,c", v1, vrc, "N/mm²", "6.4.4",
+                   hint="Deeper embedment, more top bars or a larger base.")
+        calc.check("Pull-out of two legs: v_up ≤ v_Rd,c", v2, vrc, "N/mm²", "6.4.4",
+                   hint="Deeper embedment, more top bars or a larger base.")
 
     @staticmethod
     def _punch_rows(VN, Mb, X, Y, dA, net, c, d, B):
@@ -847,18 +1133,34 @@ class CraneBaseEC7(DesignModule):
                         sc.cylinder("links", (px, y1, pz), (px, y2, pz), m(lk["dsw"]) / 2,
                                     PALETTE["punch"])
         H = 3.0
+        emb = inp["fixing"] == FIXING[1]
+        foot = top - m(inp["hemb"]) if emb else top
         for sx in (-1, 1):
             for sz in (-1, 1):
-                sc.box("mast", (sx * a / 2, top + 0.03, sz * a / 2), (cl, 0.06, cl),
+                sc.box("mast", (sx * a / 2, foot + 0.03, sz * a / 2), (cl, 0.06, cl),
                        PALETTE["steel"])
-                sc.cylinder("mast", (sx * a / 2, top, sz * a / 2),
+                sc.cylinder("mast", (sx * a / 2, foot, sz * a / 2),
                             (sx * a / 2, top + H, sz * a / 2), 0.07, "#e0a800")
+        if emb:   # bracing of the embedded anchor section
+            for y0 in (foot + 0.1, (foot + top) / 2):
+                ring = [(-a / 2, y0, -a / 2), (a / 2, y0, -a / 2), (a / 2, y0, a / 2),
+                        (-a / 2, y0, a / 2), (-a / 2, y0, -a / 2)]
+                sc.line("mast", ring, PALETTE["steel"])
+        # force on each leg: the case with the largest M, M along the diagonal towards leg 1
+        cs = max(inp["cases"], key=lambda r: r["M"])
+        if cs.get("legs"):
+            Fk = cs["legs"]
+        else:
+            f = (cs["M"] + cs["H"] * (inp["hemb"] if emb else 0.0)) / (math.sqrt(2) * inp["a"])
+            Fk = [cs["N"] / 4 + f, cs["N"] / 4, cs["N"] / 4 - f, cs["N"] / 4]
+        for (i, j), F, num in zip(LEGXY, Fk, range(1, 5)):
+            sc.label("loads", f"{num}: {F / 1e3:+.0f} kN", (i * a / 2, top + 0.5, -j * a / 2),
+                     "force" if F >= 0 else "result")
         for y0 in range(int(H)):
             for (x1, z1), (x2, z2) in (((-1, -1), (1, -1)), ((1, -1), (1, 1)), ((1, 1), (-1, 1)),
                                        ((-1, 1), (-1, -1))):
                 sc.line("mast", [(x1 * a / 2, top + y0, z1 * a / 2),
                                  (x2 * a / 2, top + y0 + 1, z2 * a / 2)], "#e0a800")
-        cs = max(inp["cases"], key=lambda r: r["M"])
         sc.arrow("loads", (0, top + H + 1.5, 0), (0, -1, 0), 1.2, PALETTE["load"])
         sc.label("loads", f"{cs['name']}: N = {cs['N'] / 1e3:.0f} kN, M = {cs['M'] / 1e6:.0f} kNm",
                  (0, top + H + 1.8, 0), "force")

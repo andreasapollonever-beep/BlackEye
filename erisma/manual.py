@@ -1023,6 +1023,17 @@ NOTES: dict[str, dict[str, list[str]]] = {
                "bars); beam shear at d from the mast base (6.2.2); punching of the mast base as "
                "a column c = a + c_l (6.4.4(2), Eq. 6.51) and under the most compressed leg; "
                "leg face v_Rd,max (6.4.5(3)).",
+               "Loads as resultants (N, M, H, M_t) or as the force on each of the four legs "
+               "(N = ΣF, M = √((ΣF x)² + (ΣF y)²)), in kN or in t (1 t = 9.80665 kN, as in Saez "
+               "tables). The forces on each leg are reported (characteristic and design) and "
+               "shown in 3D.",
+               "Embedded (built-in) anchor section: h ≥ h_emb + c + 2Ø, bearing under the feet "
+               "(EN 1992-1-1 6.7, spread below the foot), pull-out of the tension legs on a "
+               "perimeter at 2d_up above the feet (one leg / two legs); leg forces with M + H "
+               "h_emb at the level of the feet.",
+               "Optional manufacturer-type check with the unfactored loads: e ≤ B/3 and peak "
+               "soil pressure ≤ the allowable value of the data sheet — for comparison only, "
+               "not a Eurocode verification.",
                "Punching links (optional): where v_Ed > v_Rd,c, vertical links by Eq. 6.52 "
                "(f_ywd,ef = 250 + 0.25d), perimeters from 0.5d with s_r ≤ 0.75d, tangential "
                "spacing ≤ 1.5d (≤ 2d outside 2d), A_sw,min by Eq. 9.11, the outermost perimeter "
@@ -1045,6 +1056,17 @@ NOTES: dict[str, dict[str, list[str]]] = {
                "(πάνω οπλισμός)· τέμνουσα σε απόσταση d από τη βάση του ιστού (6.2.2)· διάτρηση "
                "της βάσης του ιστού ως υποστύλωμα c = a + c_l (6.4.4(2), Εξ. 6.51) και κάτω από "
                "το πιο θλιβόμενο πόδι· v_Rd,max στην παρειά του ποδιού (6.4.5(3)).",
+               "Φορτία ως συνισταμένες (N, M, H, M_t) ή ως δύναμη σε καθένα από τα τέσσερα "
+               "πόδια (N = ΣF, M = √((ΣF x)² + (ΣF y)²)), σε kN ή σε t (1 t = 9.80665 kN, όπως "
+               "στους πίνακες Saez). Οι δυνάμεις σε κάθε πόδι δίνονται (χαρακτηριστικές και "
+               "σχεδιασμού) και φαίνονται στο 3D.",
+               "Εγκιβωτισμένο (ενσωματωμένο) τμήμα αγκύρωσης: h ≥ h_emb + c + 2Ø, τοπική "
+               "θλίψη κάτω από τα πόδια (EN 1992-1-1 6.7, διασπορά κάτω από το πόδι), εξόλκευση "
+               "των εφελκυόμενων ποδιών σε περίμετρο 2d_up πάνω από τα πόδια (ένα / δύο πόδια)· "
+               "δυνάμεις ποδιών με M + H h_emb στη στάθμη των ποδιών.",
+               "Προαιρετικός έλεγχος τύπου κατασκευαστή με φορτία χωρίς συντελεστές: e ≤ B/3 "
+               "και μέγιστη τάση εδάφους ≤ επιτρεπόμενη του φύλλου — μόνο για σύγκριση, όχι "
+               "έλεγχος κατά Ευρωκώδικα.",
                "Οπλισμός διάτρησης (προαιρετικός): όπου v_Ed > v_Rd,c, κατακόρυφοι συνδετήρες "
                "κατά την Εξ. 6.52 (f_ywd,ef = 250 + 0.25d), περίμετροι από 0.5d με s_r ≤ 0.75d, "
                "εφαπτομενική απόσταση ≤ 1.5d (≤ 2d έξω από τα 2d), A_sw,min κατά την Εξ. 9.11, η "

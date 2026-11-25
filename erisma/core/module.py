@@ -41,7 +41,8 @@ class Field:
     group: str = "General"
     help: str = ""
     columns: list["Field"] | None = None  # for kind == "table"
-    show_if: str | None = None  # bool field name, or 'field=value': shown only then
+    show_if: str | None = None  # bool field name, 'field=value' or 'field!=value' (joined with
+    # '&' when all must hold): shown only then
 
     def to_dict(self, lang: str = "en") -> dict[str, Any]:
         d = asdict(self)
