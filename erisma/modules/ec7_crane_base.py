@@ -356,10 +356,48 @@ class CraneBaseEC7(DesignModule):
                   "the mast anchors) — they may be stricter than the Eurocodes.")
         if inp["input"] == INPUTS[1]:
             cls._leg_input(calc, inp)
+        pos = len(calc.items)
         links = cls._analyse(calc, inp, inp["B"], inp["h"], na)
+        cls._summary(calc, inp, links, pos)
         if inp["size"]:
             cls._sizing(calc, inp, na)
         calc.model3d = cls._scene(calc, inp, links)
+
+    @staticmethod
+    def _summary(calc, inp, links, pos) -> None:
+        """Three answers at the top of the report: dimensions, reinforcement, punching."""
+        start = len(calc.items)
+        i0, i1, i2 = calc.crane_marks
+        groups = (("Dimensions B × h (overturning, soil, sliding)", calc.checks[i0:i1]),
+                  ("Bending reinforcement and beam shear", calc.checks[i1:i2]),
+                  ("Punching and the concrete around the mast", calc.checks[i2:]))
+        calc.heading("Summary")
+        calc.text("Base {B:.2f} × {B:.2f} m, h = {h:.2f} m; bottom bars Ø{db}/{sb:.0f}, top bars "
+                  "Ø{dt}/{st:.0f} (both ways).", B=inp["B"] / 1000, h=inp["h"] / 1000,
+                  db=inp["db"], sb=inp["sb"], dt=inp["dt"], st=inp["st"])
+        rows = []
+        for label, chks in groups:
+            if not chks:
+                continue
+            worst = max(chks, key=lambda c: c.utilisation)
+            ok = all(c.passed for c in chks)
+            rows.append([calc.tr(label), calc.tr("OK") if ok else calc.tr("NOT OK"),
+                         f"{worst.utilisation:.2f}", worst.description])
+        calc.table(["Check group", "Result", "Max. utilisation", "Governing check"], rows)
+        frame, leg = (links or {}).get("frame"), (links or {}).get("leg")
+        if not frame and not leg:
+            calc.text("Punching reinforcement: not required — the concrete alone resists "
+                      "punching." if all(c.passed for c in calc.checks[i2:]) else
+                      "Punching: the concrete alone is not enough (see the checks below).")
+        for lk, where in ((frame, "around the mast base"), (leg, "around each leg")):
+            if lk:
+                calc.text("Punching reinforcement REQUIRED {w}: {n} perimeters of vertical links "
+                          "Ø{d:.0f}, {legs} legs per perimeter (details below).",
+                          w=calc.tr(where), n=len(lk["radii"]), d=lk["dsw"],
+                          legs=max(lk["legs"]))
+        new = calc.items[start:]
+        del calc.items[start:]
+        calc.items[pos:pos] = new
 
     @staticmethod
     def _leg_input(calc, inp) -> None:
@@ -477,11 +515,22 @@ class CraneBaseEC7(DesignModule):
             calc.formula("D", "h + soil above", D, "m", "Founding depth", dp=2)
         W = calc.formula("W", "γ_c B² h + γ B² t_s", GC * B * B * h + inp["gamma"] * B * B *
                          inp["ts"], "kN", "Base and soil above (γ_c = 25 kN/m³)", dp=1)
+        if not quiet:
+            calc.crane_marks = [len(calc.checks)]
         cls._equ(calc, inp, B, h, W, na, quiet)
         for name in na.combinations(inp["approach"]):
             cls._geo(calc, inp, B, h, D, W, na, name, quiet)
         if inp["mfr"]:
             cls._manufacturer(calc, inp, B, h, W, quiet)
+        if inp["fixing"] == FIXING[1]:
+            hreq = inp["hemb"] + inp["cover"] + 2 * float(inp["db"])
+            if not quiet:
+                calc.heading("Embedded anchor section — thickness")
+            calc.check_min("Embedded anchor fits: h ≥ h_emb + c + 2Ø", h, hreq, "m",
+                           "Manufacturer drawing", hint="Thicker base (the feet must stay above "
+                                                        "the bottom bars).")
+        if not quiet:
+            calc.crane_marks.append(len(calc.checks))
         if part == "all":
             return cls._str(calc, inp, B, h, W, na, quiet)
         return None
@@ -733,8 +782,6 @@ class CraneBaseEC7(DesignModule):
         Mb, Mh, Vb = gov["mb"][0] * 1000, gov["mt"][0] * 1000, gov["v"][0] * 1000  # per 1 m
         if not quiet:
             cls._leg_table(calc, inp, gG, gGf, gQ, hl)
-        if emb:
-            cls._embedded(calc, quiet, inp, gov, h, fcd, fck, na)
         # ---- bottom bars
         if not quiet:
             calc.heading("Bottom reinforcement — sagging at x = a/2", 2)
@@ -795,7 +842,11 @@ class CraneBaseEC7(DesignModule):
         # ---- punching (mast base as a column and the most compressed leg), links if needed
         nu = 0.6 * (1 - fck / 250)
         vmax = na.punch_vmax * nu * fcd
+        if not quiet:
+            calc.crane_marks.append(len(calc.checks))
         links = cls._punching(calc, quiet, inp, gov, na, B, c, d, vrc, vmax, fck, fyk)
+        if emb:
+            cls._embedded(calc, quiet, inp, gov, B, h, fcd, fck, na)
         # ---- anchors
         if not quiet:
             calc.heading("Mast anchors", 2)
@@ -835,22 +886,18 @@ class CraneBaseEC7(DesignModule):
                     "F_min,d [kN]"], rows, "Forces on the mast legs (characteristic and design)")
 
     @staticmethod
-    def _embedded(calc, quiet, inp, gov, h, fcd, fck, na) -> None:
+    def _embedded(calc, quiet, inp, gov, B, h, fcd, fck, na) -> None:
         """Embedded anchor section: fits in the base, bearing under the feet (6.7), pull-out of
         the tension legs through the concrete above the feet (6.4.4 on an upward perimeter)."""
-        a, cl, B = inp["a"], inp["cl"], inp["B"]
+        a, cl = inp["a"], inp["cl"]
         hemb, cov = inp["hemb"], inp["cover"]
-        db, dt = float(inp["db"]), float(inp["dt"])
+        dt = float(inp["dt"])
         if not quiet:
             calc.heading("Embedded anchor section", 2)
             calc.text("The manufacturer's anchor section is cast into the base and its feet sit "
                       "just above the bottom bars. The anchor itself and its connection to the "
                       "mast are the manufacturer's responsibility; here the concrete around it "
                       "is checked.")
-        hreq = hemb + cov + 2 * db
-        calc.check_min("Embedded anchor fits: h ≥ h_emb + c + 2Ø", h, hreq, "m",
-                       "Manufacturer drawing", hint="Thicker base (the feet must stay above the "
-                                                    "bottom bars).")
         # bearing under one foot (6.7): the load spreads through the concrete below the foot,
         # depth h − h_emb ≥ b2 − b1, b2 ≤ 3 b1 (Figure 6.29)
         F = gov["leg"][0]

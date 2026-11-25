@@ -319,3 +319,28 @@ def test_embedded_anchor_hand_calculation():
     taxis = 1.5 * (106.4 + 4.9 * 1.1) * T / (2 * 1.2) - 19 * T / 4
     assert out(c, "v_up,2") == pytest.approx(2 * taxis * 1e3 / (out(c, "u_up,2") * dup),
                                              rel=1e-6)
+
+
+def test_summary_answers_dimensions_reinforcement_punching():
+    c = M.calculate(NOSIZE, CY)
+    i = next(k for k, it in enumerate(c.items) if it.kind == "heading"
+             and it.data["text"] == "Summary")
+    table = next(it for it in c.items[i:] if it.kind == "table")
+    assert [r[1] for r in table.data["rows"]] == ["OK", "OK", "OK"]
+    assert any(it.kind == "text" and "not required" in it.data["text"] for it in c.items[i:i + 6])
+    c = M.calculate(HEAVY, CY)
+    texts = [it.data["text"] for it in c.items[:20] if it.kind == "text"]
+    assert any("REQUIRED around the mast base" in t for t in texts)
+
+
+def test_sizing_with_an_embedded_anchor():
+    c = M.calculate({"lunit": "t, t·m", "fixing": EMB, "hemb": 1.1, "a": 1.2, "cl": 0.3,
+                     "cases_t": [{"name": "S46", "N": 19, "M": 106.4, "H": 4.9, "Mt": 0}],
+                     "B": 5, "h": 1.2}, CY)
+    B, h = out(c, "B_min") * 1000, out(c, "h_min") * 1000
+    assert h >= 1100 + 50 + 2 * 25          # the feet stay above the bottom bars
+    inp = M.parse_inputs({"lunit": "t, t·m", "fixing": EMB, "hemb": 1.1, "a": 1.2, "cl": 0.3,
+                          "cases_t": [{"name": "S46", "N": 19, "M": 106.4, "H": 4.9,
+                                       "Mt": 0}]}, "en")
+    assert M.passes(inp, B, h, get_annex("CY")) and not M.passes(inp, B - 100, h,
+                                                                  get_annex("CY"))
