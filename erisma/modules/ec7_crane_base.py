@@ -384,6 +384,38 @@ class CraneBaseEC7(DesignModule):
             rows.append([calc.tr(label), calc.tr("OK") if ok else calc.tr("NOT OK"),
                          f"{worst.utilisation:.2f}", worst.description])
         calc.table(["Check group", "Result", "Max. utilisation", "Governing check"], rows)
+        key = getattr(calc, "crane_key", None)
+        if key:
+            name, Fk, Fd = key["legs"]
+            calc.heading("Forces on each leg", 2)
+            calc.table(["Leg", "1 (+x, +y)", "2 (−x, +y)", "3 (−x, −y)", "4 (+x, −y)"],
+                       [[calc.tr("Characteristic [kN]"), *(f"{f / 1e3:+.1f}" for f in Fk)],
+                        [calc.tr("Design [kN]"), *(f"{f / 1e3:+.1f}" for f in Fd)]],
+                       calc.tr("{c}, M along the diagonal towards leg 1 (the most onerous); "
+                               "compression +, tension −", c=name))
+            o = calc.outputs
+            val = lambda k: o[k]["value"] if k in o else None  # noqa: E731
+            rows = [[calc.tr("Bending, bottom bars (sagging)"),
+                     f"m_Ed = {key['mb'] / 1e6:.1f} kNm/m",
+                     f"A_s,req = {max(key.get('Asb_req', 0), key.get('Asb_min', 0)):.0f} mm²/m",
+                     f"A_s,prov = {key['Asb']:.0f} mm²/m"],
+                    [calc.tr("Bending, top bars (hogging)"),
+                     f"m_Ed = {key['mt'] / 1e6:.1f} kNm/m",
+                     f"A_s,req = {key.get('Ast_req', 0):.0f} mm²/m",
+                     f"A_s,prov = {key['Ast']:.0f} mm²/m"],
+                    [calc.tr("Beam shear"), f"v_Ed = {key['vb'] / 1e3:.1f} kN/m",
+                     f"V_Rd,c = {key['VRc'] / 1e3:.1f} kN/m", ""]]
+            if val("v_Ed,p") is not None:
+                rows.append([calc.tr("Punching of the mast base"),
+                             f"v_Ed = {val('v_Ed,p'):.3f} N/mm²",
+                             f"v_Rd = {val('v_Rd,p'):.3f} N/mm²", ""])
+            if val("v_Ed,leg") is not None:
+                rows.append([calc.tr("Punching under a leg"),
+                             f"v_Ed = {val('v_Ed,leg'):.3f} N/mm²",
+                             f"v_Rd = {val('v_Rd,leg'):.3f} N/mm²", ""])
+            calc.heading("Moments and shear (design values)", 2)
+            calc.table(["", "Action effect", "Resistance / required", "Provided"], rows,
+                       "Per metre width of the base; details further below")
         frame, leg = (links or {}).get("frame"), (links or {}).get("leg")
         if not frame and not leg:
             calc.text("Punching reinforcement: not required — the concrete alone resists "
@@ -782,6 +814,18 @@ class CraneBaseEC7(DesignModule):
         Mb, Mh, Vb = gov["mb"][0] * 1000, gov["mt"][0] * 1000, gov["v"][0] * 1000  # per 1 m
         if not quiet:
             cls._leg_table(calc, inp, gG, gGf, gQ, hl)
+            # key results for the summary: the case with the largest leg compression, M along
+            # the diagonal towards leg 1 (legs 2 and 4 carry N/4, leg 3 the tension)
+            best = None
+            for cs in inp["cases"]:
+                fk = (cs["M"] + cs["H"] * hl) / (math.sqrt(2) * a)
+                Fk = [cs["N"] / 4 + fk, cs["N"] / 4, cs["N"] / 4 - fk, cs["N"] / 4]
+                Fd = [gG * cs["N"] / 4 + gQ * fk, gG * cs["N"] / 4,
+                      gGf * cs["N"] / 4 - gQ * fk, gG * cs["N"] / 4]
+                if best is None or Fd[0] > best[2][0]:
+                    best = (cs["name"], Fk, Fd)
+            calc.crane_key = {"legs": best, "mb": Mb, "mt": Mh, "vb": Vb, "VRc": vrc * d * 1000,
+                              "Asb": Asb, "Ast": Ast}
         # ---- bottom bars
         if not quiet:
             calc.heading("Bottom reinforcement — sagging at x = a/2", 2)
@@ -792,6 +836,7 @@ class CraneBaseEC7(DesignModule):
             calc.formula("A_s,prov", f"Ø{inp['db']} / {inp['sb']:g} mm", Asb * 1e-3, "mm²/m",
                          dp=0)
             As_req, As_min = res["As"], res["As_min"]
+            calc.crane_key.update(Asb_req=As_req, Asb_min=As_min)
         else:
             As_req = _as_req(Mb, d, fcd, fyd)
             As_min = max(0.26 * 0.30 * fck ** (2 / 3) / fyk * 1000 * d, 0.0013 * 1000 * d)
@@ -807,6 +852,8 @@ class CraneBaseEC7(DesignModule):
             calc.heading("Top reinforcement — hogging on the lifted side", 2)
         if Mh > 0:
             Asr = _as_req(Mh, d_t, fcd, fyd)
+            if not quiet:
+                calc.crane_key["Ast_req"] = Asr
             if not quiet:
                 calc.text("Governing: {c}.", c=gov["mt"][1])
                 calc.formula("m_Ed,top", "Σ (w − q)(|x| − a/2) ΔA / B,  x < −a/2", Mh / 1000,

@@ -327,7 +327,7 @@ def test_summary_answers_dimensions_reinforcement_punching():
              and it.data["text"] == "Summary")
     table = next(it for it in c.items[i:] if it.kind == "table")
     assert [r[1] for r in table.data["rows"]] == ["OK", "OK", "OK"]
-    assert any(it.kind == "text" and "not required" in it.data["text"] for it in c.items[i:i + 6])
+    assert any(it.kind == "text" and "not required" in it.data["text"] for it in c.items[i:i + 12])
     c = M.calculate(HEAVY, CY)
     texts = [it.data["text"] for it in c.items[:20] if it.kind == "text"]
     assert any("REQUIRED around the mast base" in t for t in texts)
@@ -344,3 +344,18 @@ def test_sizing_with_an_embedded_anchor():
                                        "Mt": 0}]}, "en")
     assert M.passes(inp, B, h, get_annex("CY")) and not M.passes(inp, B - 100, h,
                                                                   get_annex("CY"))
+
+
+def test_summary_shows_leg_forces_moments_and_shear():
+    c = M.calculate(NOSIZE, CY)
+    tables = [it.data for it in c.items[:20] if it.kind == "table"]
+    legs = next(t for t in tables if t["rows"][0][0] == "Characteristic [kN]")
+    # out of service, M along the diagonal: N/4 ± M/(√2 a); design γ_G = 1.35 / 1.0, γ_Q = 1.5
+    f = 2800 / (math.sqrt(2) * 2)
+    assert float(legs["rows"][0][1]) == pytest.approx(950 / 4 + f, abs=0.05)
+    assert float(legs["rows"][0][3]) == pytest.approx(950 / 4 - f, abs=0.05)
+    assert float(legs["rows"][1][1]) == pytest.approx(1.35 * 950 / 4 + 1.5 * f, abs=0.05)
+    assert float(legs["rows"][1][3]) == pytest.approx(950 / 4 - 1.5 * f, abs=0.05)
+    mom = next(t for t in tables if t["rows"][0][0].startswith("Bending, bottom"))
+    assert mom["rows"][0][1] == f"m_Ed = {out(c, 'm_Ed'):.1f} kNm/m"
+    assert mom["rows"][2][1] == f"v_Ed = {out(c, 'v_Ed'):.1f} kN/m"
